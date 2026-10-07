@@ -6,7 +6,7 @@ const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control
 export default {async fetch(request,env){
  const url=new URL(request.url),user=request.headers.get('oai-authenticated-user-id');
  try{
-  if(url.pathname==='/health')return json({ok:true,app:'Pummy Adaptive Test',version:'0.4.1'});
+  if(url.pathname==='/health')return json({ok:true,app:'Pummy Adaptive Test',version:'0.4.2'});
   if(url.pathname==='/mcp'){
    // Discovery is public; the hosting boundary supplies authenticated identity for private calls.
    if(request.method==='POST'){

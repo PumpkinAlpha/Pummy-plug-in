@@ -1,4 +1,4 @@
-# Project Source Sync — v0.4.1
+# Project Source Sync — v0.4.2
 
 ## Walkthrough
 
@@ -15,7 +15,7 @@ The Project link is navigation metadata only. This feature grants no new Project
 
 Before sending source payloads, ChatGPT is instructed to omit unrelated instructor/student email addresses, phone numbers and administrative contact blocks from text, every page and metadata. This preserves the educational content without sharing contact details unnecessary for studying. It is client-side extraction guidance, not a guarantee or a server-side filter; the host reviews the actual outgoing payload before the server receives it and may still request permission for sensitive content. This feature neither needs nor requests address-book access, and no app permission is automatically broadened.
 
-Only `open_test` carries rendering metadata. Use `read_course_state` to get the same redacted library/course/exam state without opening a panel. Startup, refresh, polling, tutor and sync handoffs use this data-only tool. Other data tools retain app/model visibility without a UI-template association, so they do not request another panel. Hosts may retain old descriptors until a fresh conversation.
+Only the user-initiated, app-only `open_interface` entrypoint carries rendering metadata. The model cannot invoke it; `open_test` remains a legacy data-only alias with the same saved-state response. This also protects workflows that still call the old name. Use `read_course_state` to get the same redacted library/course/exam state without opening a panel. Startup, refresh, polling, tutor and sync handoffs use this data-only tool. Other data tools retain app/model visibility without a UI-template association, so they do not request another panel. Hosts may retain old descriptors until a fresh conversation.
 
 ## MCP contract
 
@@ -112,6 +112,6 @@ Course setup includes **Sync Project Sources**, truthful sent/pending/error/comp
 - Objective text: 4,000 characters. Full sync payload: 750,000 UTF-8 bytes; stored course snapshot remains capped at 900,000 UTF-8 bytes including existing questions/images/progress.
 - Split batches with fresh request IDs; large files need carefully selected excerpts or stable page-group source IDs that fit these limits. There is no original-binary upload or OCR parser added to the server.
 
-Persistence remains the existing per-user D1 `courses.data` JSON snapshot, source metadata array/text map, objectives array and completed-request history. `courseId` remains implicit in its owning course, not a parallel source table. New fields are optional and lazily interpreted. **No SQL schema migration, database wipe, course replacement, question re-ID or exam reset is required.** Old resource URIs and existing MCP actions remain available. The new interface resource is `ui://pummy/adaptive-test-v6.html` with v5/v4/v3/original aliases.
+Persistence remains the existing per-user D1 `courses.data` JSON snapshot, source metadata array/text map, objectives array and completed-request history. `courseId` remains implicit in its owning course, not a parallel source table. New fields are optional and lazily interpreted. **No SQL schema migration, database wipe, course replacement, question re-ID or exam reset is required.** Old resource URIs and existing MCP actions remain available. The new interface resource is `ui://pummy/adaptive-test-v7.html` with v6/v5/v4/v3/original aliases.
 
 Implementation does not ingest the seven real Anatomy materials until ChatGPT can actually read and push them. The course link alone is never sufficient.

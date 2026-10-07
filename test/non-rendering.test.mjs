@@ -36,3 +36,23 @@ test('sync asks the client to omit contact details before sending all text/page/
  assert.match(schema.shape.sources.removeDefault().element.shape.text.description,/Omit unrelated instructor/);
  assert.match(schema.shape.sources.removeDefault().element.shape.pages.unwrap().element.shape.text.description,/Omit unrelated personal contact/);
 });
+
+test('legacy reads have no rendering or launch intent and only a user-only entrypoint may launch',()=>{
+ const legacy=definitions.find(d=>d.name==='open_test');
+ assert.equal(legacy.opener,undefined);assert.equal(legacy.readOnly,true);
+ assert.match(legacy.description,/WITHOUT opening a panel/);
+ const launchers=definitions.filter(d=>d.opener);
+ assert.deepEqual(launchers.map(d=>d.name),['open_interface']);
+ assert.equal(launchers[0].appOnly,true);
+ assert.ok(definitions.filter(d=>!d.appOnly).every(d=>!d.opener));
+});
+
+test('explicit interface entrypoint preserves the exact data-only saved state',async t=>{
+ const db=new LocalD1();t.after(()=>db.close());const repo=new CourseRepository(db,'launcher');
+ assert.deepEqual(await executeTool(repo,'open_interface',{}),{courses:[]});
+ const {state}=await executeTool(repo,'create_course',{requestId:crypto.randomUUID(),name:'Saved mock'});
+ const before=await repo.get(state.courseId),args={courseId:state.courseId};
+ assert.deepEqual(await executeTool(repo,'open_interface',args),await executeTool(repo,'open_test',args));
+ assert.deepEqual(await executeTool(repo,'open_interface',args),await executeTool(repo,'read_course_state',args));
+ assert.deepEqual(await repo.get(state.courseId),before);
+});

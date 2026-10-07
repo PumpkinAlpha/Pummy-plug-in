@@ -1,10 +1,10 @@
 # Pummy Adaptive Test — ChatGPT plugin
 
-Version 0.4.1 adds push-based Project Source Sync, authority-ranked stored grounding, page citations and objective upserts without replacing banks or exam progress. It recreates the adaptive exam and its warm HUD-style interface inside a fullscreen ChatGPT/Codex MCP App. It reuses the original Pummy engine and does not change the desktop app.
+Version 0.4.2 adds push-based Project Source Sync, authority-ranked stored grounding, page citations and objective upserts without replacing banks or exam progress. It recreates the adaptive exam and its warm HUD-style interface inside a fullscreen ChatGPT/Codex MCP App. It reuses the original Pummy engine and does not change the desktop app.
 
 ## Use
 
-Only `open_test` explicitly launches a panel. Background reads use `read_course_state`; sync, retrieval and other data actions do not carry a UI template or open another tab. Sync prompts omit unrelated contact information before sending source payloads.
+Only the app-only `open_interface` entrypoint launches a panel when the user chooses the app. The legacy `open_test` tool is now a data-only alias, so even older model workflows cannot request a panel through it under current descriptors. Background reads use `read_course_state`; sync, retrieval and other data actions do not carry a UI template or open another tab. Sync prompts omit unrelated contact information before sending source payloads.
 
 Open the installed **Pummy Adaptive Test** plugin. Import a Pummy backup or a question JSON, or ask ChatGPT to build a bank from your course materials. A five-question arithmetic demo is available when the library is empty.
 
@@ -47,7 +47,7 @@ Full explanations and targeted question chat run through the ChatGPT conversatio
 
 - `lib/pummy-core.mjs`: bundled original engine, model, source retrieval, prompts, grading, spaced repetition and objective/prerequisite tracking, with injected host generation and adapted storage.
 - `worker/course.js`: persisted course snapshots, pending generation, redacted views, review/history and deterministic board shuffles.
-- `worker/tools.js`: twenty-three validated MCP tools, strict response/filter validation, idempotent retries, version checks, source reads, imports/exports and explanation requests.
+- `worker/tools.js`: twenty-four validated MCP tools, strict response/filter validation, idempotent retries, version checks, source reads, imports/exports and explanation requests.
 - `worker/source-sync.js`: validated atomic source/objective upserts, canonical hashes, durable retry receipts and authority defaults.
 - `worker/grounding.js`: extends the original retrieval index with supplied page boundaries, metadata matching, priority ordering, bounded prompts and citation provenance.
 - `worker/repository.js`: per-user D1 keys and compare-and-swap revisions. Existing data is upgraded lazily without a schema change.
