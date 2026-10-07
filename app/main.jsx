@@ -6,6 +6,8 @@ import {Board,Figure,initial,complete} from './boards.jsx';
 import {Settings,Results,Progress,Modal,Explanation} from './panels.jsx';
 import './style.css';
 import {CiteProvider} from './citations.jsx';
+import {loadOnMount} from './startup.js';
+import {RecoveryBoundary} from './recovery.jsx';
 import {pendingKey} from './pending.js';
 import {CourseForm,NewCourse,BuildQuestions} from './course-setup.jsx';
 import {inline,Markdown} from './markdown.jsx';
@@ -18,7 +20,7 @@ function Exam(){
  const [theme,setTheme]=usePreference('theme-v3','clean'),[reading,setReading]=usePreference('reading',17),[instant,setInstant]=usePreference('instant-v3',false),[autoExplain,setAutoExplain]=usePreference('auto-explain-v3',false),[animations,setAnimations]=usePreference('animations-v3',false);
  const lock=useRef(false),alive=useRef(true),pollErrors=useRef(0);
  const state=data.state,s=state?.session,q=state?.question,feedback=s?.feedback,inter=INTER.includes(q?.type),pending=state?.generation||state?.explanationRequest;
- useEffect(()=>{alive.current=true;const unsub=subscribe(d=>{setData(d);if(d.error)setError(d.error);});if(!embedded)call('open_test').catch(e=>setError(e.message));return()=>{alive.current=false;unsub();window.speechSynthesis?.cancel();};},[]);
+ useEffect(()=>{alive.current=true;const unsub=subscribe(d=>{setData(d);if(d.error)setError(d.error);else if(d.state||d.courses)setError('');});const stop=loadOnMount(()=>call('open_test',{}, {initial:true}),()=>latest,setError,{delay:embedded?1200:0});return()=>{alive.current=false;stop();unsub();window.speechSynthesis?.cancel();};},[]);
  useEffect(()=>{document.documentElement.dataset.theme=theme;document.documentElement.style.setProperty('--reading-size',`${reading}px`);},[theme,reading]);
  useEffect(()=>{setSelection([]);setResponse(initial(q));setFlagOpen(false);setFlagReason(q?.flagReason||'');setChat('');setAsked('');window.speechSynthesis?.cancel();setSpeaking(false);},[q?.id,s?.phase]);
  useEffect(()=>{setTab(state?.questionCount===0?'course':'exam');},[state?.courseId]);
@@ -84,4 +86,4 @@ function Exam(){
  {flash&&<div className="wrong-flash" aria-hidden="true">×</div>}{confetti&&<div className="confetti" aria-hidden="true">{Array.from({length:32},(_,i)=><i key={i} style={{'--i':i,left:`${i*37%100}%`}}/>)}</div>}
  </main></CiteProvider>;
 }
-createRoot(document.getElementById('root')).render(<Exam/>);
+createRoot(document.getElementById('root')).render(<RecoveryBoundary><Exam/></RecoveryBoundary>);
