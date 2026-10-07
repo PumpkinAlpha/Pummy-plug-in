@@ -1,6 +1,7 @@
 import React,{useState} from 'react';
+import pummyLogo from './pummy-logo.png';
 
-export function PummyMark({className=''}){return <svg className={'pummy-mark '+className} viewBox="0 0 64 64" fill="none" aria-hidden="true"><g fill="#ff791d">{Array.from({length:7},(_,i)=><ellipse key={i} cx="32" cy="15" rx="8" ry="17" transform={`rotate(${i*360/7} 32 32)`}/>)}</g><circle cx="32" cy="32" r="4" fill="#ff8d21"/></svg>;}
+export function PummyMark({className=''}){return <img className={'pummy-mark '+className} src={pummyLogo} alt="" aria-hidden="true"/>;}
 
 const FolderIcon=()=> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6.5a2 2 0 0 1 2-2h4l2.2 2.2H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>;
 

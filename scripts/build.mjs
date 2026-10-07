@@ -1,11 +1,11 @@
 import { build } from 'esbuild';
 import { readFile,writeFile,mkdir,cp,rm } from 'node:fs/promises';
 await mkdir('app',{recursive:true});
-const app=await build({entryPoints:['app/main.jsx'],bundle:true,write:false,format:'iife',target:'es2022',minify:true,jsx:'automatic',define:{'process.env.NODE_ENV':'"production"'},outdir:'app/bundle'});
+const app=await build({entryPoints:['app/main.jsx'],bundle:true,write:false,format:'iife',target:'es2022',minify:true,jsx:'automatic',loader:{'.png':'dataurl'},define:{'process.env.NODE_ENV':'"production"'},outdir:'app/bundle'});
 const js=app.outputFiles.find(f=>f.path.endsWith('.js')).text.replace(/<\/script/gi,'<\\/script');
 const css=app.outputFiles.find(f=>f.path.endsWith('.css')).text;
-const favicon=encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#d24906"/><path d="M9 25V7h8a6 6 0 0 1 0 12h-4v6zm4-10h4a2 2 0 0 0 0-4h-4z" fill="white"/></svg>');
-const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Adaptive practice tests with foundation questions and saved progress."><title>Pummy Adaptive Test</title><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,${favicon}"><style>${css}</style></head><body><div id="root"><main class="workspace"><section class="layout"><div role="status"><h1>Opening Pummy…</h1><p>If this screen stays here, close and reopen the panel. Your progress is saved.</p><noscript>JavaScript is required to display the exam.</noscript></div></section></main></div><script>${js}</script></body></html>`;
+const favicon=`data:image/png;base64,${(await readFile('app/pummy-logo.png')).toString('base64')}`;
+const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Adaptive practice tests with foundation questions and saved progress."><title>Pummy Adaptive Test</title><link rel="icon" type="image/png" href="${favicon}"><style>${css}</style></head><body><div id="root"><main class="workspace"><section class="layout"><div role="status"><h1>Opening Pummy…</h1><p>If this screen stays here, close and reopen the panel. Your progress is saved.</p><noscript>JavaScript is required to display the exam.</noscript></div></section></main></div><script>${js}</script></body></html>`;
 await writeFile('app/view.html',html);
 await rm('dist',{recursive:true,force:true});await mkdir('dist/server',{recursive:true});
 await build({entryPoints:['worker/index.js'],bundle:true,platform:'browser',format:'esm',target:'es2022',outfile:'dist/server/index.js',loader:{'.html':'text'},minify:true});
