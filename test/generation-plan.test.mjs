@@ -28,3 +28,21 @@ test('custom mode requests the entered exact count',()=>{
  const prompt=buildGenerationPrompt(state,{...base,mode:'custom',count:37},'final-request');
  assert.match(prompt,/Create exactly 37 distinct/);
 });
+
+test('difficulty and generation preferences reach the prompt without claiming model routing',()=>{
+ const prompt=buildGenerationPrompt(state,{...base,mode:'custom',count:8,difficulty:'mcat',questionModel:'gpt-6.1-sol',questionEffort:'high',explanationModel:'gpt-6-astra',explanationEffort:'xhigh'},'final-request');
+ assert.match(prompt,/Difficulty: MCAT/);
+ assert.match(prompt,/MCAT-style questions/);
+ assert.match(prompt,/question model and effort: GPT-6\.1 Sol \/ High/);
+ assert.match(prompt,/explanation model and effort: GPT-6 Astra \/ Extra high/);
+ assert.match(prompt,/ChatGPT host controls the actual model and reasoning effort/);
+ assert.match(prompt,/same add_questions call/);
+});
+
+test('quiz difficulty stays source-grounded and omits explanation preferences when off',()=>{
+ const prompt=buildGenerationPrompt(state,{...base,generateExplanations:false,difficulty:'quiz',questionModel:'not-a-model'},'final-request');
+ assert.match(prompt,/Difficulty: Quiz/);
+ assert.match(prompt,/straightforward application/);
+ assert.match(prompt,/question model and effort: Current ChatGPT model \/ Current ChatGPT effort/);
+ assert.doesNotMatch(prompt,/requested explanation model and effort/);
+});
