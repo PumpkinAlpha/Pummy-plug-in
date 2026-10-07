@@ -5,7 +5,7 @@ export class RecoveryBoundary extends React.Component{
  static getDerivedStateFromError(){return {failed:true};}
  retry=async()=>{
   this.setState({busy:true,error:''});
-  try{await call('open_test',latest.state?{courseId:latest.state.courseId}:{});this.setState({failed:false});}
+  try{await call('read_course_state',latest.state?{courseId:latest.state.courseId}:{});this.setState({failed:false});}
   catch(e){this.setState({error:e.message});}
   finally{this.setState({busy:false});}
  };

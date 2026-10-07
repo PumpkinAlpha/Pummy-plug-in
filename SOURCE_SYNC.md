@@ -1,15 +1,21 @@
-# Project Source Sync — v0.4.0
+# Project Source Sync — v0.4.1
 
 ## Walkthrough
 
 1. Open the Anatomy 1 **ChatGPT Project**, then a chat inside it with access to its materials.
 2. Open the installed **Pummy Adaptive Test** plugin in that chat; resume the existing Anatomy 1 course. Do not create a replacement course or restart its test.
 3. Open **Course & sources**, then **Sync Project Sources**. Alternatively say: “Sync the current Anatomy 1 Project sources into Pummy. Preserve my bank and active exam.”
-4. ChatGPT reads the files it can actually access, extracts text, supplied pages/slides and objectives, reads `open_test` for current IDs/revision, then calls `sync_course_sources`.
+4. ChatGPT reads the files it can actually access, extracts text, supplied pages/slides and objectives, reads `read_course_state` for current IDs/revision, then calls `sync_course_sources`.
 5. Check the tool summary and reference rows. ChatGPT must report inaccessible files rather than inventing their content. A sent request is not a completed sync.
 6. Pummy uses the stored copy for adaptive prompts, explanations and `retrieve_sources`. Bank generation remains a separate, explicit action.
 
 The Project link is navigation metadata only. This feature grants no new Project permissions, fetches no Project URLs and requires no manual text copying from the student. If files are inaccessible, open a chat in the Project or attach the missing files. A fresh chat may be required for newly added MCP tools to appear.
+
+## Privacy and panel behavior
+
+Before sending source payloads, ChatGPT is instructed to omit unrelated instructor/student email addresses, phone numbers and administrative contact blocks from text, every page and metadata. This preserves the educational content without sharing contact details unnecessary for studying. It is client-side extraction guidance, not a guarantee or a server-side filter; the host reviews the actual outgoing payload before the server receives it and may still request permission for sensitive content. This feature neither needs nor requests address-book access, and no app permission is automatically broadened.
+
+Only `open_test` carries rendering metadata. Use `read_course_state` to get the same redacted library/course/exam state without opening a panel. Startup, refresh, polling, tutor and sync handoffs use this data-only tool. Other data tools retain app/model visibility without a UI-template association, so they do not request another panel. Hosts may retain old descriptors until a fresh conversation.
 
 ## MCP contract
 
@@ -56,14 +62,14 @@ Return shape: `{state, sync, message}`. `sync` contains `requestId`, arrays `add
 
 ### Identity, hashes, retries and concurrency
 
-- New ID inserts; existing ID upserts. Reuse existing IDs discovered through `open_test`—particularly **`quiz-19-20`**. Filename similarity is not fuzzy identity matching; clients must reuse IDs.
+- New ID inserts; existing ID upserts. Reuse existing IDs discovered through `read_course_state`—particularly **`quiz-19-20`**. Filename similarity is not fuzzy identity matching; clients must reuse IDs.
 - Server computes SHA-256 over UTF-8 `JSON.stringify(canonical({text, pages}))`, where canonical recursively sorts object keys, omits undefined object values and retains array order, and absent pages become `[]`. This is **not** SHA-256 of raw text. Optional client `contentHash` is 64 hexadecimal characters and is verified; clients may omit it.
 - Same text/pages and semantic metadata are unchanged. Changes to name, type, explicit priority, lecture/week or metadata also constitute updates even when the content hash is unchanged.
 - Existing priority is retained unless `rank` is explicitly supplied. Type defaults apply only to new/unranked sources. Optional omitted fields retain old metadata. Changing text while omitting pages clears stale page segments; explicitly send `pages: []` to clear them.
 - Insert/change stores hash, creation/update/last-sync timestamps and per-source status. A legacy identical source may remain without new stored hash fields until it changes; equality still hashes its stored content server-side.
 - Successful request receipts survive restarts in the existing course snapshot. Same `requestId` and same semantic payload returns the saved result even with an old revision. Reusing an ID for a different payload fails. Fingerprints exclude client hash and metadata sync timestamp, but include array order.
 - Receipts use the existing last-40 completed-request window shared with other idempotent operations. Outside it, stable IDs still prevent duplicate sources; read the latest revision and retry with a fresh request ID.
-- Changing batches increment course revision once. Unchanged batches record completion/receipt without a revision bump, question changes or progress changes. Full-snapshot compare-and-swap also prevents losing these receipts during concurrent writes. On a conflict, read `open_test` and retry the same payload with the current revision.
+- Changing batches increment course revision once. Unchanged batches record completion/receipt without a revision bump, question changes or progress changes. Full-snapshot compare-and-swap also prevents losing these receipts during concurrent writes. On a conflict, read `read_course_state` and retry the same payload with the current revision.
 - This tool never deletes sources or questions. It refreshes stale pending grounding requests but does not restart the exam or call model generation.
 
 ## Authority defaults and Anatomy IDs
@@ -106,6 +112,6 @@ Course setup includes **Sync Project Sources**, truthful sent/pending/error/comp
 - Objective text: 4,000 characters. Full sync payload: 750,000 UTF-8 bytes; stored course snapshot remains capped at 900,000 UTF-8 bytes including existing questions/images/progress.
 - Split batches with fresh request IDs; large files need carefully selected excerpts or stable page-group source IDs that fit these limits. There is no original-binary upload or OCR parser added to the server.
 
-Persistence remains the existing per-user D1 `courses.data` JSON snapshot, source metadata array/text map, objectives array and completed-request history. `courseId` remains implicit in its owning course, not a parallel source table. New fields are optional and lazily interpreted. **No SQL schema migration, database wipe, course replacement, question re-ID or exam reset is required.** Old resource URIs and existing MCP actions remain available. The new interface resource is `ui://pummy/adaptive-test-v5.html` with v4/v3/original aliases.
+Persistence remains the existing per-user D1 `courses.data` JSON snapshot, source metadata array/text map, objectives array and completed-request history. `courseId` remains implicit in its owning course, not a parallel source table. New fields are optional and lazily interpreted. **No SQL schema migration, database wipe, course replacement, question re-ID or exam reset is required.** Old resource URIs and existing MCP actions remain available. The new interface resource is `ui://pummy/adaptive-test-v6.html` with v5/v4/v3/original aliases.
 
 Implementation does not ingest the seven real Anatomy materials until ChatGPT can actually read and push them. The course link alone is never sufficient.

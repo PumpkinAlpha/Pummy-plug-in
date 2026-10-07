@@ -15,12 +15,12 @@ const bundle=await build({entryPoints:['app/bridge.js'],bundle:true,write:false,
 function setup(call){const module={exports:{}},ctx={module,exports:module.exports,host:{call},window:{parent:{}}};vm.runInNewContext(bundle.outputFiles[0].text,ctx);return {api:module.exports,host:ctx.host};}
 test('a fullscreen request with no response does not block loading or exam tools',async()=>{
  const calls=[];const {api}=setup(async input=>{calls.push(input.name);return {structuredContent:{courses:[]}};});
- const result=await Promise.race([api.call('open_test'),new Promise((_,reject)=>setTimeout(()=>reject(Error('Blocked by display mode request')),100))]);
- assert.deepEqual(calls,['open_test']);assert.equal(result.courses.length,0);assert.equal(api.latest.courses.length,0);
+ const result=await Promise.race([api.call('read_course_state'),new Promise((_,reject)=>setTimeout(()=>reject(Error('Blocked by display mode request')),100))]);
+ assert.deepEqual(calls,['read_course_state']);assert.equal(result.courses.length,0);assert.equal(api.latest.courses.length,0);
 });
 test('late startup library read cannot replace a host-hydrated course',async()=>{
  let finish;const {api,host}=setup(()=>new Promise(r=>{finish=r;}));
- const pending=api.call('open_test',{}, {initial:true});await new Promise(r=>setImmediate(r));
+ const pending=api.call('read_course_state',{}, {initial:true});await new Promise(r=>setImmediate(r));
  host.app.ontoolresult({structuredContent:{state:{courseId:'saved',revision:9}}});
  finish({structuredContent:{courses:[]}});await pending;assert.equal(api.latest.state.courseId,'saved');assert.equal(api.latest.state.revision,9);
 });

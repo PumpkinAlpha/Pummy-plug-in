@@ -2,7 +2,7 @@ import {App} from '@modelcontextprotocol/ext-apps';
 import {pendingKey,tutorContext,requestTracker} from './pending.js';
 import {hasLoaded} from './startup.js';
 export const embedded=window.parent!==window;
-export const bridge=embedded?new App({name:'pummy-adaptive-test',version:'0.4.0'},{availableDisplayModes:['fullscreen']},{autoResize:true}):null;
+export const bridge=embedded?new App({name:'pummy-adaptive-test',version:'0.4.1'},{availableDisplayModes:['fullscreen']},{autoResize:true}):null;
 export let latest={};let listener=()=>{},ready;
 export function subscribe(fn){listener=fn;fn(latest);return ()=>{listener=()=>{};};}
 function apply(r){if(r?.isError)throw new Error(r.content?.find(c=>c.type==='text')?.text||'Could not complete the action.');const v=r?.structuredContent;if(!v?.state&&!v?.courses)return;if(v.state&&latest.state?.courseId===v.state.courseId&&v.state.revision<latest.state.revision)return;latest=v;listener(v);}
@@ -16,10 +16,10 @@ export function pendingStatus(s){return requests.status(pendingKey(s));}
 export async function askPending(s,authoritative=false){
  if(!pendingKey(s))return 'ready';
  // A tutor may already have completed the task in another view or conversation.
- const fresh=authoritative?s:(await call('open_test',{courseId:s.courseId},{background:true})).state;
+ const fresh=authoritative?s:(await call('read_course_state',{courseId:s.courseId},{background:true})).state;
  if(latest.state?.courseId!==s.courseId||!pendingKey(fresh))return 'ready';
  const key=pendingKey(fresh);if(!requests.begin(key))return 'sent';
- try{await message(fresh,fresh.generation?`Prepare the pending adaptive question for my Pummy exam (${fresh.name}). Read open_test with courseId ${fresh.courseId} for the latest revision and generation prompt, then call provide_question. If outOfScope creates a replacement generation request, complete that too until generation is null. Complete any explanationRequest using provide_explanation, reading the latest revision after each write. Never use a stale prompt from an earlier view. Keep the new answer key hidden and let me press Next.`:`Prepare the pending explanation for my Pummy exam (${fresh.name}). Read open_test with courseId ${fresh.courseId} for the latest revision and explanationRequest prompt, then call provide_explanation. Do not move to the next question or answer it for me.`);requests.finish(key,true);return 'sent';}catch(e){requests.finish(key,false);throw e;}
+ try{await message(fresh,fresh.generation?`Prepare the pending adaptive question for my Pummy exam (${fresh.name}). Read read_course_state with courseId ${fresh.courseId} for the latest revision and generation prompt, then call provide_question. If outOfScope creates a replacement generation request, complete that too until generation is null. Complete any explanationRequest using provide_explanation, reading the latest revision after each write. Never use a stale prompt from an earlier view. Keep the new answer key hidden and let me press Next.`:`Prepare the pending explanation for my Pummy exam (${fresh.name}). Read read_course_state with courseId ${fresh.courseId} for the latest revision and explanationRequest prompt, then call provide_explanation. Do not move to the next question or answer it for me.`);requests.finish(key,true);return 'sent';}catch(e){requests.finish(key,false);throw e;}
 }
 
 export async function call(name,args={},options={}){try{return await perform(name,args,options);}catch(e){if(/trusted tool scope|tool.*not.*found/i.test(e.message))throw new Error('This conversation still has the older plugin controls cached. Open Pummy Adaptive Test in a fresh ChatGPT conversation to enable the updated controls. Your progress is saved.');throw e;}}

@@ -1,7 +1,7 @@
 export const hasLoaded=data=>!!(data?.state||Array.isArray(data?.courses));
 
 // Entrypoint launches may have no initial tool-result notification. Use only
-// the authorized read-only opener, never a direct-network fallback from an app.
+// authorized read-only data tools, never a direct-network fallback from an app.
 export function loadOnMount(read,getData,onError,{delay=1200,timeout=15000}={}){
  let active=true;
  const report=e=>{if(active&&!hasLoaded(getData()))onError(e.message||'Could not load your courses. Use Refresh to retry.');};
