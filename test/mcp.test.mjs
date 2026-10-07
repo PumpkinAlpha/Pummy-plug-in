@@ -6,15 +6,29 @@ const rpc=(method,params={},user)=>new Request('https://example.test/mcp',{metho
 test('MCP initialization, discovery, resource MIME and fullscreen metadata, and authenticated calls',async()=>{
  const db=new LocalD1(),env={DB:db};
  let response=await worker.fetch(rpc('initialize',{protocolVersion:'2025-03-26',capabilities:{},clientInfo:{name:'test',version:'1'}}),env);assert.equal(response.status,200);let result=(await response.json()).result;assert.equal(result.serverInfo.name,'pummy-adaptive-test');assert.match(result.instructions,/student/);
- response=await worker.fetch(rpc('tools/list'),env);result=(await response.json()).result;assert.equal(result.tools.length,20);assert.deepEqual(result.tools.find(t=>t.name==='open_test')._meta['openai/ui'].entrypoints,[{type:'global'},{type:'thread'}]);assert.equal(result.tools.find(t=>t.name==='submit_answer').annotations.readOnlyHint,false);
+ response=await worker.fetch(rpc('tools/list'),env);result=(await response.json()).result;assert.equal(result.tools.length,22);assert.deepEqual(result.tools.find(t=>t.name==='open_test')._meta['openai/ui'].entrypoints,[{type:'global'},{type:'thread'}]);assert.equal(result.tools.find(t=>t.name==='submit_answer').annotations.readOnlyHint,false);
  response=await worker.fetch(rpc('resources/read',{uri:'ui://pummy/adaptive-test-v4.html'}),env);result=(await response.json()).result;assert.equal(result.contents[0].mimeType,'text/html;profile=mcp-app');assert.equal(result.contents[0]._meta['openai/ui'].preferredDisplayMode,'fullscreen');assert.match(result.contents[0].text,/Pummy Adaptive Test/);
  const currentPage=result.contents[0].text;
  // Cached descriptors still request the original and v3 addresses.
  response=await worker.fetch(rpc('resources/read',{uri:'ui://pummy/adaptive-test-v3.html'}),env);result=(await response.json()).result;assert.equal(result.contents[0].text,currentPage);
  response=await worker.fetch(rpc('resources/read',{uri:'ui://pummy/adaptive-test.html'}),env);result=(await response.json()).result;assert.equal(result.contents[0].uri,'ui://pummy/adaptive-test.html');assert.equal(result.contents[0].text,currentPage);assert.match(currentPage,/Reload saved test/);assert.match(currentPage,/Opening Pummy/);
- response=await worker.fetch(rpc('tools/list'),env);result=(await response.json()).result;for(const tool of result.tools){assert.equal(tool._meta.ui.resourceUri,'ui://pummy/adaptive-test-v4.html');assert.equal(tool._meta['openai/outputTemplate'],undefined);}
- response=await worker.fetch(rpc('resources/list'),env);assert.equal((await response.json()).result.resources.length,3);
+ response=await worker.fetch(rpc('tools/list'),env);result=(await response.json()).result;for(const tool of result.tools){assert.equal(tool._meta.ui.resourceUri,'ui://pummy/adaptive-test-v5.html');assert.equal(tool._meta['openai/outputTemplate'],undefined);}
+ response=await worker.fetch(rpc('resources/list'),env);assert.equal((await response.json()).result.resources.length,4);
  response=await worker.fetch(rpc('tools/call',{name:'list_courses',arguments:{}}),env);assert.equal(response.status,401);
  response=await worker.fetch(rpc('tools/call',{name:'list_courses',arguments:{}},'alice'),env);assert.equal(response.status,200);assert.deepEqual((await response.json()).result.structuredContent.courses,[]);
  const request=new Request('https://example.test/api/tool',{method:'POST',headers:{'Content-Type':'application/json','oai-authenticated-user-id':'alice',Origin:'https://evil.test'},body:JSON.stringify({name:'list_courses',arguments:{}})});response=await worker.fetch(request,env);assert.equal(response.status,403);db.close();
+});
+
+test('authenticated MCP source sync, idempotent retry, retrieval and page reads work end to end',async()=>{
+ const db=new LocalD1(),env={DB:db};
+ async function call(name,args,user='source-student'){const response=await worker.fetch(rpc('tools/call',{name,arguments:args},user),env);assert.equal(response.status,200);const body=await response.json();assert.equal(body.error,undefined,JSON.stringify(body));return body.result;}
+ try{const created=await call('create_course',{requestId:crypto.randomUUID(),name:'Isolated source test'});assert.equal(created.isError,undefined);const state=created.structuredContent.state;
+ const payload={courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),sources:[{id:'lecture-1',name:'Lecture',sourceType:'professor_slides',text:'The jugular and subclavian veins unite.',pages:[{page:15,text:'Jugular and subclavian union.'}]}]};
+ const synced=await call('sync_course_sources',payload);assert.equal(synced.isError,undefined,JSON.stringify(synced));assert.deepEqual(synced.structuredContent.sync.added,['lecture-1']);assert.deepEqual((await call('sync_course_sources',payload)).structuredContent.sync,synced.structuredContent.sync);
+ const found=await call('retrieve_sources',{courseId:state.courseId,query:'jugular'});assert.equal(found.structuredContent.context.excerpts[0].page,15);assert.equal(found.structuredContent.context.excerpts[0].rank,1);
+ assert.match((await call('read_source',{courseId:state.courseId,sourceId:'lecture-1',page:15})).structuredContent.source.text,/union/);
+ assert.equal((await call('open_test',{courseId:state.courseId},'other-student')).isError,true);
+ const rejected=await call('sync_course_sources',{...payload,revision:synced.structuredContent.state.revision,requestId:crypto.randomUUID(),sources:[payload.sources[0],payload.sources[0]]});assert.equal(rejected.isError,true);assert.match(rejected.structuredContent.sync.rejected[0].message,/duplicate/);
+ assert.equal((await call('open_test',{courseId:state.courseId})).structuredContent.state.revision,synced.structuredContent.state.revision);
+ }finally{db.close();}
 });

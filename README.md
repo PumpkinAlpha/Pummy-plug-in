@@ -1,6 +1,6 @@
 # Pummy Adaptive Test — ChatGPT plugin
 
-Version 0.3.3 cleans up the panel layout and adds course/project setup and named custom tests. It recreates the adaptive exam and its warm HUD-style interface inside a fullscreen ChatGPT/Codex MCP App. It reuses the original Pummy engine and does not change the desktop app.
+Version 0.4.0 adds push-based Project Source Sync, authority-ranked stored grounding, page citations and objective upserts without replacing banks or exam progress. It recreates the adaptive exam and its warm HUD-style interface inside a fullscreen ChatGPT/Codex MCP App. It reuses the original Pummy engine and does not change the desktop app.
 
 ## Use
 
@@ -13,7 +13,8 @@ After a miss, ChatGPT prepares a course-grounded foundation question. The engine
 ## Courses, custom tests, and speed
 
 - Add an empty course directly. Rename it, append question banks, and add course excerpts without resetting progress.
-- Associate each course with a ChatGPT Project name and URL. Open that Project, start/open a chat inside it, and open the plugin there to work with sources actually accessible to that chat. The URL is only a navigation reference: the plugin cannot enumerate or sync Project files from a link, and does not relocate the current conversation.
+- Associate each course with a ChatGPT Project name and URL. Open that Project, start/open a chat inside it, and open the plugin there to work with sources actually accessible to that chat. The URL is only a navigation reference: the plugin cannot enumerate or fetch Project files from a link, and does not relocate the current conversation. Use **Sync Project Sources** to ask ChatGPT to push the files actually accessible in that conversation into Pummy.
+- Syncing sources does not generate questions. Stable source IDs prevent duplicates; unchanged resyncs do not bump the course revision. See `SOURCE_SYNC.md` for the MCP contract, limits and walkthrough.
 - Build new questions from selected saved references or accessible Project sources through the conversation tutor. The request appends to the selected course, not a new unrelated bank.
 - Save and edit named custom tests with individual question selections, size, source/objective/week/type/set filters, and adaptive mode. Active exams are never silently replaced.
 - New course setups default to fast bank practice: no generation between answers. Existing active adaptive exams remain unchanged. Adaptive model latency still depends on the conversation model; there is no separate background inference service.
@@ -44,7 +45,9 @@ Full explanations and targeted question chat run through the ChatGPT conversatio
 
 - `lib/pummy-core.mjs`: bundled original engine, model, source retrieval, prompts, grading, spaced repetition and objective/prerequisite tracking, with injected host generation and adapted storage.
 - `worker/course.js`: persisted course snapshots, pending generation, redacted views, review/history and deterministic board shuffles.
-- `worker/tools.js`: twenty validated MCP tools, strict response/filter validation, idempotent retries, version checks, source reads, imports/exports and explanation requests.
+- `worker/tools.js`: twenty-two validated MCP tools, strict response/filter validation, idempotent retries, version checks, source reads, imports/exports and explanation requests.
+- `worker/source-sync.js`: validated atomic source/objective upserts, canonical hashes, durable retry receipts and authority defaults.
+- `worker/grounding.js`: extends the original retrieval index with supplied page boundaries, metadata matching, priority ordering, bounded prompts and citation provenance.
 - `worker/repository.js`: per-user D1 keys and compare-and-swap revisions. Existing data is upgraded lazily without a schema change.
 - `worker/mcp.js`: official MCP SDK, stateless Web Standards transport, registered fullscreen MCP App resource and global/thread entrypoints.
 - `app/`: React interface and official MCP Apps SDK bridge. No third-party fonts, remote images, scripts, or tracking.
@@ -73,7 +76,7 @@ npm run build
 npm test
 ```
 
-Automated tests cover adaptive chains/depth, returns, deferred retries, skip/end correctness, six question formats, hidden keys, duplicate-answer idempotency, source/user isolation, concurrent writes, exact filters, backup/export roundtrips, checkpoints/history, explanation lifecycle, mastery, and authenticated MCP discovery/resource metadata. Browser checks use an isolated mock-user bank, never submit answers to the real student's cloud exam.
+Automated tests cover adaptive chains/depth, returns, deferred retries, skip/end correctness, six question formats, hidden keys, duplicate-answer idempotency, source/user isolation, concurrent writes, exact filters, backup/export roundtrips, checkpoints/history, explanation lifecycle, mastery, and authenticated MCP discovery/resource metadata. Source-sync tests additionally cover atomic batches, hash verification, legacy priorities, retained progress/sessions, exact retries, page reads, context budgets, citation validation, and authenticated MCP sync/retrieval. Browser checks use an isolated mock-user bank, never submit answers to the real student's cloud exam.
 
 ## Publishing
 
