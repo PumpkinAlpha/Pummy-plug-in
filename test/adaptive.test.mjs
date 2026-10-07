@@ -9,7 +9,7 @@ const args=state=>({courseId:state.courseId,revision:state.revision,sessionId:st
 const next=async(repo,state)=> (await executeTool(repo,'next_question',args(state))).state;
 const start=async(repo,state,adaptive=true,size=2)=>(await executeTool(repo,'start_test',{courseId:state.courseId,revision:state.revision,adaptive,size})).state;
 const answer=async(repo,state,choices)=>(await executeTool(repo,'submit_answer',{...args(state),questionId:state.question.id,choices})).state;
-const provide=async(repo,state,question)=>(await executeTool(repo,'provide_question',{courseId:state.courseId,revision:state.revision,generationId:state.generation.id,question})).state;
+const provide=async(repo,state,question)=>(await executeTool(repo,'provide_question',{courseId:state.courseId,revision:state.revision,generationId:state.generation.id,question:{...question,optionNotes:question.options.map((_,i)=>i===question.answer[0]?'This choice follows the course rule.':'This choice does not follow the course rule.')}})).state;
 test('adaptive miss → foundation → climb → original resolution survives new repository instances',async()=>{
  const {db,repo,state:imported}=await setup();let state=await start(repo,imported,true,1);
  assert.equal(state.question.answer,undefined);assert.equal(state.question.definition,undefined);
@@ -20,7 +20,7 @@ test('adaptive miss → foundation → climb → original resolution survives ne
  state=await provide(restored,state,{term:'Multiplication basics',stem:'What does 4 × 2 represent?',options:['4 + 2','4 + 4'],answer:[1],definition:'Two groups of four make eight.'});
  assert.equal(state.generation,null);state=await next(restored,state);assert.equal(state.question.depth,1);assert.equal(state.question.answer,undefined);
  let stored=await restored.get(state.courseId);const key=stored.data.questions.find(q=>q.id===state.question.id).answer;
- state=await answer(restored,state,key);assert.equal(state.session.nextType,'climb');assert.ok(state.generation);
+ state=await answer(restored,state,key);assert.equal(state.session.nextType,'climb');assert.ok(state.generation);assert.equal(state.question.optionNotes.length,2);assert.ok(state.question.optionNotes.every(Boolean));
  state=await provide(restored,state,{term:'Order of operations',stem:'What is 1 + 3 × 2?',options:['7','8','9'],answer:[0],definition:'3 × 2 = 6, then 1 + 6 = 7.'});
  state=await next(restored,state);assert.equal(state.question.depth,0);stored=await restored.get(state.courseId);
  state=await answer(restored,state,stored.data.questions.find(q=>q.id===state.question.id).answer);state=await next(restored,state);

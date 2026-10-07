@@ -70,8 +70,9 @@ test('unsupported foundation plus replacement completes in one write, hides key 
  const db=new LocalD1(),repo=new CourseRepository(db,'alice');let {state:s}=await executeTool(repo,'import_questions',{requestId:crypto.randomUUID(),name:'Thorax',questions:[keyed],sources:[{id:'arch',name:'Arch',text:'Brachiocephalic trunk, left common carotid, left subclavian, right to left.'}]});
  s=(await executeTool(repo,'start_test',{...args(s),size:1})).state;s=(await executeTool(repo,'submit_answer',{...args(s),questionId:s.question.id,choices:[1]})).state;
  assert.match(s.generation.prompt,/ONLY if explicitly marked/);
- await assert.rejects(executeTool(repo,'provide_question',{...args(s),generationId:s.generation.id,question:{...keyed,term:'ARCH ORDER'}}),/distinct prerequisite/);
- const payload={...args(s),generationId:s.generation.id,question:{outOfScope:true,gap:'No distinct prerequisite is supported by the excerpt.',replacement:{...keyed,stem:'Which arch branch arises to the right of the left common carotid?'}}};
+ const optionNotes=keyed.options.map((_,i)=>i===keyed.answer[0]?'This branch is first.':'This branch is not first.');
+ await assert.rejects(executeTool(repo,'provide_question',{...args(s),generationId:s.generation.id,question:{...keyed,term:'ARCH ORDER',optionNotes}}),/distinct prerequisite/);
+ const payload={...args(s),generationId:s.generation.id,question:{outOfScope:true,gap:'No distinct prerequisite is supported by the excerpt.',replacement:{...keyed,optionNotes,stem:'Which arch branch arises to the right of the left common carotid?'}}};
  s=(await executeTool(repo,'provide_question',payload)).state;assert.equal(s.generation,null);assert.equal(s.session.next.ready,true);assert.equal(s.session.phase,'feedback');assert.equal(s.session.nextType,'retry');
  assert.deepEqual((await executeTool(repo,'provide_question',payload)).state,s);
  s=(await executeTool(repo,'next_question',args(s))).state;assert.match(s.question.stem,/to the right/);assert.equal(s.question.answer,undefined);
