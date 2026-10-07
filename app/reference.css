@@ -195,6 +195,21 @@ input::placeholder,textarea::placeholder { color:var(--faint); }
 .tag-assignment-list { display:grid; gap:10px; }
 .tag-assignment-row { display:grid; grid-template-columns:minmax(130px,1fr) minmax(170px,2fr); align-items:center; gap:10px; }
 .tag-assignment-row span { font-size:13px; }
+.source-folder-picker { display:grid; gap:8px; margin:10px 0 20px; color:var(--muted); font-size:13px; font-weight:650; }
+.source-folder-picker select { width:100%; padding:11px 12px; border:1px solid var(--line-2); border-radius:8px; background:var(--panel); color:var(--ink); font:inherit; }
+.course-setup .project-card { display:block; padding:0; margin:0; }
+.project-card summary { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 20px; cursor:pointer; list-style:none; }
+.project-card summary::-webkit-details-marker { display:none; }
+.project-card summary span { color:var(--muted); font-size:13px; font-weight:400; }
+.project-card-body { display:grid; gap:13px; padding:4px 20px 20px; }
+.project-card-body > button,.project-card-body > a { justify-self:start; }
+.source-meta-trigger { justify-self:start; padding:0; border:0; background:transparent; color:var(--muted); font:inherit; font-size:14px; text-align:left; text-decoration:underline; text-decoration-style:dotted; text-underline-offset:3px; }
+.source-meta-trigger:hover { color:var(--brand); }
+.source-meta-editor { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; padding:13px; border:1px solid var(--line-2); border-radius:8px; background:var(--raised); }
+.source-meta-editor label { display:grid; gap:5px; font-size:12px; }
+.source-meta-editor select { min-width:0; width:100%; }
+.source-meta-actions { display:flex; justify-content:flex-end; gap:8px; grid-column:1/-1; }
+@media (max-width:650px) { .source-meta-editor { grid-template-columns:1fr; } }
 .folder-detail { margin:0 8px 10px; padding:14px 18px; border:1px solid var(--line); border-radius:0 0 10px 10px; background:var(--panel); }
 .folder-detail-actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
 .source-entry { display:flex; justify-content:space-between; gap:12px; width:100%; padding:10px 0; border:0; border-bottom:1px solid var(--line); background:none; color:var(--ink); text-align:left; font-size:13px; }

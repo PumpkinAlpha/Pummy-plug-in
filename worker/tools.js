@@ -1,5 +1,5 @@
 import {grounding,refreshGrounding,explanationPrompt,provenance,pagesOf,validateProvenance} from './grounding.js';
-import {syncFields,syncSources,syncSource} from './source-sync.js';
+import {syncFields,syncSources,syncSource,SOURCE_TYPES} from './source-sync.js';
 import { z } from 'zod';
 import { PluginCourse,emptyCourse,validateQuestion,createExam,createSession,settle,view,ingest,isInteractive,archiveSession } from './course.js';
 const id=z.string().min(1).max(180),revision=z.number().int().min(1),text=z.string().min(1).max(4000),num=z.number().finite().min(0);
@@ -31,6 +31,7 @@ export const definitions=[
  {name:'delete_course',title:'Delete course',description:'Delete a course and its saved questions and progress after the student confirms in the app.',schema:z.object(stateArgs),readOnly:false,appOnly:true},
  {name:'manage_folder',title:'Rename or remove study folder',description:'Rename a displayed study folder, or remove its grouping after confirmation while keeping its study material in the course.',schema:z.object({...stateArgs,kind:folderKind,label:z.string().min(1).max(300),action:z.enum(['rename','delete']),newName:z.string().min(1).max(160).optional()}),readOnly:false,appOnly:true},
  {name:'set_folder_tags',title:'Assign study folder tags',description:'Save tags used to filter study folders in the course overview.',schema:z.object({...stateArgs,assignments:z.array(z.object({kind:folderKind,label:z.string().min(1).max(300),tags:z.array(z.string().trim().min(1).max(40)).max(12)})).max(250)}),readOnly:false,appOnly:true},
+ {name:'update_source_metadata',title:'Edit source type, priority and subfolder',description:'Update an imported source’s type, priority or folder without replacing its content or questions.',schema:z.object({...stateArgs,sourceId:id,sourceType:z.enum(SOURCE_TYPES),rank:z.number().int().min(1).max(6),folder:z.object({kind:folderKind,label:z.string().min(1).max(300)})}),readOnly:false,appOnly:true},
  {name:'save_custom_test',title:'Save custom test',description:'Save a named test with a specific subset of the course question bank and exam settings. Does not start or replace an active exam.',schema:preferences.extend({...stateArgs,testId:z.string().uuid(),name:z.string().min(1).max(120),questionIds:z.array(id).min(1).max(200)}),readOnly:false},
  {name:'read_course_state',title:'Read saved course state',description:'Read the same saved course/exam state as open_test without opening an app tab. No courseId lists courses. Use for background polling, revision checks, sync and tutor prompts; unsubmitted keys stay hidden. Does not change progress.',schema:z.object({courseId:id.optional()}),readOnly:true},
  {name:'open_test',title:'Read saved exam (legacy)',description:'Legacy read-only alias of read_course_state. Returns saved library/course/exam state WITHOUT opening a panel. Prefer read_course_state for sync, tutoring and checks. Unsubmitted answer keys stay hidden; progress is never changed.',schema:z.object({courseId:id.optional()}),readOnly:true},
@@ -122,6 +123,18 @@ export async function executeTool(repo,name,raw){
  }
  else if(name==='set_folder_tags'){
   for(const a of args.assignments){const tags=[...new Set(a.tags.map(t=>t.trim()))];const key=folderKey(a.kind,a.label);if(tags.length)model.folderTags[key]=tags;else delete model.folderTags[key];}
+ }
+ else if(name==='update_source_metadata'){
+  const source=model.sources.get(args.sourceId);if(!source)throw new Error('Source not found.');
+  if(source.weekId)model.folderNames[folderKey('week',source.weekId)]??=source.weekId;
+  else if(source.lecture)model.folderNames[folderKey('lecture',source.lecture)]??=source.lecture;
+  if(['week','lecture'].includes(args.folder.kind))model.folderNames[folderKey(args.folder.kind,args.folder.label)]??=args.folder.label;
+  const weekId=args.folder.kind==='week'?args.folder.label:null;
+  const lecture=args.folder.kind==='lecture'?args.folder.label:'';
+  Object.assign(source,{sourceType:args.sourceType,rank:args.rank,weekId,lecture,updatedAt:Date.now()});
+  for(const q of model.questions.values())if(q.sourceId===source.id){q.weekId=weekId;q.lecture=lecture;}
+  for(const objective of model.objectives)if(objective.sourceId===source.id){objective.weekId=weekId;objective.lecture=lecture;}
+  model._index=null;refreshGrounding(model);
  }
  else if(name==='save_custom_test'){if(new Set(args.questionIds).size!==args.questionIds.length||args.questionIds.some(id=>!model.rootQuestions().some(q=>q.id===id&&q.keyed)))throw new Error('Select valid course questions without duplicates.');const t={id:args.testId,name:args.name.trim(),questionIds:args.questionIds,preferences:preferences.parse(args)};model.customTests=model.customTests.filter(t=>t.id!==args.testId);if(model.customTests.length>=30)throw new Error('Use up to 30 custom tests per course.');model.customTests.push(t);}
  else if(name==='save_preferences'){model.preferences=preferences.parse(args);}

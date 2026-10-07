@@ -4,6 +4,7 @@ import {LocalD1} from '../scripts/local-db.mjs';
 import {CourseRepository} from '../worker/repository.js';
 import {executeTool} from '../worker/tools.js';
 import {pendingKey,tutorContext,requestTracker} from '../app/pending.js';
+import {studyFolders,sourcesInFolder} from '../app/folders.js';
 const keyed={term:'Arch order',stem:'Which arch branch is first?',options:['Brachiocephalic trunk','Left subclavian'],answer:[0],definition:'Brachiocephalic trunk is first.'};
 const args=s=>({courseId:s.courseId,revision:s.revision,sessionId:s.session?.id});
 test('empty course, project association, source addition, bank append, saved custom test and exact fast-bank selection',async()=>{
@@ -50,6 +51,19 @@ test('folder names and tags persist; removing a folder keeps its material',async
  s=(await executeTool(repo,'manage_folder',{courseId:s.courseId,revision:s.revision,kind:'lecture',label:'Thorax',action:'delete'})).state;
  assert.equal(s.questionCount,1);assert.equal(s.questionIndex[0].id,originalQuestion);assert.equal(s.questionIndex[0].lecture,'');assert.equal(s.sources[0].lecture,'');
  assert.equal(s.folderNames['lecture:Thorax'],undefined);assert.equal(s.folderTags['lecture:Thorax'],undefined);
+ db.close();
+});
+test('source metadata edits move a source and its question without replacing content',async()=>{
+ const db=new LocalD1(),repo=new CourseRepository(db,'alice');
+ let {state:s}=await executeTool(repo,'import_questions',{requestId:crypto.randomUUID(),name:'Anatomy',sources:[{id:'slide',name:'Lecture slides',lecture:'Lecture A',sourceType:'professor_slides',rank:1,text:'Original source text.'}],questions:[{...keyed,sourceId:'slide',lecture:'Lecture A'}]});
+ const before=(await repo.get(s.courseId)).data;
+ s=(await executeTool(repo,'update_source_metadata',{courseId:s.courseId,revision:s.revision,sourceId:'slide',sourceType:'professor_quiz',rank:3,folder:{kind:'lecture',label:'Lecture B'}})).state;
+ assert.equal(s.sources[0].sourceType,'professor_quiz');assert.equal(s.sources[0].rank,3);assert.equal(s.sources[0].lecture,'Lecture B');
+ assert.equal(s.questionIndex[0].lecture,'Lecture B');assert.equal(s.questionCount,1);
+ assert.equal(s.folderNames['lecture:Lecture A'],'Lecture A');assert.equal(s.folderNames['lecture:Lecture B'],'Lecture B');
+ const folders=studyFolders(s);assert.deepEqual(folders.map(f=>f.label),['Lecture A','Lecture B']);
+ assert.equal(sourcesInFolder(s,folders[0]).length,0);assert.equal(sourcesInFolder(s,folders[1])[0].id,'slide');
+ const after=(await repo.get(s.courseId)).data;assert.deepEqual(after.texts,before.texts);assert.equal(after.questions[0].id,before.questions[0].id);
  db.close();
 });
 test('unsupported foundation plus replacement completes in one write, hides key and tolerates duplicate model writes',async()=>{
