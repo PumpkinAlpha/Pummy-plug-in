@@ -401,6 +401,46 @@ input::placeholder,textarea::placeholder { color:var(--faint); }
 .workspace.shell-course .dashboard-bottom { position:sticky; bottom:12px; width:max-content; max-width:100%; margin:48px auto 0; padding:7px; border-radius:99px; background:color-mix(in srgb,var(--sunk) 82%,transparent); backdrop-filter:blur(8px); }
 .workspace.shell-course .dashboard-bottom button { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:135px; min-height:44px; border:0; border-radius:99px; }
 .workspace.shell-course .dashboard-bottom .secondary { background:var(--raised); }
+/* Adaptive setup and custom authoring */
+.adaptive-setup,.custom-tests-page { width:min(100%,960px); margin:0 auto; }
+.adaptive-setup { display:grid; gap:18px; padding:30px; }
+.adaptive-setup h2,.custom-tests-page h2 { margin:0; font-size:30px; font-weight:720; }
+.adaptive-setup .muted,.custom-tests-page .muted { margin:0; color:var(--muted); }
+.adaptive-start-actions { display:flex; flex-wrap:wrap; gap:10px; margin:2px 0 8px; }
+.adaptive-start-actions button { min-height:46px; }
+.adaptive-setup .settings-grid { margin:0; }
+.adaptive-setup .toggle { display:flex; align-items:center; gap:10px; }
+.adaptive-setup details { padding:12px 0; border-top:1px solid var(--line); }
+.adaptive-setup details summary { color:var(--accent); font-weight:650; }
+.adaptive-setup .notice { display:flex; justify-content:space-between; align-items:center; gap:12px; margin:0; }
+.custom-tests-page { padding:24px 0 80px; }
+.custom-tests-page h2 { margin:8px 0 10px; }
+.custom-tests-page .saved-tests { margin:26px 0; }
+.custom-tests-page .saved-tests>div { background:var(--panel); }
+.custom-mode-tabs { display:flex; gap:6px; width:100%; margin:26px 0 22px; padding:5px; border:1px solid var(--line); border-radius:12px; background:var(--sunk); }
+.custom-mode-tabs button { flex:1; min-height:42px; padding:8px 12px; border:0; border-radius:8px; background:transparent; color:var(--muted); font-weight:650; }
+.custom-mode-tabs button[aria-selected="true"] { background:var(--raised); color:var(--ink); box-shadow:0 0 0 1px var(--line-2); }
+.custom-author { display:grid; gap:18px; }
+.custom-author>label,.custom-question>label,.custom-author fieldset { display:grid; gap:8px; }
+.custom-author input:not([type="checkbox"]):not([type="file"]),.custom-author textarea { width:100%; padding:12px 14px; border:1px solid var(--line-2); border-radius:8px; background:var(--sunk); color:var(--ink); }
+.custom-author textarea { resize:vertical; }
+.custom-author fieldset { margin:0; padding:16px; border:1px solid var(--line-2); border-radius:10px; }
+.custom-author legend { padding:0 6px; color:var(--muted); }
+.custom-question { display:grid; gap:16px; padding:22px; border:1px solid var(--line-2); border-radius:12px; background:var(--panel); }
+.custom-question-heading,.custom-choice { display:flex; align-items:center; gap:10px; }
+.custom-question-heading { justify-content:space-between; }
+.custom-question-heading h3 { margin:0; }
+.custom-choice input:not([type="checkbox"]) { flex:1; min-width:0; }
+.custom-answer-check { display:flex; align-items:center; gap:6px; min-width:48px; }
+.custom-answer-check input { width:18px; height:18px; }
+.custom-example { max-width:100%; margin:0; padding:16px; overflow:auto; border:1px solid var(--line); border-radius:10px; background:var(--sunk); color:var(--muted); white-space:pre-wrap; }
+.custom-file { justify-self:start; display:grid; gap:8px; padding:10px 14px; border:1px solid var(--line-2); border-radius:8px; background:var(--raised); cursor:pointer; }
+.custom-file input { max-width:260px; }
+.custom-bank { max-height:500px; overflow:auto; padding:16px; border:1px solid var(--line-2); border-radius:10px; }
+.custom-bank .toggle { display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); }
+.custom-bank small { display:block; color:var(--muted); }
+.custom-tests-page .actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+@media(max-width:650px) { .adaptive-setup,.custom-tests-page { padding:18px 0 60px; } .adaptive-start-actions button { width:100%; } .custom-mode-tabs { flex-wrap:wrap; } .custom-mode-tabs button { min-width:130px; } .custom-question { padding:14px; } .custom-choice { flex-wrap:wrap; } .custom-choice input:not([type="checkbox"]) { min-width:calc(100% - 100px); } }
 @media (max-width:900px) {
  .workspace.shell-course { display:block; }
  .workspace.shell-course .layout { border:0; border-radius:0; }

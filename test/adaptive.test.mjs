@@ -10,6 +10,19 @@ const next=async(repo,state)=> (await executeTool(repo,'next_question',args(stat
 const start=async(repo,state,adaptive=true,size=2)=>(await executeTool(repo,'start_test',{courseId:state.courseId,revision:state.revision,adaptive,size})).state;
 const answer=async(repo,state,choices)=>(await executeTool(repo,'submit_answer',{...args(state),questionId:state.question.id,choices})).state;
 const provide=async(repo,state,question)=>(await executeTool(repo,'provide_question',{courseId:state.courseId,revision:state.revision,generationId:state.generation.id,question:{...question,optionNotes:question.options.map((_,i)=>i===question.answer[0]?'This choice follows the course rule.':'This choice does not follow the course rule.')}})).state;
+test('prefetched explanation is required with each adaptive follow-up when enabled',async()=>{
+ const {db,repo,state:imported}=await setup();
+ let state=(await executeTool(repo,'start_test',{courseId:imported.courseId,revision:imported.revision,adaptive:true,size:1,generateExplanations:true})).state;
+ state=await answer(repo,state,[0]);
+ const followup={term:'Multiplication basics',stem:'What does 4 × 2 represent?',options:['4 + 2','4 + 4'],answer:[1],definition:'Two groups of four make eight.',optionNotes:['Addition combines four and two.','Two groups of four are eight.']};
+ const request={courseId:state.courseId,revision:state.revision,generationId:state.generation.id};
+ await assert.rejects(executeTool(repo,'provide_question',{...request,question:followup}),/full explanation/);
+ state=(await executeTool(repo,'provide_question',{...request,question:{...followup,explanation:{body:['Multiplication represents equal groups.']}}})).state;
+ state=await next(repo,state);
+ assert.equal(state.session.opts.generateExplanations,true);
+ assert.equal(state.question.explanation,undefined);
+ db.close();
+});
 test('adaptive miss → foundation → climb → original resolution survives new repository instances',async()=>{
  const {db,repo,state:imported}=await setup();let state=await start(repo,imported,true,1);
  assert.equal(state.question.answer,undefined);assert.equal(state.question.definition,undefined);
