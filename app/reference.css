@@ -369,6 +369,7 @@ input::placeholder,textarea::placeholder { color:var(--faint); }
 .app-sidebar .nav-item.active,.app-sidebar .nav-item[aria-current="page"] { background:var(--raised); color:var(--ink); font-weight:650; }
 .app-sidebar .nav-item span { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 .app-sidebar .nav-section { margin:14px 8px 6px; padding:13px 2px 0; border-top:1px solid var(--line); color:var(--faint); font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.app-sidebar > .nav-section:first-child { margin-top:2px; padding-top:4px; border-top:0; }
 .app-sidebar .nav-courses { margin-bottom:6px; }
 .app-topbar { display:grid; grid-template-columns:minmax(0,1fr) minmax(160px,560px) minmax(0,1fr); gap:16px; min-height:62px; padding:0 16px 0 12px; border-bottom:0; background:var(--bg); }
 .app-topbar .topbar-left,.app-topbar .topbar-right { display:flex; align-items:center; gap:8px; min-width:0; }
