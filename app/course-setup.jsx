@@ -2,6 +2,7 @@ import React,{useEffect,useState} from 'react';
 import {QUESTION_FILE_ACCEPT} from './question-files.js';
 import {syncStatus} from './source-sync.js';
 import {folderKey,studyFolders,sourcesInFolder} from './folders.js';
+import {BUILD_MODES,generationCapacity,gapSignals} from './generation-plan.js';
 
 const SOURCE_TYPES=['professor_slides','objectives','group_activity','professor_quiz','course_supplement','approved_external','other'];
 const DEFAULT_RANKS={professor_slides:1,objectives:2,group_activity:2,professor_quiz:3,course_supplement:4,approved_external:5,other:6};
@@ -38,4 +39,27 @@ export function CourseForm({state,busy,folderScope,onSave,onAddSource,onUpdateSo
 
 export function NewCourse({busy,onCreate}){const [name,setName]=useState(''),[url,setUrl]=useState('');return <form className="course-form" onSubmit={e=>{e.preventDefault();onCreate({requestId:crypto.randomUUID(),name,project:url?{name,url}:null});}}><label>Course name<input autoFocus required maxLength={160} value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Thoracic Anatomy"/></label><label>ChatGPT Project link (optional)<input type="url" maxLength={800} value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://chatgpt.com/g/g-p-…/project"/></label><p className="fine">You can link the project and add references later.</p><button className="primary" disabled={busy||!name.trim()}>Create course</button></form>;}
 
-export function BuildQuestions({state,busy,onBuild,initialSourceIds,launchAfterBuild=false,examSettings=null}){const [instructions,setInstructions]=useState(''),[count,setCount]=useState(launchAfterBuild?Math.min(30,Number(examSettings?.size)||10):10),[sourceIds,setSourceIds]=useState(initialSourceIds||state.sources.map(s=>s.id)),[generateExplanations,setGenerateExplanations]=useState(!!examSettings?.generateExplanations);return <form className="course-form" onSubmit={e=>{e.preventDefault();onBuild({instructions,count,sourceIds,generateExplanations,launchAfterBuild,examSettings});}}><label>Number of questions<input type="number" min="1" max="30" required value={count} onChange={e=>setCount(Number(e.target.value))}/></label><label>Topics, objectives, or instructions<textarea required maxLength={4000} value={instructions} onChange={e=>setInstructions(e.target.value)} placeholder="e.g. A 10-question test on the aortic arch and its branches, covering lecture objectives 1–3."/></label>{state.sources.length>0&&<fieldset><legend>Saved course references</legend>{state.sources.map(s=><label className="toggle" key={s.id}><input type="checkbox" checked={sourceIds.includes(s.id)} onChange={()=>setSourceIds(sourceIds.includes(s.id)?sourceIds.filter(id=>id!==s.id):[...sourceIds,s.id])}/>{s.name}</label>)}</fieldset>}<label className="toggle"><input type="checkbox" checked={generateExplanations} onChange={e=>setGenerateExplanations(e.target.checked)}/>Generate full explanations with these questions</label><p className="fine">ChatGPT prepares the questions once. {launchAfterBuild?'The exam opens automatically after they are saved. ':''}Project files must be available to the current chat; a project link is not a file connection.</p><button className="primary" disabled={busy||!instructions.trim()||count<1||count>30}>{launchAfterBuild?'Generate and start exam':'Ask ChatGPT to build questions'}</button></form>;}
+export function BuildQuestions({state,busy,connected,onBuild,initialSourceIds,launchAfterBuild=false,examSettings=null}){
+ const [mode,setMode]=useState('coverage');
+ const [instructions,setInstructions]=useState('');
+ const [count,setCount]=useState(launchAfterBuild?Math.min(30,Number(examSettings?.size)||10):10);
+ const [sourceIds,setSourceIds]=useState(initialSourceIds||state.sources.map(source=>source.id));
+ const [generateExplanations,setGenerateExplanations]=useState(!!examSettings?.generateExplanations);
+ const capacity=generationCapacity(state),customMax=Math.min(200,capacity),gaps=gapSignals(state);
+ const invalidCount=mode==='custom'&&(!Number.isInteger(count)||count<1||count>customMax);
+ const submit=event=>{event.preventDefault();if(!capacity||invalidCount)return;onBuild({mode,instructions:instructions.trim(),count:mode==='custom'?count:null,sourceIds,generateExplanations,launchAfterBuild,examSettings});};
+ return <form className="course-form build-questions-form" onSubmit={submit}>
+  <fieldset className="generation-mode-options"><legend>How should Pummy build this bank?</legend><div className="generation-mode-grid">{Object.entries(BUILD_MODES).map(([id,label])=><button type="button" key={id} className={'generation-mode'+(mode===id?' selected':'')} aria-pressed={mode===id} onClick={()=>setMode(id)}><strong>{label}</strong><span>{id==='coverage'?'Cover the selected sources and objectives.':id==='gaps'?'Focus on material you missed or have not mastered.':'Choose the exact number of questions.'}</span></button>)}</div></fieldset>
+  {mode==='custom'&&<label>Number of questions<input type="number" min="1" max={customMax} required value={count} onChange={event=>setCount(Number(event.target.value))}/></label>}
+  {mode==='gaps'&&<p className="fine" role="status">{gaps.concepts.length||gaps.objectives.length?`Using ${gaps.concepts.length} learning or missed concepts and ${gaps.objectives.length} objectives not yet mastered.`:'No attempt history yet. Pummy will use uncovered objectives, if available.'}</p>}
+  {mode==='coverage'&&<p className="fine">Pummy will choose the number of questions needed for the selected material. It will report any material it cannot cover.</p>}
+  <label>Topics, objectives, or instructions (optional)<textarea maxLength={4000} value={instructions} onChange={event=>setInstructions(event.target.value)} placeholder="e.g. Emphasize the aortic arch and lecture objectives 1–3."/></label>
+  {state.sources.length>0&&<fieldset><legend>Saved course references</legend>{state.sources.map(source=><label className="toggle" key={source.id}><input type="checkbox" checked={sourceIds.includes(source.id)} onChange={()=>setSourceIds(sourceIds.includes(source.id)?sourceIds.filter(id=>id!==source.id):[...sourceIds,source.id])}/>{source.name}</label>)}</fieldset>}
+  <label className="toggle"><input type="checkbox" checked={generateExplanations} onChange={event=>setGenerateExplanations(event.target.checked)}/>Generate full explanations with these questions</label>
+  {!capacity&&<p className="error-text">This course has reached its 500-question limit.</p>}
+  {invalidCount&&<p className="error-text">Enter 1–{customMax} questions.</p>}
+  <p className="fine">{launchAfterBuild?'The exam opens after the final batch is saved. ':''}Project files must be available to the current chat; a project link is not a file connection.</p>
+  {!connected&&<p className="fine">Open Pummy inside a ChatGPT conversation to generate new questions.</p>}
+  <button className="primary" disabled={busy||!connected||!capacity||invalidCount}>{launchAfterBuild?'Generate and start exam':'Ask ChatGPT to build questions'}</button>
+ </form>;
+}

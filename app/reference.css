@@ -440,6 +440,17 @@ input::placeholder,textarea::placeholder { color:var(--faint); }
 .custom-bank .toggle { display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); }
 .custom-bank small { display:block; color:var(--muted); }
 .custom-tests-page .actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.build-questions-form { gap:20px; }
+.build-questions-form .generation-mode-options { margin:0; padding:14px; border:1px solid var(--line-2); border-radius:10px; }
+.build-questions-form .generation-mode-options legend { padding:0 6px; font-weight:650; }
+.generation-mode-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.generation-mode { display:grid; align-content:start; gap:5px; min-height:92px; padding:13px; border:1px solid var(--line-2); border-radius:9px; background:var(--sunk); text-align:left; }
+.generation-mode strong { color:var(--ink); font-size:14px; }
+.generation-mode span { color:var(--muted); font-size:12px; line-height:1.4; }
+.generation-mode.selected { border-color:var(--accent); background:var(--accent-soft); box-shadow:inset 0 0 0 1px var(--accent); }
+.build-questions-form label.toggle { display:flex; align-items:center; gap:10px; }
+.build-questions-form label.toggle input { flex:none; }
+@media(max-width:650px) { .generation-mode-grid { grid-template-columns:1fr; } .generation-mode { min-height:0; } }
 @media(max-width:650px) { .adaptive-setup,.custom-tests-page { padding:18px 0 60px; } .adaptive-start-actions button { width:100%; } .custom-mode-tabs { flex-wrap:wrap; } .custom-mode-tabs button { min-width:130px; } .custom-question { padding:14px; } .custom-choice { flex-wrap:wrap; } .custom-choice input:not([type="checkbox"]) { min-width:calc(100% - 100px); } }
 @media (max-width:900px) {
  .workspace.shell-course { display:block; }
