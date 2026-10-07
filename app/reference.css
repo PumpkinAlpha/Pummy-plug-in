@@ -64,7 +64,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .save-indicator.working::before { background:var(--brand); box-shadow:0 0 0 3px #f3702128; }
 .header-icon { display:grid; place-items:center; width:38px; height:38px; padding:0; border:0; border-radius:9px; background:transparent; color:var(--ink); font-size:23px; }
 .header-icon:hover { background:var(--raised); }
-.avatar { display:grid; place-items:center; width:36px; height:36px; border-radius:50%; background:var(--ink); color:var(--bg); font-size:15px; font-weight:700; }
 .course-nav { display:flex; flex-wrap:nowrap; align-items:center; gap:4px; padding:7px clamp(16px,2.2vw,32px); overflow:auto; border-bottom:1px solid var(--line); background:var(--bg); white-space:nowrap; }
 .course-nav > * { flex:none; }
 .nav-tab { min-height:37px; padding:7px 12px; border:0; border-radius:8px; background:transparent; color:var(--muted); font-size:13px; }
@@ -326,7 +325,7 @@ input::placeholder,textarea::placeholder { color:var(--faint); }
   .global-search kbd { display:none; }
   .global-search input { font-size:12px; }
   .header-actions { gap:2px; }
-  .header-icon,.avatar { width:34px; height:34px; }
+  .header-icon { width:34px; height:34px; }
   .course-nav { padding:6px 10px; }
   .layout,.library-view .layout,.dashboard-view .layout,.exam-focused .layout { display:block; padding:18px 14px 54px; }
   .rail { padding:0 0 16px; }
@@ -400,7 +399,6 @@ input::placeholder,textarea::placeholder { color:var(--faint); }
 .app-topbar .save-indicator { display:inline-grid; place-items:center; width:28px; height:36px; }
 .app-topbar .save-indicator .save-label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
 .app-topbar .save-indicator::before { width:10px; height:10px; }
-.app-topbar .avatar { margin-left:2px; }
 .workspace.exam-focused,.workspace.exam-focused:fullscreen { width:100%; min-height:100dvh; max-width:none; overflow:auto; background:var(--bg); }
 .workspace.exam-focused .app-topbar { display:none; }
 .workspace.exam-focused .layout { width:100%; max-width:none; min-height:100dvh; padding:24px clamp(16px,4vw,64px) 80px; }

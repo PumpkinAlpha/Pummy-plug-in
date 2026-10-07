@@ -14,7 +14,7 @@ export function AppHeader({state,courses=[],busy,search,setSearch,searchRef,onHo
    </div>
   </>}</div>
   <div className="topbar-center">{state&&<div className="search-wrap"><label className="global-search"><Icon name="search" size={19}/><input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search your library, sources, or ask anything…" aria-label="Search course folders and sources"/><kbd>⌘K</kbd></label>{search.trim()&&<div className="search-matches">{matches.map(src=><button key={src.id} onClick={()=>{setSearch('');onSource(src.id);}}>{src.name}<span>Source ›</span></button>)}{!matches.length&&<p>No matching sources.</p>}</div>}</div>}</div>
-  <div className="header-actions"><span className={"save-indicator"+(busy?" working":"")} role="status" title={busy?'Working':'Saved on this device'}><span className="save-label">{busy?'Working':'Saved on this device'}</span></span><button className="shell-icon-btn" aria-label="Display settings" onClick={onSettings}><Icon name="gear" size={21}/></button><span className="avatar" aria-hidden="true">D</span></div>
+  <div className="header-actions"><span className={"save-indicator"+(busy?" working":"")} role="status" title={busy?'Working':'Saved on this device'}><span className="save-label">{busy?'Working':'Saved on this device'}</span></span><button className="shell-icon-btn" aria-label="Display settings" onClick={onSettings}><Icon name="gear" size={21}/></button></div>
  </header>;
 }
 
