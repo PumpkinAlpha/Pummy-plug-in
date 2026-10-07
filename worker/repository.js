@@ -1,6 +1,7 @@
+import {bucket,isDue} from '../lib/pummy-core.mjs';
 export class CourseRepository {
   constructor(db,userId){this.db=db;this.userId=userId;}
-  async list(){const {results}=await this.db.prepare('SELECT id, name, revision, updated_at FROM courses WHERE user_id=? ORDER BY updated_at DESC').bind(this.userId).all();return results;}
+  async list(){const {results}=await this.db.prepare('SELECT id, name, revision, updated_at, data FROM courses WHERE user_id=? ORDER BY updated_at DESC').bind(this.userId).all();return results.map(({data,...row})=>{const saved=JSON.parse(data),concepts=saved.concepts||[],questions=saved.questions||[];return {...row,questionCount:questions.filter(q=>q.keyed&&!['followup','variant'].includes(q.origin)).length,sourceCount:saved.sources?.length||0,weekCount:new Set([...(saved.sources||[]).map(s=>s.weekId),...questions.map(q=>q.weekId)].filter(Boolean)).size,due:concepts.filter(isDue).length,learning:concepts.filter(c=>bucket(c)==='learning').length,retained:concepts.filter(c=>bucket(c)==='retained').length,professorCount:questions.filter(q=>q.keyed&&q.origin==='practice').length};});}
   async get(id){const row=await this.db.prepare('SELECT data, revision FROM courses WHERE user_id=? AND id=?').bind(this.userId,id).first();return row?{data:JSON.parse(row.data),revision:row.revision}:null;}
   async save(data,revision,expectedData){
     const json=JSON.stringify(data);
