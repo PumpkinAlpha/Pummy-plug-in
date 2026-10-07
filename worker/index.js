@@ -3,10 +3,17 @@ import logoDataUrl from '../app/pummy-logo.png';
 import { handleMcp } from './mcp.js';
 import { executeTool } from './tools.js';
 import { CourseRepository } from './repository.js';
+import {publicPage} from './public-pages.js';
+import {publicationInfo} from './public-content.js';
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 export default {async fetch(request,env){
  const url=new URL(request.url),user=request.headers.get('oai-authenticated-user-id');
  try{
+  const info=publicPage(url.pathname,publicationInfo);
+  if(info){
+   if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
+   return new Response(request.method==='HEAD'?null:info,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; style-src 'unsafe-inline'; img-src 'self'; object-src 'none'; base-uri 'none'"}});
+  }
   if(url.pathname==='/health')return json({ok:true,app:'Pummy Adaptive Test',version:'0.4.4'});
   if(url.pathname==='/pummy-logo.png')return new Response(Uint8Array.from(atob(logoDataUrl.split(',')[1]),c=>c.charCodeAt(0)),{headers:{'Content-Type':'image/png','Cache-Control':'public, max-age=86400','X-Content-Type-Options':'nosniff'}});
   if(url.pathname==='/mcp'){
@@ -25,7 +32,10 @@ export default {async fetch(request,env){
    const body=JSON.parse(bodyText);const data=await executeTool(new CourseRepository(env.DB,user),body.name,body.arguments);
    return json({structuredContent:data});
   }
-  if(url.pathname==='/')return new Response(page,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':"default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'"}});
+  if(url.pathname==='/'){
+   if(!user)return new Response(null,{status:302,headers:{Location:'/signin-with-chatgpt?return_to=%2F','Cache-Control':'no-store'}});
+   return new Response(page,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':"default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'"}});
+  }
   return new Response('Not found',{status:404});
  }catch(e){console.error('pummy-request-failed',url.pathname,e.message);return json({error:e.message||'Could not load your test. Try again.'},e.code==='conflict'?409:400);}
 }};

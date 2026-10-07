@@ -6,7 +6,7 @@ const rpc=(method,params={},user)=>new Request('https://example.test/mcp',{metho
 test('MCP initialization, discovery, resource MIME and fullscreen metadata, and authenticated calls',async()=>{
  const db=new LocalD1(),env={DB:db};
  let response=await worker.fetch(rpc('initialize',{protocolVersion:'2025-03-26',capabilities:{},clientInfo:{name:'test',version:'1'}}),env);assert.equal(response.status,200);let result=(await response.json()).result;assert.equal(result.serverInfo.name,'pummy-adaptive-test');assert.equal(result.serverInfo.version,'0.4.4');assert.equal(result.serverInfo.icons[0].src,'https://pummy-adaptive-test.daniel-dehkordi1.chatgpt.site/pummy-logo.png');assert.match(result.instructions,/student/);
- response=await worker.fetch(rpc('tools/list'),env);result=(await response.json()).result;assert.equal(result.tools.length,30);assert.deepEqual(result.tools.find(t=>t.name==='open_interface')._meta['openai/ui'].entrypoints,[{type:'global'},{type:'thread'}]);assert.equal(result.tools.find(t=>t.name==='submit_answer').annotations.readOnlyHint,false);assert.deepEqual(result.tools.find(t=>t.name==='delete_course')._meta.ui.visibility,['app']);
+ response=await worker.fetch(rpc('tools/list'),env);result=(await response.json()).result;assert.equal(result.tools.length,30);assert.deepEqual(result.tools.find(t=>t.name==='open_interface')._meta['openai/ui'].entrypoints,[{type:'global'},{type:'thread'}]);assert.equal(result.tools.find(t=>t.name==='submit_answer').annotations.readOnlyHint,false);assert.deepEqual(result.tools.find(t=>t.name==='delete_course')._meta.ui.visibility,['app']);assert.equal(result.tools.find(t=>t.name==='delete_course').annotations.destructiveHint,true);
  response=await worker.fetch(rpc('resources/read',{uri:'ui://pummy/adaptive-test-v4.html'}),env);result=(await response.json()).result;assert.equal(result.contents[0].mimeType,'text/html;profile=mcp-app');assert.equal(result.contents[0]._meta['openai/ui'].preferredDisplayMode,'fullscreen');assert.match(result.contents[0].text,/Pummy Adaptive Test/);
  const currentPage=result.contents[0].text;
  // Cached descriptors still request the original and v3 addresses.
@@ -32,4 +32,25 @@ test('authenticated MCP source sync, idempotent retry, retrieval and page reads 
  const rejected=await call('sync_course_sources',{...payload,revision:synced.structuredContent.state.revision,requestId:crypto.randomUUID(),sources:[payload.sources[0],payload.sources[0]]});assert.equal(rejected.isError,true);assert.match(rejected.structuredContent.sync.rejected[0].message,/duplicate/);
  assert.equal((await call('open_test',{courseId:state.courseId})).structuredContent.state.revision,synced.structuredContent.state.revision);
  }finally{db.close();}
+});
+
+test('public listing pages work anonymously while saved app data still requires sign-in',async()=>{
+ const env={DB:{prepare(){throw new Error('Public pages must not read private data.');}}};
+ for(const route of ['/about','/support','/privacy','/terms']){
+  const response=await worker.fetch(new Request('https://example.test'+route),env);
+  assert.equal(response.status,200);
+  const html=await response.text();
+  assert.match(html,/Daniel Dehkordi/);
+  if(route!=='/about')assert.match(html,/daniel.dehkordi1@gmail.com/);
+  assert.doesNotMatch(html,/\[CONTACT\]/);
+  assert.match(response.headers.get('content-security-policy'),/default-src 'self'/);
+ }
+ const anonymous=await worker.fetch(new Request('https://example.test/'),env);
+ assert.equal(anonymous.status,302);
+ assert.equal(anonymous.headers.get('location'),'/signin-with-chatgpt?return_to=%2F');
+ const signed=await worker.fetch(new Request('https://example.test/',{headers:{'oai-authenticated-user-id':'reviewer'}}),env);
+ assert.equal(signed.status,200);
+ assert.match(await signed.text(),/Opening Pummy/);
+ const post=await worker.fetch(new Request('https://example.test/api/tool',{method:'POST',headers:{Origin:'https://example.test'},body:JSON.stringify({name:'list_courses',arguments:{}})}),env);
+ assert.equal(post.status,401);
 });

@@ -1,4 +1,5 @@
 import React,{useEffect,useState} from 'react';
+import {ExamGenerationProgress} from './generation-progress.jsx';
 
 const TYPES=[['mcq','Single choice'],['multi','Select all'],['image','Image / identify'],['label','Diagram labeling'],['order','Ordering'],['match','Matching']];
 const defaults={size:20,adaptive:true,generateExplanations:false,practiceFirst:true,includeReviews:true,types:null,sourceIds:null,objectiveIds:null,weekId:'all',setId:null};
@@ -16,8 +17,8 @@ export function AdaptiveSetup({state,busy,connected,resume,onResume,onStart,onBu
   <span className="eyebrow">Exam configuration</span><h2>Adaptive exam</h2>
   <p className="muted">Choose what to study. Start with saved questions or generate a fresh set from your course sources.</p>
   {resume&&<div className="notice"><span>Your current exam is saved.</span><button className="primary" disabled={busy} onClick={onResume}>Resume exam</button></div>}
-  {buildJob&&<p className="notice" role="status">Generating {buildJob.label}. The exam will open when the bank is saved.</p>}
-  <div className="adaptive-start-actions"><button className="primary" disabled={busy||bad||resume||!bank.length} onClick={()=>onStart(settings)}>Start adaptive exam</button><button className="secondary" disabled={busy||resume||!connected||!!buildJob} onClick={()=>onBuild(settings)}>Generate questions and start exam</button></div>
+  {buildJob&&<ExamGenerationProgress job={buildJob} state={state}/>}
+  <div className="adaptive-start-actions"><button className="primary" disabled={busy||bad||resume||!bank.length||!!buildJob} onClick={()=>onStart(settings)}>Start adaptive exam</button><button className="secondary" disabled={busy||resume||!connected||!!buildJob} onClick={()=>onBuild(settings)}>Generate questions and start exam</button></div>
   {!connected&&<p className="fine">Open Pummy in a ChatGPT conversation to generate questions and adaptive follow-ups. Saved bank questions can still be practiced here.</p>}
   <div className="settings-grid"><label>Questions in this exam<input type="number" min="1" max="100" value={p.size} onChange={e=>patch('size',e.target.value)}/></label><label>Week<select value={p.weekId} onChange={e=>patch('weekId',e.target.value)}><option value="all">All weeks</option>{weeks.map(w=><option key={w}>{w}</option>)}</select></label><label>Practice set<select value={p.setId||''} onChange={e=>patch('setId',e.target.value||null)}><option value="">All sets</option>{[...new Set(bank.map(q=>q.setId).filter(Boolean))].map(id=><option key={id}>{id}</option>)}</select></label></div>
   <label className="toggle"><input type="checkbox" checked={connected&&p.adaptive} disabled={!connected} onChange={e=>patch('adaptive',e.target.checked)}/>Adaptive follow-ups after missed questions</label>
