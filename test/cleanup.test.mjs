@@ -53,6 +53,16 @@ test('folder names and tags persist; removing a folder keeps its material',async
  assert.equal(s.folderNames['lecture:Thorax'],undefined);assert.equal(s.folderTags['lecture:Thorax'],undefined);
  db.close();
 });
+test('creating an empty study subfolder makes it selectable without moving existing sources',async()=>{
+ const db=new LocalD1(),repo=new CourseRepository(db,'alice');
+ let {state:s}=await executeTool(repo,'import_questions',{requestId:crypto.randomUUID(),name:'Anatomy',sources:[{id:'slide',name:'Lecture slides',lecture:'Session 19-20',text:'Thorax anatomy.'}],questions:[{...keyed,sourceId:'slide',lecture:'Session 19-20'}]});
+ s=(await executeTool(repo,'manage_folder',{courseId:s.courseId,revision:s.revision,kind:'lecture',label:'Session 21-22',action:'create'})).state;
+ assert.deepEqual(studyFolders(s).map(f=>f.label),['Session 19-20','Session 21-22']);
+ assert.equal(sourcesInFolder(s,studyFolders(s)[1]).length,0);
+ assert.equal(s.sources[0].lecture,'Session 19-20');
+ await assert.rejects(executeTool(repo,'manage_folder',{courseId:s.courseId,revision:s.revision,kind:'lecture',label:'session 21-22',action:'create'}),/already has that name/);
+ db.close();
+});
 test('source metadata edits move a source and its question without replacing content',async()=>{
  const db=new LocalD1(),repo=new CourseRepository(db,'alice');
  let {state:s}=await executeTool(repo,'import_questions',{requestId:crypto.randomUUID(),name:'Anatomy',sources:[{id:'slide',name:'Lecture slides',lecture:'Lecture A',sourceType:'professor_slides',rank:1,text:'Original source text.'}],questions:[{...keyed,sourceId:'slide',lecture:'Lecture A'}]});

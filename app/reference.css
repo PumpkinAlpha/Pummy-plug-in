@@ -223,8 +223,13 @@ input::placeholder,textarea::placeholder { color:var(--faint); }
 .tag-assignment-list { display:grid; gap:10px; }
 .tag-assignment-row { display:grid; grid-template-columns:minmax(130px,1fr) minmax(170px,2fr); align-items:center; gap:10px; }
 .tag-assignment-row span { font-size:13px; }
-.source-folder-picker { display:grid; gap:8px; margin:10px 0 20px; color:var(--muted); font-size:13px; font-weight:650; }
+.source-folder-control { display:flex; align-items:end; gap:10px; margin:10px 0 20px; }
+.source-folder-control > button { white-space:nowrap; }
+.source-folder-picker { display:grid; flex:1; gap:8px; min-width:0; color:var(--muted); font-size:13px; font-weight:650; }
 .source-folder-picker select { width:100%; padding:11px 12px; border:1px solid var(--line-2); border-radius:8px; background:var(--panel); color:var(--ink); font:inherit; }
+.source-folder-create { display:flex; align-items:end; flex-wrap:wrap; gap:10px; margin:-6px 0 20px; padding:14px; border:1px solid var(--line); border-radius:10px; background:var(--panel); }
+.source-folder-create label { display:grid; flex:1 1 230px; gap:7px; font-size:13px; }
+@media (max-width:650px) { .source-folder-control { align-items:stretch; flex-direction:column; } }
 .course-setup .project-card { display:block; padding:0; margin:0; }
 .project-card summary { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 20px; cursor:pointer; list-style:none; }
 .project-card summary::-webkit-details-marker { display:none; }

@@ -29,7 +29,7 @@ export const definitions=[
  {name:'create_course',title:'Add course',description:'Create an empty course, optionally linked to a ChatGPT Project. A URL is a reference, not permission to fetch its files. Open a chat inside that Project and use accessible sources to populate this course.',schema:z.object({requestId:z.string().uuid(),name:z.string().min(1).max(160),project:project.nullish()}),readOnly:false},
  {name:'update_course',title:'Course sources and project',description:'Rename a course, set or clear its ChatGPT Project reference, or add source excerpts explicitly supplied by the student or accessible in the current Project chat. Never fabricate project access or replace existing source content.',schema:z.object({...stateArgs,name:z.string().min(1).max(160).optional(),project:project.nullish(),sources:z.array(z.object({id,name:z.string().min(1).max(300),text:z.string().min(1).max(60000),rank:z.number().int().min(1).max(6).default(1)})).max(30).optional()}),readOnly:false},
  {name:'delete_course',title:'Delete course',description:'Delete a course and its saved questions and progress after the student confirms in the app.',schema:z.object(stateArgs),readOnly:false,appOnly:true},
- {name:'manage_folder',title:'Rename or remove study folder',description:'Rename a displayed study folder, or remove its grouping after confirmation while keeping its study material in the course.',schema:z.object({...stateArgs,kind:folderKind,label:z.string().min(1).max(300),action:z.enum(['rename','delete']),newName:z.string().min(1).max(160).optional()}),readOnly:false,appOnly:true},
+ {name:'manage_folder',title:'Manage study folder',description:'Create, rename, or remove a study folder. Removing its grouping keeps its study material in the course.',schema:z.object({...stateArgs,kind:folderKind,label:z.string().min(1).max(300),action:z.enum(['create','rename','delete']),newName:z.string().min(1).max(160).optional()}),readOnly:false,appOnly:true},
  {name:'set_folder_tags',title:'Assign study folder tags',description:'Save tags used to filter study folders in the course overview.',schema:z.object({...stateArgs,assignments:z.array(z.object({kind:folderKind,label:z.string().min(1).max(300),tags:z.array(z.string().trim().min(1).max(40)).max(12)})).max(250)}),readOnly:false,appOnly:true},
  {name:'update_source_metadata',title:'Edit source type, priority and subfolder',description:'Update an imported source’s type, priority or folder without replacing its content or questions.',schema:z.object({...stateArgs,sourceId:id,sourceType:z.enum(SOURCE_TYPES),rank:z.number().int().min(1).max(6),folder:z.object({kind:folderKind,label:z.string().min(1).max(300)})}),readOnly:false,appOnly:true},
  {name:'save_custom_test',title:'Save custom test',description:'Save a named test with a specific subset of the course question bank and exam settings. Does not start or replace an active exam.',schema:preferences.extend({...stateArgs,testId:z.string().uuid(),name:z.string().min(1).max(120),questionIds:z.array(id).min(1).max(200)}),readOnly:false},
@@ -110,7 +110,16 @@ export async function executeTool(repo,name,raw){
  else if(name==='update_course'){if(args.name)model.nameData=args.name.trim();if('project' in args)model.project=args.project||null;for(const src of args.sources||[]){if(model.sources.has(src.id))throw new Error('That source ID already exists. Add a new source ID to preserve the existing reference.');model.sources.set(src.id,{id:src.id,name:src.name,rank:src.rank,kind:'material',createdAt:Date.now()});model.texts.set(src.id,src.text);}if(model.sources.size>30)throw new Error('Use up to 30 sources per course.');}
  else if(name==='manage_folder'){
   const key=folderKey(args.kind,args.label);
-  if(args.action==='rename'){
+  if(args.action==='create'){
+   if(!['week','lecture'].includes(args.kind))throw new Error('Choose a study folder type.');
+   const label=args.label.trim();
+   if(!label||label.length>160)throw new Error('Enter a folder name up to 160 characters.');
+   const sameName=Object.entries(model.folderNames).some(([other,name])=>other.toLowerCase()===folderKey(args.kind,label).toLowerCase()||name.toLowerCase()===label.toLowerCase());
+   const sameMaterial=[...model.sources.values(),...model.questions.values()].some(item=>String(args.kind==='week'?item.weekId:item.lecture||'').toLowerCase()===label.toLowerCase());
+   if(sameName||sameMaterial)throw new Error('Another folder already has that name.');
+   if(Object.keys(model.folderNames).length>=250)throw new Error('This course has reached its folder limit.');
+   model.folderNames[folderKey(args.kind,label)]=label;
+  }else if(args.action==='rename'){
    if(!args.newName?.trim())throw new Error('Enter a folder name.');
    if(Object.entries(model.folderNames).some(([other,name])=>other!==key&&name.toLowerCase()===args.newName.trim().toLowerCase()))throw new Error('Another folder already has that name.');
    model.folderNames[key]=args.newName.trim();
