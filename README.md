@@ -1,6 +1,6 @@
 # Pummy Adaptive Test — ChatGPT plugin
 
-Version 0.3.2 cleans up the panel layout and adds course/project setup and named custom tests. It recreates the adaptive exam and its warm HUD-style interface inside a fullscreen ChatGPT/Codex MCP App. It reuses the original Pummy engine and does not change the desktop app.
+Version 0.3.3 cleans up the panel layout and adds course/project setup and named custom tests. It recreates the adaptive exam and its warm HUD-style interface inside a fullscreen ChatGPT/Codex MCP App. It reuses the original Pummy engine and does not change the desktop app.
 
 ## Use
 
