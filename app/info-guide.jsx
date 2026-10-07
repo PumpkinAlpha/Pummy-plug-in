@@ -2,7 +2,7 @@ import React from 'react';
 
 const steps=[
  ['Create a course','Use Add course on the Courses tab, or import an existing question bank. Each course keeps its own sources, questions, exam settings, and progress.'],
- ['Organize the material','Open the course, create or open study folders, and use Course & sources to add references to the right folder. You can paste an excerpt, import a question file, or sync files available in your current ChatGPT Project conversation.'],
+ ['Organize the material','Open the course and its study folders, then use Course & sources to add references to the right folder. You can paste an excerpt, import a question file, or sync files available in your current ChatGPT Project conversation.'],
  ['Build a question bank','In Course & sources, choose Build questions from sources. Pick Full coverage, Based on your gaps, or Custom; select references and Quiz, Exam, or MCAT difficulty. You can request full explanations with the questions.'],
  ['Take an exam','Open Adaptive exam to set the question count, week, question types, sources, and objectives. Start with saved questions, or generate a bank and start when it is saved. You can resume an unfinished exam.'],
  ['Review and return','After each answer, read the feedback and source citations. Use Progress for due concepts and objective mastery; Exam history holds completed sessions.']
