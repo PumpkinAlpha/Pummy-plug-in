@@ -1,42 +1,61 @@
 # Pummy Adaptive Test — ChatGPT plugin
 
-An MCP App that brings Pummy.Ai's adaptive exam into ChatGPT, with a fullscreen/sidebar entrypoint, clickable answers, feedback, saved progress, source-grounded foundation questions, and spaced review.
+Version 0.2 recreates the adaptive exam and its warm HUD-style interface inside a fullscreen ChatGPT/Codex MCP App. It reuses the original Pummy engine and does not change the desktop app.
 
 ## Use
 
-Install the private plugin provisioned by this Site, then ask ChatGPT to open Pummy Adaptive Test. Import a question JSON or Pummy backup using the interface, or ask ChatGPT to build a bank from supplied course materials. A five-question arithmetic demo is available before importing any personal material.
+Open the installed **Pummy Adaptive Test** plugin. Import a Pummy backup or a question JSON, or ask ChatGPT to build a bank from your course materials. A five-question arithmetic demo is available when the library is empty.
 
-The conversation model prepares foundation/return questions via `provide_question`; the backend validates, grades and persists them. No separate inference API key is required. When using the standalone website, open the connected plugin in ChatGPT for generated adaptive questions; nonadaptive practice works directly in the website.
+Single-choice answers submit immediately by default, as in Pummy. Select-all and interactive boards have a Submit button. Number keys select answers; Enter submits or continues. Display settings can switch instant answers off, change reading size/theme, and enable automatic full-explanation requests.
 
-This version supports text single-choice and select-all questions. Image, labeling, ordering and matching questions are deliberately excluded. A Pummy backup imports text questions and source excerpts; it does not upload original documents or images, migrate desktop attempt history, or synchronize the desktop library. The cloud plugin keeps its own progress. Limits: 200 questions per imported bank, 100 per test, 30 sources of at most 60,000 characters each, and 900 KB total saved course state.
+After a miss, ChatGPT prepares a course-grounded foundation question. The engine can step down four levels, then climb back through fresh questions. The student, not the agent, presses Next. While a question or explanation is being prepared the view automatically refreshes. The standalone website can practice nonadaptive banks but needs the connected ChatGPT plugin for model-generated questions and explanations. No separate inference API key is required.
+
+## Restored exam features
+
+- Single-choice, select-all, embedded-image identification, diagram labeling, ordering, and matching; drag/drop plus tap and arrow alternatives.
+- Professor/flagged-first ordering, scheduled reviews, exam size, strict source/week/objective/type/set filters, persisted configuration, pause/resume, confirmed skip/end.
+- Complete foundation ladder, gap diagnosis, out-of-scope handling, return versions, deferred nonadaptive retries, ten-question review checkpoints.
+- Streaks, optional feedback animations and confetti, retained-objective celebrations.
+- Answer and distractor feedback; deeper choice explanations; rich explanations with Markdown, tables, embedded figures, objectives, gaps, and clickable source references.
+- Question-specific conversation handoff and optional browser speech synthesis.
+- Flag notes, concept buckets, scheduled review intervals, prerequisite relationships, tracked-objective retention, completed-exam history, full review results.
+- Pummy backup import including available raster images and spaced-review progress; JSON bank/progress download. Existing banks and cloud sessions are not overwritten by imports.
+- Warm brown/orange/yellow Pummy HUD, responsive phone layout, light reading theme, adjustable type, keyboard controls, reduced-motion support.
+
+See `PARITY.md` for scope and remaining host/desktop differences. This is an exam port, not the full Pummy course authoring/studio/document system.
+
+## Limits and differences
+
+Imports support up to 200 questions, 30 source excerpts of at most 60,000 characters, and 200 objectives per bank; exams have up to 100 questions. Saved course state is bounded to 900 KB, including embedded images. Large courses should be split and images compressed. Original PDFs/PowerPoint/Word files are not uploaded, and missing image questions are explicitly counted as omitted. Backup source excerpts are capped at 60,000 characters per source. Desktop in-progress exam sessions are not migrated; question attempts and concept schedules can be restored. There is no automatic desktop/cloud sync.
+
+Full explanations and targeted question chat run through the ChatGPT conversation. Voice output and download behavior depend on the host/browser; no automatic source-document page rendering, native local audio service, or background model generation is added. Matching imports require unique right-hand labels because the original board uses each bank label once. Adaptive variants of interactive boards are reused/reshuffled by the original engine rather than generated as new diagrams.
 
 ## Architecture
 
-- `lib/pummy-core.mjs`: bundled **existing** Pummy exam engine, course model, grading, source retrieval, prompts and spaced repetition. Its storage writes are adapted to isolated persisted course snapshots; AI generation is injected per exam. Original Pummy source files are unchanged.
-- `worker/course.js`: host-generation adapter, persisted pending generation, redacted question view.
-- `worker/tools.js`: nine validated MCP tools, idempotent imports and answer retries, revision checks.
-- `worker/repository.js`: D1 course storage with per-user keys and compare-and-swap revision updates.
-- `worker/mcp.js`: official MCP SDK with stateless Web Standards HTTP transport and registered MCP App resources.
-- `app/main.jsx`: React UI using the official MCP Apps SDK; user actions call the same tools as chat.
-- `db/schema.ts` / `drizzle/`: generated schema migrations.
+- `lib/pummy-core.mjs`: bundled original engine, model, source retrieval, prompts, grading, spaced repetition and objective/prerequisite tracking, with injected host generation and adapted storage.
+- `worker/course.js`: persisted course snapshots, pending generation, redacted views, review/history and deterministic board shuffles.
+- `worker/tools.js`: sixteen validated MCP tools, strict response/filter validation, idempotent retries, version checks, source reads, imports/exports and explanation requests.
+- `worker/repository.js`: per-user D1 keys and compare-and-swap revisions. Existing data is upgraded lazily without a schema change.
+- `worker/mcp.js`: official MCP SDK, stateless Web Standards transport, registered fullscreen MCP App resource and global/thread entrypoints.
+- `app/`: React interface and official MCP Apps SDK bridge. No third-party fonts, remote images, scripts, or tracking.
 
-The Sites boundary authenticates requests. Private tool data requires the trusted `oai-authenticated-user-id` header. Public discovery contains no user data. Browser API writes require a same-origin request. Answer keys are withheld from the current-question result until submission. Course text is reference data and does not authorize actions.
+Sites supplies trusted user identity. Private calls require it; public discovery contains no course data. Same-origin checks protect browser writes. Current and deferred-retry answer keys, board ordering and matching associations are withheld until submission, including related history entries. Export is an app-only explicit download and includes keys. Course text and model-generated strings render as escaped React content, never HTML instructions.
 
-## Local development
+## Development and verification
 
-Requires Node 22.13+ (the local preview uses `node:sqlite`).
+Node 22.13+ is required for the local SQLite preview.
 
 ```sh
 npm ci
 npm run build
-npm test
 npm run validate
+npm test
 npm run dev
 ```
 
-Preview: http://127.0.0.1:8777. The local-only dev server supplies a mock user and writes to ignored `work/local.sqlite`. It binds only to loopback. Production does not contain this mock-auth server.
+Local preview binds `127.0.0.1:8777`, supplies a mock user, and stores test data in ignored `work/local.sqlite`. Production does not include this mock identity server.
 
-To refresh the vendored engine from the original app:
+To refresh the original bundled code:
 
 ```sh
 node scripts/vendor-core.mjs /absolute/path/to/Pummy/App
@@ -44,8 +63,8 @@ npm run build
 npm test
 ```
 
-## Deployment
+Automated tests cover adaptive chains/depth, returns, deferred retries, skip/end correctness, six question formats, hidden keys, duplicate-answer idempotency, source/user isolation, concurrent writes, exact filters, backup/export roundtrips, checkpoints/history, explanation lifecycle, mastery, and authenticated MCP discovery/resource metadata. Browser checks use an isolated mock-user bank, never submit answers to the real student's cloud exam.
 
-`.openai/hosting.json` identifies the **same** private Site and its logical D1 binding. Publish updates to that Site, rather than creating a replacement plugin. The build emits `dist/server/index.js`, with default `fetch(request, env)`, and a self-contained HTML resource. The Sites publisher applies the generated Drizzle migrations and provisions the private plugin; do not wrap it in a second plugin.
+## Publishing
 
-Validation covers adaptive chains, nonadaptive retries, multi-select grading, persistence, idempotency, revision conflicts, user isolation, skip correctness, MCP discovery, protected calls, and UI resource metadata. Browser QA covers selection, feedback, retry, results, refresh, mobile layout, and simulated MCP App host communication. Actual ChatGPT placement and connection must be verified after installation.
+Reuse `.openai/hosting.json` and the existing private Site/plugin identity. Build produces a self-contained HTML resource and a Cloudflare-compatible `dist/server/index.js` default.fetch. Keep the Site audience unchanged and do not create a replacement plugin.
