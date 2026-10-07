@@ -269,6 +269,13 @@ input::placeholder,textarea::placeholder { color:var(--faint); }
 .reference-kicker { color:var(--accent); }
 .page-nav { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 0; border-block:1px solid var(--line); color:var(--muted); font-size:12px; }
 .source-text { max-height:62vh; padding:18px 0; overflow:auto; color:var(--ink); background:var(--panel); }
+.source-page-stage { max-height:68vh; overflow:auto; margin-top:14px; background:#fff; text-align:center; }
+.source-page-stage .fine { color:#555; padding:22px; }
+.source-page-image { display:block; width:100%; height:auto; }
+.source-visual-note,.source-visual-error { color:var(--muted); font-size:13px; margin:14px 0 0; }
+.source-visual-error { color:var(--bad); }
+.source-attach-button { display:inline-flex; align-items:center; width:auto; margin-top:12px; cursor:pointer; }
+.source-attach-button input { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
 .summary-big > div,.review-item,.mastery-tile,.bank,.setup,.history-entry { border-color:var(--line-2); border-radius:10px; background:var(--panel); }
 @media (max-width:900px) {
   .topbar { grid-template-columns:auto minmax(120px,1fr) auto; gap:10px; }
