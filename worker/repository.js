@@ -3,6 +3,10 @@ export class CourseRepository {
   constructor(db,userId){this.db=db;this.userId=userId;}
   async list(){const {results}=await this.db.prepare('SELECT id, name, revision, updated_at, data FROM courses WHERE user_id=? ORDER BY updated_at DESC').bind(this.userId).all();return results.map(({data,...row})=>{const saved=JSON.parse(data),concepts=saved.concepts||[],questions=saved.questions||[],sources=saved.sources||[];const weeks=new Set([...sources.map(s=>s.weekId),...questions.map(q=>q.weekId)].filter(Boolean));const lectures=new Set(sources.map(s=>s.lecture).filter(Boolean));const unassigned=lectures.size&&(sources.some(s=>!s.lecture)||questions.some(q=>!sources.some(s=>s.id===q.sourceId&&s.lecture)));return {...row,questionCount:questions.filter(q=>q.keyed&&!['followup','variant'].includes(q.origin)).length,sourceCount:sources.length,weekCount:weeks.size||(lectures.size+Number(!!unassigned))||(sources.length||questions.length?1:0),due:concepts.filter(isDue).length,learning:concepts.filter(c=>bucket(c)==='learning').length,retained:concepts.filter(c=>bucket(c)==='retained').length,professorCount:questions.filter(q=>q.keyed&&q.origin==='practice').length};});}
   async get(id){const row=await this.db.prepare('SELECT data, revision FROM courses WHERE user_id=? AND id=?').bind(this.userId,id).first();return row?{data:JSON.parse(row.data),revision:row.revision}:null;}
+  async delete(id,revision){
+    const result=await this.db.prepare('DELETE FROM courses WHERE user_id=? AND id=? AND revision=?').bind(this.userId,id,revision).run();
+    if(result.meta.changes!==1)throw Object.assign(new Error('This course changed in another window. Refresh before deleting it.'),{code:'conflict'});
+  }
   async save(data,revision,expectedData){
     const json=JSON.stringify(data);
     if(new TextEncoder().encode(json).length>900000)throw new Error('This course is too large. Import fewer questions or shorter source excerpts.');

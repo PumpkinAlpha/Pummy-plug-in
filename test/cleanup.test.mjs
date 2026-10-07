@@ -23,6 +23,20 @@ test('empty course, project association, source addition, bank append, saved cus
  assert.equal(s.question.answer,undefined);assert.ok(s.questionIndex.every(q=>!('answer' in q)&&!('definition' in q)));
  await assert.rejects(executeTool(new CourseRepository(db,'bob'),'open_test',{courseId:s.courseId}),/not found/);db.close();
 });
+test('course deletion requires the current revision and affects only the owner',async()=>{
+ const db=new LocalD1(),alice=new CourseRepository(db,'alice'),bob=new CourseRepository(db,'bob');
+ const first=(await executeTool(alice,'create_course',{requestId:crypto.randomUUID(),name:'First'})).state;
+ const second=(await executeTool(alice,'create_course',{requestId:crypto.randomUUID(),name:'Second'})).state;
+ const other=(await executeTool(bob,'create_course',{requestId:crypto.randomUUID(),name:'Private'})).state;
+ await assert.rejects(executeTool(bob,'delete_course',{courseId:first.courseId,revision:first.revision}),/changed in another window/);
+ const renamed=(await executeTool(alice,'update_course',{courseId:first.courseId,revision:first.revision,name:'Renamed'})).state;
+ await assert.rejects(executeTool(alice,'delete_course',{courseId:first.courseId,revision:first.revision}),/changed in another window/);
+ const {courses}=await executeTool(alice,'delete_course',{courseId:first.courseId,revision:renamed.revision});
+ assert.deepEqual(courses.map(c=>c.id),[second.courseId]);
+ assert.equal((await executeTool(bob,'list_courses',{})).courses[0].id,other.courseId);
+ await assert.rejects(executeTool(alice,'read_course_state',{courseId:first.courseId}),/not found/);
+ db.close();
+});
 test('unsupported foundation plus replacement completes in one write, hides key and tolerates duplicate model writes',async()=>{
  const db=new LocalD1(),repo=new CourseRepository(db,'alice');let {state:s}=await executeTool(repo,'import_questions',{requestId:crypto.randomUUID(),name:'Thorax',questions:[keyed],sources:[{id:'arch',name:'Arch',text:'Brachiocephalic trunk, left common carotid, left subclavian, right to left.'}]});
  s=(await executeTool(repo,'start_test',{...args(s),size:1})).state;s=(await executeTool(repo,'submit_answer',{...args(s),questionId:s.question.id,choices:[1]})).state;

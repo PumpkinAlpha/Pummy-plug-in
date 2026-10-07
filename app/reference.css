@@ -119,8 +119,16 @@ input::placeholder,textarea::placeholder { color:var(--faint); }
 .course-tile { display:flex; flex-direction:column; min-height:270px; padding:22px; border:1px solid var(--line); border-radius:14px; background:var(--panel); box-shadow:0 6px 22px #0002; }
 .course-tile-heading { display:flex; align-items:start; justify-content:space-between; gap:12px; }
 .course-tile h2 { margin:0; color:var(--ink); font-size:23px; font-weight:700; letter-spacing:-.02em; overflow-wrap:anywhere; }
-.course-add-mark { display:grid; place-items:center; width:36px; height:36px; flex:none; border:0; border-radius:8px; background:var(--brand); color:#fff; font-size:25px; line-height:1; }
-.course-add-mark:hover { filter:brightness(1.12); }
+.course-options { position:relative; flex:none; }
+.course-options-trigger { display:grid; place-items:center; width:36px; height:36px; border:1px solid var(--line); border-radius:8px; background:var(--raised); color:var(--muted); }
+.course-options-trigger:hover,.course-options-trigger[aria-expanded="true"] { color:var(--brand); border-color:var(--brand); }
+.course-options-menu { position:absolute; z-index:10; top:42px; right:0; width:180px; padding:5px; border:1px solid var(--line-2); border-radius:10px; background:var(--panel); box-shadow:0 14px 34px #0005; }
+.course-options-menu button { display:flex; align-items:center; gap:9px; width:100%; padding:10px; border:0; border-radius:6px; background:transparent; color:var(--ink); text-align:left; font-size:13px; }
+.course-options-menu button:hover { background:var(--raised); }
+.course-options-menu button.danger { color:#d75646; }
+.course-add-tile { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; min-height:270px; border:1px dashed var(--line-2); border-radius:14px; background:var(--panel); color:var(--muted); font-size:16px; box-shadow:0 6px 22px #0001; }
+.course-add-tile:hover { border-color:var(--brand); background:var(--raised); color:var(--brand); }
+.course-add-icon { display:grid; place-items:center; width:54px; height:54px; border-radius:12px; background:var(--brand); color:#fff; }
 .outlined-label { align-self:flex-start; margin-top:8px; padding:4px 8px; border:1px solid var(--line-2); border-radius:6px; color:var(--muted); font:600 11px ui-monospace,Menlo,monospace; letter-spacing:.06em; text-transform:uppercase; }
 .mini-track { height:6px; margin:18px 0 14px; background:var(--line); }
 .mini-track i { display:block; height:100%; background:var(--brand); }
@@ -132,6 +140,12 @@ input::placeholder,textarea::placeholder { color:var(--faint); }
 .open-course span { color:var(--brand); font-size:22px; line-height:1; }
 .home-empty { margin:50px auto; text-align:center; }
 .home-empty .actions { justify-content:center; }
+.course-action-form { display:grid; gap:13px; }
+.course-action-form label { color:var(--muted); font-size:13px; font-weight:650; }
+.course-action-form input { width:100%; padding:11px 12px; border:1px solid var(--line-2); border-radius:8px; background:var(--raised); color:var(--ink); font:inherit; }
+.course-action-form p { margin:0; line-height:1.55; }
+.course-action-buttons { display:flex; justify-content:flex-end; gap:9px; margin-top:6px; }
+.course-delete-confirm { background:#b9382e; border-color:#b9382e; }
 
 /* Course page: App folder rows and a compact study action bar. */
 .dashboard-view .layout { display:block; max-width:1240px; padding-top:34px; }
