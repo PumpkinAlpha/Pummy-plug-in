@@ -1,4 +1,5 @@
 import page from '../app/view.html';
+import logoDataUrl from '../app/pummy-logo.png';
 import { handleMcp } from './mcp.js';
 import { executeTool } from './tools.js';
 import { CourseRepository } from './repository.js';
@@ -6,7 +7,8 @@ const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control
 export default {async fetch(request,env){
  const url=new URL(request.url),user=request.headers.get('oai-authenticated-user-id');
  try{
-  if(url.pathname==='/health')return json({ok:true,app:'Pummy Adaptive Test',version:'0.4.2'});
+  if(url.pathname==='/health')return json({ok:true,app:'Pummy Adaptive Test',version:'0.4.4'});
+  if(url.pathname==='/pummy-logo.png')return new Response(Uint8Array.from(atob(logoDataUrl.split(',')[1]),c=>c.charCodeAt(0)),{headers:{'Content-Type':'image/png','Cache-Control':'public, max-age=86400','X-Content-Type-Options':'nosniff'}});
   if(url.pathname==='/mcp'){
    // Discovery is public; the hosting boundary supplies authenticated identity for private calls.
    if(request.method==='POST'){

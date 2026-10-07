@@ -8,6 +8,6 @@ const favicon=`data:image/png;base64,${(await readFile('app/pummy-logo.png')).to
 const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Adaptive practice tests with foundation questions and saved progress."><title>Pummy Adaptive Test</title><link rel="icon" type="image/png" href="${favicon}"><style>${css}</style></head><body><div id="root"><main class="workspace"><section class="layout"><div role="status"><h1>Opening Pummy…</h1><p>If this screen stays here, close and reopen the panel. Your progress is saved.</p><noscript>JavaScript is required to display the exam.</noscript></div></section></main></div><script>${js}</script></body></html>`;
 await writeFile('app/view.html',html);
 await rm('dist',{recursive:true,force:true});await mkdir('dist/server',{recursive:true});
-await build({entryPoints:['worker/index.js'],bundle:true,platform:'browser',format:'esm',target:'es2022',outfile:'dist/server/index.js',loader:{'.html':'text'},minify:true});
+await build({entryPoints:['worker/index.js'],bundle:true,platform:'browser',format:'esm',target:'es2022',outfile:'dist/server/index.js',loader:{'.html':'text','.png':'dataurl'},minify:true});
 await cp('.openai','dist/.openai',{recursive:true});await cp('drizzle','dist/drizzle',{recursive:true});
 console.log('Built standalone MCP App UI and Cloudflare Worker.');
