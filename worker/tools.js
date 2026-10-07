@@ -17,6 +17,8 @@ const question=z.union([
 ]);
 const project=z.object({name:z.string().min(1).max(160),url:z.string().url().max(800).refine(v=>{try{const u=new URL(v);return u.protocol==='https:'&&u.hostname==='chatgpt.com'&&!u.username&&!u.password&&/^\/g\/g-p-[^/]+(?:\/project)?\/?$/.test(u.pathname);}catch{return false;}},'Paste a ChatGPT Project URL, not a chat or GPT link.')});
 const courseArgs={courseId:id},stateArgs={...courseArgs,revision},sessionArgs={...stateArgs,sessionId:id};
+const folderKind=z.enum(['week','lecture','unassigned','all']);
+const folderKey=(kind,label)=>`${kind}:${label}`;
 const types=z.array(z.enum(['mcq','multi','image','order','match','label'])).max(6).nullable();
 const preferences=z.object({size:z.number().int().min(1).max(100).default(20),adaptive:z.boolean().default(true),practiceFirst:z.boolean().default(true),includeReviews:z.boolean().default(true),types:types.default(null),sourceIds:z.array(id).max(30).nullable().default(null),objectiveIds:z.array(id).max(200).nullable().default(null),weekId:id.default('all'),setId:id.nullable().default(null)});
 const objective=z.object({id,text:z.string().min(1).max(4000),num:z.union([z.string().max(40),z.number()]).optional(),lecture:z.string().max(300).optional(),sourceId:id.nullish(),weekId:id.nullish()});
@@ -27,6 +29,8 @@ export const definitions=[
  {name:'create_course',title:'Add course',description:'Create an empty course, optionally linked to a ChatGPT Project. A URL is a reference, not permission to fetch its files. Open a chat inside that Project and use accessible sources to populate this course.',schema:z.object({requestId:z.string().uuid(),name:z.string().min(1).max(160),project:project.nullish()}),readOnly:false},
  {name:'update_course',title:'Course sources and project',description:'Rename a course, set or clear its ChatGPT Project reference, or add source excerpts explicitly supplied by the student or accessible in the current Project chat. Never fabricate project access or replace existing source content.',schema:z.object({...stateArgs,name:z.string().min(1).max(160).optional(),project:project.nullish(),sources:z.array(z.object({id,name:z.string().min(1).max(300),text:z.string().min(1).max(60000),rank:z.number().int().min(1).max(6).default(1)})).max(30).optional()}),readOnly:false},
  {name:'delete_course',title:'Delete course',description:'Delete a course and its saved questions and progress after the student confirms in the app.',schema:z.object(stateArgs),readOnly:false,appOnly:true},
+ {name:'manage_folder',title:'Rename or remove study folder',description:'Rename a displayed study folder, or remove its grouping after confirmation while keeping its study material in the course.',schema:z.object({...stateArgs,kind:folderKind,label:z.string().min(1).max(300),action:z.enum(['rename','delete']),newName:z.string().min(1).max(160).optional()}),readOnly:false,appOnly:true},
+ {name:'set_folder_tags',title:'Assign study folder tags',description:'Save tags used to filter study folders in the course overview.',schema:z.object({...stateArgs,assignments:z.array(z.object({kind:folderKind,label:z.string().min(1).max(300),tags:z.array(z.string().trim().min(1).max(40)).max(12)})).max(250)}),readOnly:false,appOnly:true},
  {name:'save_custom_test',title:'Save custom test',description:'Save a named test with a specific subset of the course question bank and exam settings. Does not start or replace an active exam.',schema:preferences.extend({...stateArgs,testId:z.string().uuid(),name:z.string().min(1).max(120),questionIds:z.array(id).min(1).max(200)}),readOnly:false},
  {name:'read_course_state',title:'Read saved course state',description:'Read the same saved course/exam state as open_test without opening an app tab. No courseId lists courses. Use for background polling, revision checks, sync and tutor prompts; unsubmitted keys stay hidden. Does not change progress.',schema:z.object({courseId:id.optional()}),readOnly:true},
  {name:'open_test',title:'Read saved exam (legacy)',description:'Legacy read-only alias of read_course_state. Returns saved library/course/exam state WITHOUT opening a panel. Prefer read_course_state for sync, tutoring and checks. Unsubmitted answer keys stay hidden; progress is never changed.',schema:z.object({courseId:id.optional()}),readOnly:true},
@@ -95,6 +99,30 @@ export async function executeTool(repo,name,raw){
  if(args.revision!==saved.revision)throw Object.assign(new Error('Your test changed. Refresh before continuing.'),{code:'conflict'});
  if(name==='add_questions'){if(model.questions.size+args.questions.length>500)throw new Error('Split larger courses; use at most 500 stored questions per course.');args.questions.forEach(validateQuestion);for(const src of args.sources){if(model.sources.has(src.id)){if(model.texts.get(src.id)!==src.text)throw new Error('That source ID has different content. Use a new ID to preserve the existing reference.');}else{const {text,...info}=src;model.sources.set(src.id,{...info,kind:'material',createdAt:Date.now()});model.texts.set(src.id,text);}}if(model.sources.size>30)throw new Error('Use up to 30 course sources.');for(const o of args.objectives){if(!model.objectives.some(v=>v.id===o.id))model.objectives.push(o);}if(model.objectives.length>200)throw new Error('Use up to 200 objectives.');for(const q of args.questions){if(q.sourceId&&!model.sources.has(q.sourceId))throw new Error('A question references a missing source.');if((q.objective||q.objectiveId)&&!model.objective(q.objective||q.objectiveId))throw new Error('A question references a missing objective.');ingest(model,q,model.questions.size);}model.completedRequests=[...model.completedRequests,{id:args.requestId,tool:'add_questions',sessionId:s?.id,addedCount:args.questions.length,completedAt:Date.now()}].slice(-40);}
  else if(name==='update_course'){if(args.name)model.nameData=args.name.trim();if('project' in args)model.project=args.project||null;for(const src of args.sources||[]){if(model.sources.has(src.id))throw new Error('That source ID already exists. Add a new source ID to preserve the existing reference.');model.sources.set(src.id,{id:src.id,name:src.name,rank:src.rank,kind:'material',createdAt:Date.now()});model.texts.set(src.id,src.text);}if(model.sources.size>30)throw new Error('Use up to 30 sources per course.');}
+ else if(name==='manage_folder'){
+  const key=folderKey(args.kind,args.label);
+  if(args.action==='rename'){
+   if(!args.newName?.trim())throw new Error('Enter a folder name.');
+   if(Object.entries(model.folderNames).some(([other,name])=>other!==key&&name.toLowerCase()===args.newName.trim().toLowerCase()))throw new Error('Another folder already has that name.');
+   model.folderNames[key]=args.newName.trim();
+  }else{
+   if(!['week','lecture'].includes(args.kind))throw new Error('The default study folder cannot be removed.');
+   const prop=args.kind==='week'?'weekId':'lecture';
+   const old=args.label;
+   for(const src of model.sources.values())if(src[prop]===old)src[prop]=args.kind==='week'?null:'';
+   for(const q of model.questions.values())if(q[prop]===old)q[prop]=args.kind==='week'?null:'';
+   for(const objective of model.objectives)if(objective[prop]===old)objective[prop]=args.kind==='week'?null:'';
+   if(args.kind==='lecture')for(const concept of model.concepts.values())if(concept.lecture===old)concept.lecture='';
+   if(args.kind==='week'){
+    if(model.preferences.weekId===old)model.preferences.weekId='all';
+    for(const test of model.customTests)if(test.preferences?.weekId===old)test.preferences.weekId='all';
+   }
+   delete model.folderNames[key];delete model.folderTags[key];
+  }
+ }
+ else if(name==='set_folder_tags'){
+  for(const a of args.assignments){const tags=[...new Set(a.tags.map(t=>t.trim()))];const key=folderKey(a.kind,a.label);if(tags.length)model.folderTags[key]=tags;else delete model.folderTags[key];}
+ }
  else if(name==='save_custom_test'){if(new Set(args.questionIds).size!==args.questionIds.length||args.questionIds.some(id=>!model.rootQuestions().some(q=>q.id===id&&q.keyed)))throw new Error('Select valid course questions without duplicates.');const t={id:args.testId,name:args.name.trim(),questionIds:args.questionIds,preferences:preferences.parse(args)};model.customTests=model.customTests.filter(t=>t.id!==args.testId);if(model.customTests.length>=30)throw new Error('Use up to 30 custom tests per course.');model.customTests.push(t);}
  else if(name==='save_preferences'){model.preferences=preferences.parse(args);}
  else if(name==='start_test'){

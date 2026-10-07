@@ -37,6 +37,21 @@ test('course deletion requires the current revision and affects only the owner',
  await assert.rejects(executeTool(alice,'read_course_state',{courseId:first.courseId}),/not found/);
  db.close();
 });
+test('folder names and tags persist; removing a folder keeps its material',async()=>{
+ const db=new LocalD1(),repo=new CourseRepository(db,'alice');
+ let {state:s}=await executeTool(repo,'import_questions',{requestId:crypto.randomUUID(),name:'Anatomy',sources:[{id:'lecture-a',name:'Thorax slides',lecture:'Thorax',text:'A course excerpt about veins.'}],questions:[{...keyed,sourceId:'lecture-a',lecture:'Thorax'}]});
+ const folder={courseId:s.courseId,revision:s.revision,kind:'lecture',label:'Thorax'};
+ s=(await executeTool(repo,'manage_folder',{...folder,action:'rename',newName:'Thoracic Viscera'})).state;
+ assert.equal(s.folderNames['lecture:Thorax'],'Thoracic Viscera');
+ await assert.rejects(executeTool(repo,'set_folder_tags',{...folder,assignments:[{kind:'lecture',label:'Thorax',tags:['exam 1']}]}),/changed/);
+ s=(await executeTool(repo,'set_folder_tags',{courseId:s.courseId,revision:s.revision,assignments:[{kind:'lecture',label:'Thorax',tags:['exam 1','anatomy']}]})).state;
+ assert.deepEqual(s.folderTags['lecture:Thorax'],['exam 1','anatomy']);
+ const originalQuestion=s.questionIndex[0].id;
+ s=(await executeTool(repo,'manage_folder',{courseId:s.courseId,revision:s.revision,kind:'lecture',label:'Thorax',action:'delete'})).state;
+ assert.equal(s.questionCount,1);assert.equal(s.questionIndex[0].id,originalQuestion);assert.equal(s.questionIndex[0].lecture,'');assert.equal(s.sources[0].lecture,'');
+ assert.equal(s.folderNames['lecture:Thorax'],undefined);assert.equal(s.folderTags['lecture:Thorax'],undefined);
+ db.close();
+});
 test('unsupported foundation plus replacement completes in one write, hides key and tolerates duplicate model writes',async()=>{
  const db=new LocalD1(),repo=new CourseRepository(db,'alice');let {state:s}=await executeTool(repo,'import_questions',{requestId:crypto.randomUUID(),name:'Thorax',questions:[keyed],sources:[{id:'arch',name:'Arch',text:'Brachiocephalic trunk, left common carotid, left subclavian, right to left.'}]});
  s=(await executeTool(repo,'start_test',{...args(s),size:1})).state;s=(await executeTool(repo,'submit_answer',{...args(s),questionId:s.question.id,choices:[1]})).state;

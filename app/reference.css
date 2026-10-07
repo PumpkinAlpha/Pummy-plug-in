@@ -146,6 +146,10 @@ input::placeholder,textarea::placeholder { color:var(--faint); }
 .course-action-form p { margin:0; line-height:1.55; }
 .course-action-buttons { display:flex; justify-content:flex-end; gap:9px; margin-top:6px; }
 .course-delete-confirm { background:#b9382e; border-color:#b9382e; }
+.course-options-dialog { display:grid; gap:7px; }
+.course-options-dialog button { display:flex; align-items:center; gap:10px; width:100%; padding:13px; border:1px solid var(--line); border-radius:8px; background:var(--raised); color:var(--ink); text-align:left; }
+.course-options-dialog button:hover { border-color:var(--brand); }
+.course-options-dialog button.danger { color:#e36454; }
 
 /* Course page: App folder rows and a compact study action bar. */
 .dashboard-view .layout { display:block; max-width:1240px; padding-top:34px; }
@@ -157,9 +161,12 @@ input::placeholder,textarea::placeholder { color:var(--faint); }
 .folder-filters { display:flex; gap:8px; margin-bottom:18px; }
 .filter-active,.filter-plus { display:grid; place-items:center; min-height:36px; padding:0 14px; border:0; border-radius:99px; background:var(--primary); color:#fff; font-size:13px; font-weight:650; }
 .filter-plus { width:36px; padding:0; background:var(--raised); color:var(--ink); font-size:22px; }
+.filter-tag { min-height:36px; padding:0 14px; border:1px solid var(--line-2); border-radius:99px; background:var(--raised); color:var(--muted); font-size:13px; }
+.folder-filters { flex-wrap:wrap; }
 .folder-toolbar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:16px 0 12px; color:var(--muted); font-size:13px; }
 .folder-count { color:var(--faint); }
 .folder-list { display:grid; gap:6px; }
+.folder-entry { display:flex; align-items:center; position:relative; border-radius:10px; background:var(--raised); }
 .folder-row { display:flex; align-items:center; gap:12px; width:100%; padding:7px 12px; border:1px solid transparent; border-radius:10px; background:var(--raised); color:var(--ink); text-align:left; }
 .folder-row:hover,.folder-row.selected { border-color:var(--line-2); }
 .folder-icon { display:grid; place-items:center; width:44px; height:44px; flex:none; border-radius:8px; background:var(--panel); }
@@ -168,6 +175,26 @@ input::placeholder,textarea::placeholder { color:var(--faint); }
 .folder-copy strong { font-size:15px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .folder-copy small { color:var(--muted); font-size:12px; }
 .folder-chevron { margin-left:auto; color:var(--faint); font-size:22px; }
+.folder-options { position:relative; padding-right:10px; flex:none; }
+.folder-options-trigger { display:grid; place-items:center; width:32px; height:32px; border:0; border-radius:7px; background:transparent; color:var(--muted); }
+.folder-options-trigger:hover,.folder-options-trigger[aria-expanded="true"] { background:var(--panel); color:var(--brand); }
+.folder-options .course-options-menu { top:37px; }
+.folder-back { display:flex; align-items:center; gap:5px; margin:0 0 24px; padding:4px 0; border:0; background:transparent; color:var(--muted); font-size:14px; }
+.folder-back:hover { color:var(--brand); }
+.folder-subtitle { color:var(--muted); font-size:13px; }
+.folder-tag-list { display:flex; flex-wrap:wrap; gap:7px; margin:-8px 0 24px; }
+.folder-tag { padding:5px 9px; border:1px solid var(--line-2); border-radius:99px; color:var(--brand); font-size:12px; }
+.subfolder-actions { display:flex; gap:9px; margin:24px 0 32px; }
+.subfolder-view h2 { margin:26px 0 10px; font-size:17px; }
+.subfolder-resources,.subfolder-questions { border:1px solid var(--line); border-radius:10px; background:var(--panel); }
+.subfolder-resources .source-entry { align-items:center; justify-content:flex-start; padding:15px; }
+.subfolder-resources .source-entry:last-child { border-bottom:0; }
+.subfolder-resources .source-entry span { flex:1; color:var(--ink); }
+.subfolder-questions > div { padding:13px 15px; border-bottom:1px solid var(--line); font-size:13px; line-height:1.45; }
+.subfolder-questions > div:last-child { border-bottom:0; }
+.tag-assignment-list { display:grid; gap:10px; }
+.tag-assignment-row { display:grid; grid-template-columns:minmax(130px,1fr) minmax(170px,2fr); align-items:center; gap:10px; }
+.tag-assignment-row span { font-size:13px; }
 .folder-detail { margin:0 8px 10px; padding:14px 18px; border:1px solid var(--line); border-radius:0 0 10px 10px; background:var(--panel); }
 .folder-detail-actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
 .source-entry { display:flex; justify-content:space-between; gap:12px; width:100%; padding:10px 0; border:0; border-bottom:1px solid var(--line); background:none; color:var(--ink); text-align:left; font-size:13px; }
