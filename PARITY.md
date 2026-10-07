@@ -37,3 +37,7 @@ The current snapshot architecture caps each saved course at 900 KB. Embedded ima
 ## Verification
 
 Seventeen backend/protocol tests pass. Native browser verification completed a six-format isolated local exam, checked correct feedback, final rich review results, progress, desktop appearance, and a 390px layout without horizontal overflow. The upgraded interface opens in the actual installed host and resumes existing progress. This already-running conversation retains the old nine-tool trusted scope: newly added source, explanation, settings and end/download actions require a fresh plugin conversation. This limitation is shown plainly instead of exposing an internal scope error. Live audio/download support and new-tool interactions are not yet verified in a refreshed host session.
+
+## v0.3 cleanup
+
+Course creation, append-only bank/reference management, ChatGPT Project links, saved/editable custom question selections and source-based bank authoring handoff are now available. A Project link is not automatic source-file access or cross-project chat routing; open the plugin inside that Project chat. Bank practice avoids generation. Adaptive tutoring still runs through the conversation model. The export remains a question-bank/spaced-review backup, not a full course/project/custom-test configuration backup.

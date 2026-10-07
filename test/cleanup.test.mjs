@@ -1,0 +1,43 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {LocalD1} from '../scripts/local-db.mjs';
+import {CourseRepository} from '../worker/repository.js';
+import {executeTool} from '../worker/tools.js';
+import {pendingKey,tutorContext,requestTracker} from '../app/pending.js';
+const keyed={term:'Arch order',stem:'Which arch branch is first?',options:['Brachiocephalic trunk','Left subclavian'],answer:[0],definition:'Brachiocephalic trunk is first.'};
+const args=s=>({courseId:s.courseId,revision:s.revision,sessionId:s.session?.id});
+test('empty course, project association, source addition, bank append, saved custom test and exact fast-bank selection',async()=>{
+ const db=new LocalD1(),repo=new CourseRepository(db,'alice');const requestId=crypto.randomUUID();
+ let {state:s}=await executeTool(repo,'create_course',{requestId,name:'Thorax',project:{name:'Anatomy',url:'https://chatgpt.com/g/g-p-test-anatomy/project'}});
+ assert.equal(s.questionCount,0);assert.equal(s.project.name,'Anatomy');assert.deepEqual((await executeTool(repo,'create_course',{requestId,name:'Ignore'})).state,s);
+ await assert.rejects(executeTool(repo,'update_course',{...args(s),project:{name:'Wrong',url:'https://example.com'}}),/Project URL/);
+ s=(await executeTool(repo,'update_course',{...args(s),sources:[{id:'arch',name:'Arch slides',text:'Normal right-to-left order: brachiocephalic trunk, left common carotid, left subclavian.'}]})).state;
+ const rid=crypto.randomUUID(),add={...args(s),requestId:rid,questions:[{...keyed,sourceId:'arch'},{...keyed,stem:'Which arch branch is last?',options:['Brachiocephalic trunk','Left subclavian'],answer:[1],definition:'Left subclavian is last.',sourceId:'arch'}]};
+ s=(await executeTool(repo,'add_questions',add)).state;assert.equal(s.questionCount,2);assert.equal(s.hasMaterials,true);
+ const testId=crypto.randomUUID();s=(await executeTool(repo,'save_custom_test',{...args(s),testId,name:'Both arch questions',adaptive:false,size:2,questionIds:s.questionIndex.map(q=>q.id)})).state;
+ assert.equal(s.customTests.length,1);assert.equal(s.session,null);
+ s=(await executeTool(repo,'start_test',{...args(s),customTestId:testId})).state;assert.equal(s.session.total,2);assert.equal(s.session.adaptive,false);const session=s.session.id;
+ assert.equal((await executeTool(repo,'add_questions',add)).state.questionCount,2);assert.equal((await executeTool(repo,'add_questions',add)).state.session.id,session);
+ s=(await executeTool(repo,'update_course',{...args(s),name:'Thoracic Anatomy'})).state;assert.equal(s.name,'Thoracic Anatomy');assert.equal(s.session.id,session);
+ const stored=await repo.get(s.courseId);assert.equal(stored.data.project.name,'Anatomy');assert.equal(stored.data.customTests[0].id,testId);
+ assert.equal(s.question.answer,undefined);assert.ok(s.questionIndex.every(q=>!('answer' in q)&&!('definition' in q)));
+ await assert.rejects(executeTool(new CourseRepository(db,'bob'),'open_test',{courseId:s.courseId}),/not found/);db.close();
+});
+test('unsupported foundation plus replacement completes in one write, hides key and tolerates duplicate model writes',async()=>{
+ const db=new LocalD1(),repo=new CourseRepository(db,'alice');let {state:s}=await executeTool(repo,'import_questions',{requestId:crypto.randomUUID(),name:'Thorax',questions:[keyed],sources:[{id:'arch',name:'Arch',text:'Brachiocephalic trunk, left common carotid, left subclavian, right to left.'}]});
+ s=(await executeTool(repo,'start_test',{...args(s),size:1})).state;s=(await executeTool(repo,'submit_answer',{...args(s),questionId:s.question.id,choices:[1]})).state;
+ assert.match(s.generation.prompt,/ONLY if explicitly marked/);
+ await assert.rejects(executeTool(repo,'provide_question',{...args(s),generationId:s.generation.id,question:{...keyed,term:'ARCH ORDER'}}),/distinct prerequisite/);
+ const payload={...args(s),generationId:s.generation.id,question:{outOfScope:true,gap:'No distinct prerequisite is supported by the excerpt.',replacement:{...keyed,stem:'Which arch branch arises to the right of the left common carotid?'}}};
+ s=(await executeTool(repo,'provide_question',payload)).state;assert.equal(s.generation,null);assert.equal(s.session.next.ready,true);assert.equal(s.session.phase,'feedback');assert.equal(s.session.nextType,'retry');
+ assert.deepEqual((await executeTool(repo,'provide_question',payload)).state,s);
+ s=(await executeTool(repo,'next_question',args(s))).state;assert.match(s.question.stem,/to the right/);assert.equal(s.question.answer,undefined);
+ db.close();
+});
+test('tutor context omits generation prompt and keys; request dedup survives new views and failed sends can retry',()=>{
+ const values=new Map(),storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+ const s={courseId:'course',revision:8,session:{phase:'feedback'},generation:{id:'request',prompt:'A very long prompt with a key'},question:{id:'q',answer:[0]},project:{name:'Anatomy'}};
+ assert.equal(pendingKey(s),'question:course:request');const context=tutorContext(s);assert.equal(context.generation.prompt,undefined);assert.equal(context.question.answer,undefined);assert.equal(context.project.name,'Anatomy');
+ const a=requestTracker(storage),now=1_000_000;assert.equal(a.begin(pendingKey(s),now),true);assert.equal(a.begin(pendingKey(s),now),false);a.finish(pendingKey(s),true);
+ const b=requestTracker(storage);assert.equal(b.begin(pendingKey(s),now+1),false);assert.equal(b.begin(pendingKey(s),now+90001),true);b.finish(pendingKey(s),false);assert.equal(b.begin(pendingKey(s),now+90002),true);
+});
