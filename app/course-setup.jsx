@@ -9,7 +9,7 @@ const SOURCE_TYPES=['professor_slides','objectives','group_activity','professor_
 const DEFAULT_RANKS={professor_slides:1,objectives:2,group_activity:2,professor_quiz:3,course_supplement:4,approved_external:5,other:6};
 const typeLabel=type=>(type||'other').replaceAll('_',' ');
 
-export function CourseForm({state,busy,folderScope,onSave,onCreateFolder,onAddSource,onUpdateSource,onDeleteSource,onRestoreSource,onImport,onImportSource,onDownloadSource,onBuild,onSync,syncing,syncError,connected,onExplain,onContinueExplanations}){
+export function CourseForm({state,busy,folderScope,onFolderChange,onSave,onCreateFolder,onAddSource,onUpdateSource,onDeleteSource,onRestoreSource,onImport,onImportSource,onDownloadSource,onBuild,onSync,syncing,syncError,connected,onExplain,onContinueExplanations}){
  const folders=studyFolders(state);
  const [selectedKey,setSelectedKey]=useState(()=>folderScope?folderKey(folderScope):folders[0]?.key);
  const [projectName,setProjectName]=useState(state.project?.name||'');
@@ -19,6 +19,7 @@ export function CourseForm({state,busy,folderScope,onSave,onCreateFolder,onAddSo
  const [creatingFolder,setCreatingFolder]=useState(false),[folderName,setFolderName]=useState('');
  useEffect(()=>{if(folderScope)setSelectedKey(folderKey(folderScope));},[folderScope?.kind,folderScope?.label]);
  const selected=folders.find(f=>f.key===selectedKey)||folders[0];
+ useEffect(()=>{onFolderChange?.(selected||null);},[selected?.key,selected?.displayName]);
  const visibleSources=sourcesInFolder(state,selected);
  const missing=questionsInFolder(state,selected).filter(q=>!q.hasExplanation);
  const folderOptions=folders.some(f=>f.kind==='all')?folders:[...folders,...(!folders.some(f=>f.kind==='unassigned')?[{kind:'unassigned',label:'Other resources',key:'unassigned:Other resources',displayName:'Other resources'}]:[])];

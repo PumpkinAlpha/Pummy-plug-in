@@ -13,7 +13,7 @@ const bundle=await build({entryPoints:['app/bridge.js'],bundle:true,write:false,
  }`}));
 }}]});
 function setup(call,embedded=true){const module={exports:{}},window={};window.parent=embedded?{}:window;const ctx={module,exports:module.exports,host:{call},window};vm.runInNewContext(bundle.outputFiles[0].text,ctx);return {api:module.exports,host:ctx.host};}
-test('a fullscreen request with no response does not block loading or exam tools',async()=>{
+test('inline initialization does not request host fullscreen or block tools',async()=>{
  const calls=[];const {api}=setup(async input=>{calls.push(input.name);return {structuredContent:{courses:[]}};});
  const result=await Promise.race([api.call('read_course_state'),new Promise((_,reject)=>setTimeout(()=>reject(Error('Blocked by display mode request')),100))]);
  assert.deepEqual(calls,['read_course_state']);assert.equal(result.courses.length,0);assert.equal(api.latest.courses.length,0);
@@ -49,11 +49,12 @@ test('stale background course responses cannot navigate away from a newly opened
  finish({structuredContent:{state:{courseId:'old',revision:5}}});await pending;
  assert.equal(api.latest.state.courseId,'new');
 });
-test('editor fullscreen uses the MCP host display mode when embedded',async()=>{
- const {api,host}=setup(async()=>({structuredContent:{courses:[]}}));await api.call('read_course_state');const calls=[];
+test('embedded editor expands locally without requesting host or browser fullscreen',async()=>{
+ const {api,host}=setup(async()=>({structuredContent:{courses:[]}}));const calls=[];
  host.display=async input=>{calls.push(input.mode);return {mode:'fullscreen'};};
+ await api.call('read_course_state');
  await api.fullscreen({requestFullscreen(){throw Error('Browser fullscreen must not be used in the host.');}});
- assert.deepEqual(calls,['fullscreen']);
+ assert.deepEqual(calls,[]);
 });
 test('standalone editor requests browser fullscreen and reports unsupported browsers',async()=>{
  const {api}=setup(null,false);let count=0;await api.fullscreen({requestFullscreen(){count++;return Promise.resolve();}});assert.equal(count,1);
