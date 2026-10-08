@@ -4,10 +4,10 @@ import {zipSync,unzipSync,strToU8,strFromU8} from 'fflate';
 import {CHUNK_SIZE,MAX_ASSET,encode64,decode64,pptxMetadata} from '../lib/tutor/presentations.js';
 import {annotationSVG} from '../lib/tutor/annotations.js';
 const assets=new Map(),uploads=new WeakMap();let documentCache=null;
-export async function uploadPresentationFile(call,courseId,file){
+export async function uploadPresentationFile(call,courseId,file,{source=false}={}){
  if(!file||!file.size||file.size>MAX_ASSET)throw new Error('Choose a PDF, PPT or PPTX up to 24 MB.');
- const kind=file.name.toLowerCase().endsWith('.pptx')?'pptx':file.name.toLowerCase().endsWith('.pdf')?'pdf':file.name.toLowerCase().endsWith('.ppt')?'ppt':null;
- if(!kind)throw new Error('Choose a PDF, PPT or PPTX file.');
+ const extension=file.name.toLowerCase().split('.').at(-1),kind=(source?['pdf','ppt','pptx','docx','txt','md']:['pdf','ppt','pptx']).includes(extension)?extension:null;
+ if(!kind)throw new Error(source?'Choose a PDF, PowerPoint, Word, TXT or Markdown file.':'Choose a PDF, PPT or PPTX file.');
  let transfer=uploads.get(file)?.get(courseId);
  if(!transfer){const data=encode64(new Uint8Array(await file.arrayBuffer()));transfer={data,assetId:crypto.randomUUID(),chunks:Math.ceil(data.length/CHUNK_SIZE),next:0};if(!uploads.has(file))uploads.set(file,new Map());uploads.get(file).set(courseId,transfer);}
  await call('begin_presentation_upload',{courseId,assetId:transfer.assetId,name:file.name,kind,bytes:file.size,chunks:transfer.chunks});

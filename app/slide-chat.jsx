@@ -12,7 +12,8 @@ async function originalVisual(dataUrl,region){
 }
 
 export function SlideChatContext({p,slide,image,annotations,region,onClear}){
- const [allowGeneral,setAllowGeneral]=useState(false),[status,setStatus]=useState(''),[retry,setRetry]=useState(0),current=useRef(null),generation=useRef(0);
+ const [allowGeneral,setAllowGeneral]=useState(false),[status,setStatus]=useState(''),[retry,setRetry]=useState(0),[open,setOpen]=useState(false),current=useRef(null),generation=useRef(0);
+ useEffect(()=>setOpen(false),[slide.id]);
  const notes=annotations.slice(0,30).map(a=>({id:a.id,type:a.type,text:a.text?.slice(0,4000),region:{x:a.x,y:a.y,w:a.w,h:a.h}}));
  const args={courseId:p.courseId,presentationId:p.id,slideId:slide.id,annotationIds:notes.map(a=>a.id),...(region?{region}:{}),allowGeneral};
  current.current={args,notes,image};
@@ -41,5 +42,5 @@ export function SlideChatContext({p,slide,image,annotations,region,onClear}){
   return()=>{alive=false;clearTimeout(timer);};
  },[slide.id,image,JSON.stringify(notes),JSON.stringify(region),allowGeneral,retry]);
  useEffect(()=>()=>{if(bridge)bridge.updateModelContext({structuredContent:{interactiveTutor:null},content:[{type:'text',text:'The Pummy slide editor is closed. The previously visible slide is no longer current.'}]}).catch(()=>{});},[]);
- return <section className="tutor-chat-context" aria-label="Conversation context"><div><strong>Ask in this chat</strong><span>Type your questions in the conversation beside Pummy.</span><small>Slide {slide.page} of {p.slides.length}{region?' · Selected region':notes.length?` · ${notes.length} selected annotation${notes.length===1?'':'s'}`:' · Whole slide'}</small></div>{region&&<button onClick={onClear}>Clear region</button>}<label><input type="checkbox" checked={allowGeneral} onChange={e=>setAllowGeneral(e.target.checked)}/>Allow general knowledge, clearly labeled</label>{bridge&&<span className="fine" role="status">{status}{status.startsWith('Could not')&&<button onClick={()=>setRetry(n=>n+1)}>Retry</button>}</span>}</section>;
+ return <section className="tutor-chat-context" aria-label="Conversation context"><details open={open} onToggle={e=>setOpen(e.currentTarget.open)}><summary>Ask in this chat <small>Slide {slide.page} of {p.slides.length}{region?' · Selected region':notes.length?` · ${notes.length} selected annotations`:' · Whole slide'}</small></summary><div className="tutor-chat-settings"><span>Type your questions in the conversation beside Pummy.</span><label><input type="checkbox" checked={allowGeneral} onChange={e=>setAllowGeneral(e.target.checked)}/>Allow general knowledge, clearly labeled</label>{bridge&&<span className="fine" role="status">{status}{status.startsWith('Could not')&&<button onClick={()=>setRetry(n=>n+1)}>Retry</button>}</span>}</div></details>{region&&<button onClick={onClear}>Clear region</button>}</section>;
 }

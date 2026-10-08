@@ -1,3 +1,4 @@
+import {uploadPresentationFile} from './tutor-files.js';
 import {extractQuestionFile,minimizeContacts,MAX_FILE_BYTES,MAX_TEXT} from './question-files.js';
 import {pptxMetadata} from '../lib/tutor/presentations.js';
 import {legacyPptSlides} from '../lib/tutor/legacy-ppt.js';
@@ -18,13 +19,15 @@ export async function extractSourceFile(file,options={}){
   if(!['pdf','docx','txt','md'].includes(extension))throw new Error('Choose PowerPoint (.ppt or .pptx), PDF, Word (.docx), TXT, or Markdown.');
   extracted=await extractQuestionFile(file,options);extracted.warnings=extracted.warnings.filter(w=>!w.startsWith('Text only:'));
  }
- return {...extracted,warnings:[...extracted.warnings,'This saves extracted source text. Images, diagrams and slide layout are not included. For slide viewing and annotation, import the presentation in Interactive Tutor; PowerPoint viewing uses a matching PDF.',...(['ppt','pptx'].includes(extension)?['PowerPoint speaker notes are not mixed into the slide reference.']:[])]};
+ return {...extracted,originalFile:file,warnings:[...extracted.warnings,'The original file is kept unchanged alongside this extracted text copy. The text copy is used for questions and tutoring; the original retains its images, layout and embedded media.',...(['ppt','pptx'].includes(extension)?['PowerPoint speaker notes are not mixed into the slide reference.']:[])]};
 }
 export async function saveManualSource(call,courseId,file,folder,attempt){
  const text=minimizeContacts(file.text).trim();if(!text||text.length>MAX_TEXT)throw new Error('Review source text containing 1–60,000 characters.');
+ if(!file.originalFile)throw new Error('Choose the original source file before importing.');
+ if(!attempt.originalAssetId)attempt.originalAssetId=await uploadPresentationFile(call,courseId,file.originalFile,{source:true});
  const state=(await call('read_course_state',{courseId})).state;
  const grouping=folder?.kind==='week'?{weekId:folder.label}:folder?.kind==='lecture'?{lecture:folder.label}:{};
  const pages=file.pages?.filter(p=>p.text.trim()).map(p=>({...p,text:minimizeContacts(p.text)}));
- const source={id:attempt.sourceId,name:file.name.trim(),text,sourceType:file.sourceType,rank:file.rank,...grouping,...(pages?.length?{pages}:{}),metadata:{originalFileName:file.originalFileName||file.name,mimeType:file.mimeType,sourceOrigin:'student_upload',...(file.pageCount?{pageCount:file.pageCount}:{})}};
+ const source={id:attempt.sourceId,originalAssetId:attempt.originalAssetId,name:file.name.trim(),text,sourceType:file.sourceType,rank:file.rank,...grouping,...(pages?.length?{pages}:{}),metadata:{originalFileName:file.originalFileName||file.name,mimeType:file.mimeType,sourceOrigin:'student_upload',...(file.pageCount?{pageCount:file.pageCount}:{})}};
  return call('sync_course_sources',{courseId,revision:state.revision,requestId:attempt.requestId,sources:[source]});
 }
