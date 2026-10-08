@@ -58,6 +58,7 @@ export function Markdown({ text }) {
       const rows = [];
       while (i < lines.length && /^\s*\|/.test(lines[i])) { rows.push(lines[i]); i++; }
       const body = rows.filter((r) => !/^\s*\|?\s*:?-{2,}/.test(r));
+      if (!body.length) { blocks.push(<p key={k++}>{rows.join('\n')}</p>); continue; }
       const [head, ...rest] = body;
       blocks.push(
         <div className="tablewrap" key={k++}><table className="t">

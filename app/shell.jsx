@@ -1,20 +1,22 @@
-import React,{useState} from 'react';
+import React,{useEffect,useState} from 'react';
 import {PummyMark} from './dashboard.jsx';
 import {Icon} from './icons.jsx';
 
 export function AppHeader({state,courses=[],busy,search,setSearch,searchRef,onHome,onOpenCourse,onTab,onSource,onSettings,onToggleSidebar,sidebarOpen,exam}){
  const [contextOpen,setContextOpen]=useState(false);
+ useEffect(()=>setContextOpen(false),[state?.courseId]);
+ useEffect(()=>{if(!contextOpen)return;const close=event=>{if(event.key==='Escape'||(event.type==='pointerdown'&&!event.target.closest('[data-course-context]')))setContextOpen(false);};document.addEventListener('keydown',close);document.addEventListener('pointerdown',close);return()=>{document.removeEventListener('keydown',close);document.removeEventListener('pointerdown',close);};},[contextOpen]);
  const matches=state&&search.trim()?state.sources.filter(src=>src.name.toLowerCase().includes(search.toLowerCase())).slice(0,8):[];
  return <header className={'topbar app-topbar'+(!state?' is-home':'')}>
   <div className="topbar-left">{state&&<>
    {!exam&&<button className="shell-icon-btn" type="button" aria-label={sidebarOpen?'Close sidebar':'Open sidebar'} aria-expanded={sidebarOpen} onClick={onToggleSidebar}><Icon name="menu" size={22}/></button>}
    <button className="brand" onClick={onHome} aria-label="Pummy.Ai home"><PummyMark/><span>Pummy.Ai</span></button>
-   <div className="context-menu"><button className="course-crumb" type="button" aria-haspopup="menu" aria-expanded={contextOpen} onClick={()=>setContextOpen(!contextOpen)}><span>{state.name}</span>{exam&&<><span className="context-sep">/</span><span>Exam</span></>}<Icon name="chevronDown" size={17}/></button>
+   <div className="context-menu" data-course-context><button className="course-crumb" type="button" aria-haspopup="menu" aria-expanded={contextOpen} onClick={()=>setContextOpen(!contextOpen)}><span>{state.name}</span>{exam&&<><span className="context-sep">/</span><span>Exam</span></>}<Icon name="chevronDown" size={17}/></button>
     {contextOpen&&<div className="context-pop" role="menu"><div className="context-heading">{state.name}</div><button role="menuitem" onClick={()=>{onTab('dashboard');setContextOpen(false);}}><Icon name="folder" size={17}/>Course overview</button><button role="menuitem" onClick={()=>{onTab('exam-setup');setContextOpen(false);}}><Icon name="exam" size={17}/>Adaptive exam</button><button role="menuitem" onClick={()=>{onTab('course');setContextOpen(false);}}><Icon name="library" size={17}/>Course & sources</button>{courses.filter(c=>c.id!==state.courseId).length>0&&<><hr/><div className="context-heading">Switch course</div>{courses.filter(c=>c.id!==state.courseId).map(c=><button key={c.id} role="menuitem" onClick={()=>{onOpenCourse(c.id);setContextOpen(false);}}><Icon name="folder" size={17}/>{c.name}</button>)}</>}</div>}
    </div>
   </>}</div>
   <div className="topbar-center">{state&&<div className="search-wrap"><label className="global-search"><Icon name="search" size={19}/><input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search your library, sources, or ask anything…" aria-label="Search course folders and sources"/><kbd>⌘K</kbd></label>{search.trim()&&<div className="search-matches">{matches.map(src=><button key={src.id} onClick={()=>{setSearch('');onSource(src.id);}}>{src.name}<span>Source ›</span></button>)}{!matches.length&&<p>No matching sources.</p>}</div>}</div>}</div>
-  <div className="header-actions"><span className={"save-indicator"+(busy?" working":"")} role="status" title={busy?'Working':'Saved on this device'}><span className="save-label">{busy?'Working':'Saved on this device'}</span></span><button className="shell-icon-btn" aria-label="Display settings" onClick={onSettings}><Icon name="gear" size={21}/></button></div>
+  <div className="header-actions"><span className={"save-indicator"+(busy?" working":"")} role="status" title={busy?'Working':'Saved'}><span className="save-label">{busy?'Working':'Saved'}</span></span><button className="shell-icon-btn" aria-label="Display settings" onClick={onSettings}><Icon name="gear" size={21}/></button></div>
  </header>;
 }
 

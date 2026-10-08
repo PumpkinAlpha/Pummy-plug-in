@@ -29,6 +29,13 @@ test('custom mode requests the entered exact count',()=>{
  assert.match(prompt,/Create exactly 37 distinct/);
 });
 
+test('generation capacity counts stored adaptive followups as well as root questions',()=>{
+ const withFollowups={...state,storedQuestionCount:498};
+ assert.equal(generationCapacity(withFollowups),2);
+ assert.match(buildGenerationPrompt(withFollowups,{...base,mode:'coverage'},'final-request'),/at most 2 more questions/);
+ assert.equal(generationCapacity({...state,storedQuestionCount:501}),0);
+});
+
 test('difficulty and generation preferences reach the prompt without claiming model routing',()=>{
  const prompt=buildGenerationPrompt(state,{...base,mode:'custom',count:8,difficulty:'mcat',questionModel:'gpt-6.1-sol',questionEffort:'high',explanationModel:'gpt-6-astra',explanationEffort:'xhigh'},'final-request');
  assert.match(prompt,/Difficulty: MCAT/);

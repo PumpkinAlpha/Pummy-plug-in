@@ -42,6 +42,22 @@ test('stable file IDs and conversion prompt preserve professor keys, authority a
  assert.equal(await fileSourceId('Quiz.TXT'),await fileSourceId('quiz.txt'));assert.notEqual(await fileSourceId('quiz.txt'),await fileSourceId('another.txt'));
  const prompt=questionFileMessage('course','quiz-reference','request');for(const expected of ['verbatim','supplied answer keys','untrusted','add_questions','requestId request','read_course_state','missing images','Do not launch','not a completed'])assert.ok(prompt.includes(expected),expected);
 });
+
+test('same-named question files in different folders preserve each reference',async t=>{
+ const db=new LocalD1();t.after(()=>db.close());const repo=new CourseRepository(db,'folder-file-test');const call=(name,args)=>executeTool(repo,name,args);
+ const {state}=await call('create_course',{requestId:crypto.randomUUID(),name:'Folder imports'});
+ const first={kind:'week',label:'week1'},second={kind:'week',label:'week2'};
+ const firstId=await fileSourceId('Quiz.txt',first),secondId=await fileSourceId('quiz.txt',second);
+ assert.equal(firstId,await fileSourceId('quiz.txt',first));assert.notEqual(firstId,secondId);
+ assert.notEqual(firstId,await fileSourceId('quiz.txt',{kind:'lecture',label:'week1'}));
+ const extracted=await extractQuestionFile(file('quiz.txt',quiz));
+ await stageQuestionFile(call,state.courseId,{...extracted,sourceType:'professor_quiz',rank:3},firstId,crypto.randomUUID(),first);
+ await stageQuestionFile(call,state.courseId,{...extracted,text:quiz.replace('Mock','Another'),sourceType:'professor_quiz',rank:3},secondId,crypto.randomUUID(),second);
+ const saved=(await call('read_course_state',{courseId:state.courseId})).state;
+ assert.deepEqual(saved.sources.map(source=>[source.id,source.weekId]),[[firstId,'week1'],[secondId,'week2']]);
+ assert.equal((await call('read_source',{courseId:state.courseId,sourceId:firstId})).source.text,quiz);
+ assert.match((await call('read_source',{courseId:state.courseId,sourceId:secondId})).source.text,/Another/);
+});
 test('file staging is source-only; append receipts confirm a single idempotent import and preserve keys/session',async t=>{
  const db=new LocalD1();t.after(()=>db.close());const repo=new CourseRepository(db,'file-test');const call=(name,args)=>executeTool(repo,name,args);
  let {state}=await call('import_questions',{requestId:crypto.randomUUID(),name:'Mock',questions:[{term:'Original',stem:'Original?',options:['One','Two'],answer:[0]}]});

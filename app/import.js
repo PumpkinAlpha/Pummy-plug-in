@@ -1,5 +1,6 @@
 const root=q=>['practice','own','generated'].includes(q.origin)&&q.keyed;
 export function banksFromFile(data,name){
+ if(!data||typeof data!=='object')throw new Error('This JSON must contain a question bank or an array of questions.');
  if(data.format==='daniel-ai-backup'&&Array.isArray(data.documents)){
   const assets=new Map((data.assets||[]).filter(a=>/^image\/(png|jpeg|webp|gif)$/.test(a.type)).map(a=>[a.id,`data:${a.type};base64,${a.data}`]));const courses=new Map();
   for(const [path,v] of data.documents){const p=path?.match(/^data\/users\/local\/workup\/courses\/([^/]+)(?:\/(sources|texts|questions|concepts|state)\/([^/]+))?$/);if(!p)continue;if(!courses.has(p[1]))courses.set(p[1],{name:'Imported course',questions:[],sources:[],texts:[],concepts:[],objectives:[]});const c=courses.get(p[1]);if(!p[2])c.name=v.name;else if(p[2]==='state'){if(p[3]==='objectives')c.objectives=v.items||[];}else c[p[2]].push({...v,id:p[3]});}
@@ -8,13 +9,13 @@ export function banksFromFile(data,name){
     const figure=q.figure?{dataUrl:q.figure.dataUrl||assets.get(q.figure.assetId),file:q.figure.file,unit:q.figure.unit,page:q.figure.page,marks:q.figure.marks||[]}:undefined;
     const image=q.image?(q.image.startsWith('data:')?q.image:assets.get(q.image)):undefined;
     if((q.figure&&!figure.dataUrl)||(q.image&&!image)){skipped.push(q.term||q.stem);return [];}
-    const explanation=q.explanation?{...q.explanation,figures:q.explanation.figures?.flatMap(f=>(f.assetIds||[]).map(a=>({dataUrl:assets.get(a),file:f.file,unit:f.unit||'page',page:f.page||1,caption:f.caption})).filter(f=>f.dataUrl)).slice(0,6)}:undefined;
-    return [{...q,figure,image,explanation,objective:c.objectives.some(o=>o.id===q.objectiveId)?q.objectiveId:undefined,sourceId:c.sources.some(s=>s.id===q.sourceId)?q.sourceId:undefined,distractors:q.type==='label'?q.bank.filter(x=>!q.targets.some(t=>t.answer===x)):undefined,progress:{attempts:q.attempts||0,correctCount:q.correctCount||0,lastSeen:q.lastSeen||0,lastResult:q.lastResult||null}}];
+    const explanation=q.explanation?{...q.explanation,figures:q.explanation.figures?.flatMap(f=>[...(f.dataUrl?[{...f}]:[]),...(f.assetIds||[]).map(a=>({dataUrl:assets.get(a),file:f.file,unit:f.unit||'page',page:f.page||1,caption:f.caption}))].filter(f=>f.dataUrl)).slice(0,6)}:undefined;
+    return [{...q,figure,image,explanation,objective:c.objectives.some(o=>o.id===q.objectiveId)?q.objectiveId:undefined,objectiveId:undefined,sourceId:c.sources.some(s=>s.id===q.sourceId)?q.sourceId:undefined,distractors:q.type==='label'?(q.distractors||q.bank?.filter(x=>!q.targets.some(t=>t.answer===x))||[]):undefined,progress:{attempts:q.attempts||0,correctCount:q.correctCount||0,lastSeen:q.lastSeen||0,lastResult:q.lastResult||null}}];
    });
-   return {name:c.name,questions,sources:c.sources.map(s=>({...s,rank:s.rank||3,text:c.texts.filter(t=>t.sid===s.id).sort((a,b)=>a.i-b.i).map(t=>t.text).join('').slice(0,60000)})),objectives:c.objectives,conceptProgress:c.concepts.map(c=>({term:c.name,status:c.status||'new',interval:c.interval||0,ease:c.ease||2.6,due:c.due||0,reps:c.reps||0,lapses:c.lapses||0,attempts:c.attempts||0,correct:c.correct||0,lastSeen:c.lastSeen||0})),skipped};
+   return {name:c.name||'Imported course',questions,sources:c.sources.map(s=>{const text=c.texts.filter(t=>t.sid===s.id).sort((a,b)=>a.i-b.i).map(t=>t.text).join('');if(text.length>60000)throw new Error(`Reference "${s.name||s.id}" contains more than 60,000 characters. Split it into smaller references before importing; nothing was imported.`);return {...s,rank:s.rank||3,text};}),objectives:c.objectives,conceptProgress:c.concepts.map(c=>({term:c.name,status:c.status||'new',interval:c.interval||0,ease:c.ease||2.6,due:c.due||0,reps:c.reps||0,lapses:c.lapses||0,attempts:c.attempts||0,correct:c.correct||0,lastSeen:c.lastSeen||0})),skipped};
   }).filter(c=>c.questions.length);
  }
- return (Array.isArray(data)?[{name:name.replace(/\.json$/i,''),questions:data}]:[data]).map(c=>({...c,name:c.name||name.replace(/\.json$/i,''),sources:c.sources||[],objectives:c.objectives||[],conceptProgress:c.conceptProgress||[],skipped:[]}));
+ return (Array.isArray(data)?[{name:name.replace(/\.json$/i,''),questions:data}]:[data]).map(c=>{if(!Array.isArray(c.questions)||!c.questions.length)throw new Error('This JSON must contain a nonempty questions array.');return {...c,name:c.name||name.replace(/\.json$/i,''),sources:c.sources||[],objectives:c.objectives||[],conceptProgress:c.conceptProgress||[],skipped:[]};});
 }
 export const demo={name:'Arithmetic · practice demo',questions:[
  {term:'Order of operations',stem:'What is 3 + 4 × 2?',options:['14','11','10','7'],answer:[1],definition:'Multiply before adding: 4 × 2 = 8, then 3 + 8 = 11.'},

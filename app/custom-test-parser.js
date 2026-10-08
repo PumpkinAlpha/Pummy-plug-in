@@ -1,4 +1,6 @@
-const LETTERS='ABCDEFGHIJKL';
+const OPTION_LINE=/^([A-L])[.)]\s+(.+)$/i;
+const ANSWER_LINE=/^(?:correct\s+)?answers?\s*[:：]\s*(.+)$/i;
+const EXPLANATION_LINE=/^explanation\s*[:：]\s*(.*)$/i;
 export const blankQuestion=()=>({id:crypto.randomUUID(),stem:'',options:['',''],answer:[0],explanation:''});
 
 function parsePairs(lines){
@@ -15,11 +17,11 @@ function parseBlock(block,index){
  const lines=block.split('\n').map(line=>line.trim()).filter(Boolean);
  const options=[];let stem=[],answerLine='',explanation='',mode='stem';
  for(const line of lines){
-  const option=line.match(/^([A-L])[.)]\s+(.+)$/i);
-  const key=line.match(/^(?:correct\s+)?answers?\s*[:：]\s*(.+)$/i);
-  const why=line.match(/^explanation\s*[:：]\s*(.*)$/i);
+  const option=line.match(OPTION_LINE);
+  const key=line.match(ANSWER_LINE);
+  const why=line.match(EXPLANATION_LINE);
   if(option){mode='options';options.push({letter:option[1].toUpperCase(),text:option[2].trim()});}
-  else if(key){answerLine=key[1].trim();mode='answer';}
+  else if(key){if(answerLine)throw new Error(`Question ${index+1} has more than one Answer line. Separate the questions before importing.`);answerLine=key[1].trim();mode='answer';}
   else if(why){explanation=why[1].trim();mode='explanation';}
   else if(mode==='stem')stem.push(line);
   else if(mode==='explanation')explanation+=' '+line;
@@ -27,10 +29,27 @@ function parseBlock(block,index){
  }
  const question=stem.join(' ').replace(/^\d+[.)]\s*/, '').trim();
  if(!question||options.length<2||options.length>12||!answerLine)throw new Error(`Question ${index+1} needs a stem, at least two lettered choices, and an Answer line.`);
- const letters=answerLine.toUpperCase().split(/\s*(?:,|;|\bAND\b)\s*/).map(value=>value.replace(/[().\s]/g,'')).filter(Boolean);
+ if(new Set(options.map(option=>option.letter)).size!==options.length)throw new Error(`Question ${index+1} has duplicate choice letters.`);
+ const letters=answerLine.toUpperCase().split(/\s*(?:,|;|\/|&|\bAND\b)\s*|\s+/).map(value=>value.replace(/[().]/g,'')).filter(Boolean);
  const answer=letters.map(letter=>options.findIndex(option=>option.letter===letter));
  if(!answer.length||answer.some(choice=>choice<0)||new Set(answer).size!==answer.length)throw new Error(`Question ${index+1} has an invalid Answer line.`);
  return {...blankQuestion(),stem:question,options:options.map(option=>option.text),answer,explanation:explanation.trim()};
+}
+
+function questionBlocks(text){
+ const lines=text.split('\n'),blocks=[];let block=[],hasAnswer=false,blank=false;
+ for(let index=0;index<lines.length;index++){
+  const line=lines[index].trim();if(!line){blank=true;continue;}
+  const control=OPTION_LINE.test(line)||ANSWER_LINE.test(line)||EXPLANATION_LINE.test(line);
+  // A completed question can be followed by a numbered question without a blank line.
+  // Blank lines before its choices, key, or explanation still belong to that question.
+  let next=index+1;while(next<lines.length&&!lines[next].trim())next++;
+  const numbered=/^\d+[.)]\s+/.test(line)&&OPTION_LINE.test(lines[next]?.trim()||'');
+  if(hasAnswer&&((blank&&!control)||numbered)){blocks.push(block.join('\n'));block=[];hasAnswer=false;}
+  block.push(line);if(ANSWER_LINE.test(line))hasAnswer=true;blank=false;
+ }
+ if(block.length)blocks.push(block.join('\n'));
+ return blocks;
 }
 
 export function parseCustomTestText(raw){
@@ -38,7 +57,7 @@ export function parseCustomTestText(raw){
  if(!text)throw new Error('Paste questions or choose a TXT file first.');
  if(text.length>100000)throw new Error('Use a TXT file smaller than 100,000 characters.');
  const lines=text.split('\n').map(line=>line.trim()).filter(Boolean);
- const questions=lines.every(line=>line.includes('\t'))?parsePairs(lines):text.split(/\n\s*\n/).map(parseBlock);
+ const questions=lines.every(line=>line.includes('\t'))?parsePairs(lines):questionBlocks(text).map(parseBlock);
  if(questions.length>100)throw new Error('Import up to 100 questions per custom test.');
  return questions;
 }
@@ -47,6 +66,6 @@ export function validateCustomQuestion(question,index){
  const stem=question.stem.trim(),options=question.options.map(option=>option.trim());
  if(!stem)throw new Error(`Question ${index+1} needs question text.`);
  if(options.length<2||options.length>12||options.some(option=>!option))throw new Error(`Question ${index+1} needs 2–12 filled choices.`);
- if(!question.answer.length||question.answer.some(answer=>answer<0||answer>=options.length))throw new Error(`Question ${index+1} needs a correct choice.`);
+ if(!Array.isArray(question.answer)||!question.answer.length||question.answer.some(answer=>!Number.isInteger(answer)||answer<0||answer>=options.length)||new Set(question.answer).size!==question.answer.length)throw new Error(`Question ${index+1} needs valid, distinct correct choices.`);
  return {stem,options,answer:question.answer,multi:question.answer.length>1,definition:question.explanation.trim()||`Correct answer: ${question.answer.map(choice=>options[choice]).join('; ')}`, ...(question.explanation.trim()?{explanation:{body:[question.explanation.trim()]}}:{})};
 }

@@ -20,7 +20,7 @@ const sections=[
   ['Import a bank','You can import a Pummy JSON backup, TXT, Word (.docx), or text PDF question file. Review extracted questions before saving. Scanned PDFs need readable text or a separate text version.']
  ]},
  {id:'exams',title:'Exams and custom tests',items:[
-  ['Adaptive exam','Choose up to 100 questions, a week or set, question types, sources, and objectives. Prioritize professor or flagged questions and include scheduled reviews if you want them. With ChatGPT connected, adaptive follow-ups can test a missing prerequisite and then return to the original concept.'],
+  ['Adaptive exam','Choose All questions, Struggling questions, Professor questions, or a Custom count up to the available bank size. Filter by week or set, question types, sources, and objectives. Prioritize professor or flagged questions and include scheduled reviews if you want them. With ChatGPT connected, adaptive follow-ups can test a missing prerequisite and then return to the original concept.'],
   ['Custom tests','Type your own questions, paste or import a TXT file, or select questions already in the course bank. Review answer keys, name the test, and save it for reuse.'],
   ['Question formats','Pummy supports single choice, select all that apply, image identification, diagram labeling, ordering, and matching when those formats are present in the bank. Number keys select choices; Enter submits or continues where applicable.']
  ]},

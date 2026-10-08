@@ -1,6 +1,8 @@
 # Pummy Adaptive Test — ChatGPT plugin
 
-Version 0.4.2 adds push-based Project Source Sync, authority-ranked stored grounding, page citations and objective upserts without replacing banks or exam progress. It recreates the adaptive exam and its warm HUD-style interface inside a fullscreen ChatGPT/Codex MCP App. It reuses the original Pummy engine and does not change the desktop app.
+Version 0.4.5 fixes import key preservation, custom-test limits and retries, course switching, and background-refresh errors. It recreates the adaptive exam and its warm HUD-style interface inside a fullscreen ChatGPT/Codex MCP App. It reuses the original Pummy engine and does not change the desktop app.
+
+This maintenance release preserves explicit supplied answer keys and flags conflicting explanation labels for review. TXT imports tolerate blank lines within questions and preserve drafts after a parse error. References with more than 60,000 characters are rejected before import instead of silently shortened. Exam setup offers All questions, Struggling questions, Professor questions and Custom; exams and saved selections can use the full bank. Custom tests include bank search and reuse saved questions on a failed-save retry. Study actions clear unrelated saved filters; course and session changes reset local selections. Background tool errors are surfaced and incomplete Markdown tables cannot crash the view.
 
 ## Use
 
@@ -39,7 +41,7 @@ See `PARITY.md` for scope and remaining host/desktop differences. This is an exa
 
 ## Limits and differences
 
-Imports support up to 200 questions, 30 source excerpts of at most 60,000 characters, and 200 objectives per bank; exams have up to 100 questions. Saved course state is bounded to 900 KB, including embedded images. Large courses should be split and images compressed. Original PDFs/PowerPoint/Word files are not uploaded, and missing image questions are explicitly counted as omitted. Backup source excerpts are capped at 60,000 characters per source. Desktop in-progress exam sessions are not migrated; question attempts and concept schedules can be restored. There is no automatic desktop/cloud sync.
+Imports support up to 200 questions per write, 30 source excerpts of at most 60,000 characters, and 200 objectives per bank. Exams can include every matching saved question; Custom lets you choose a count up to the available bank size. Courses hold up to 500 stored questions. Saved course state is bounded to 900 KB, including embedded images. Large courses should be split and images compressed. Original PDFs/PowerPoint/Word files are not uploaded, and missing image questions are explicitly counted as omitted. Backup source excerpts are capped at 60,000 characters per source. Desktop in-progress exam sessions are not migrated; question attempts and concept schedules can be restored. There is no automatic desktop/cloud sync.
 
 Full explanations and targeted question chat run through the ChatGPT conversation. Voice output and download behavior depend on the host/browser; no automatic source-document page rendering, native local audio service, or background model generation is added. Matching imports require unique right-hand labels because the original board uses each bank label once. Adaptive variants of interactive boards are reused/reshuffled by the original engine rather than generated as new diagrams.
 
@@ -47,7 +49,7 @@ Full explanations and targeted question chat run through the ChatGPT conversatio
 
 - `lib/pummy-core.mjs`: bundled original engine, model, source retrieval, prompts, grading, spaced repetition and objective/prerequisite tracking, with injected host generation and adapted storage.
 - `worker/course.js`: persisted course snapshots, pending generation, redacted views, review/history and deterministic board shuffles.
-- `worker/tools.js`: twenty-four validated MCP tools, strict response/filter validation, idempotent retries, version checks, source reads, imports/exports and explanation requests.
+- `worker/tools.js`: thirty validated MCP tools, strict response/filter validation, idempotent retries, version checks, source reads, imports/exports and explanation requests.
 - `worker/source-sync.js`: validated atomic source/objective upserts, canonical hashes, durable retry receipts and authority defaults.
 - `worker/grounding.js`: extends the original retrieval index with supplied page boundaries, metadata matching, priority ordering, bounded prompts and citation provenance.
 - `worker/repository.js`: per-user D1 keys and compare-and-swap revisions. Existing data is upgraded lazily without a schema change.
@@ -83,3 +85,5 @@ Automated tests cover adaptive chains/depth, returns, deferred retries, skip/end
 ## Publishing
 
 Reuse `.openai/hosting.json` and the existing private Site/plugin identity. Build produces a self-contained HTML resource and a Cloudflare-compatible `dist/server/index.js` default.fetch. Keep the Site audience unchanged and do not create a replacement plugin.
+
+The publishing scanner can begin with the newer `server/discover` request. Pummy answers this metadata-only probe using the SDK's actual initialization metadata and supported versions, allowing clients to negotiate the existing MCP protocol. Other requests retain normal protocol validation and private tool calls still require Sites-authenticated identity. A domain verification success does not replace a successful connection and MCP scan.

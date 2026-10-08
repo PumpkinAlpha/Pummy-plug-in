@@ -1,16 +1,44 @@
 import {GroundedIndex,grounding,formatGrounding,relevantObjectives,provenance,validateProvenance} from './grounding.js';
-import { CourseModel, Exam, createSession, cleanQuestion, isDue, bucket, summarize, isInteractive, questionType, objectiveConcepts } from '../lib/pummy-core.mjs';
+import { CourseModel, Exam, createSession as createEngineSession, cleanQuestion, isDue, bucket, summarize, isInteractive, questionType, objectiveConcepts } from '../lib/pummy-core.mjs';
 export function emptyCourse(id,name){return {id,name,questions:[],concepts:[],sources:[],texts:[],objectives:[],folderNames:{},folderTags:{},session:null,generation:null,explanationRequest:null,history:[],preferences:{}};}
+const answerPrefix=/^\s*\(?([A-L](?:\s*(?:,|and|&)\s*[A-L])*)\s*[.):]\s*/;
+function suppliedQuestion(raw){
+ const definition=String(raw.definition||'').trim(),match=definition.match(answerPrefix);
+ // The original engine can infer a key from the explanation. Plugin calls already
+ // supply an explicit key, so remove its display prefix before engine normalization.
+ return {...raw,multi:raw.type==='multi'||!!raw.multi,definition:match?definition.slice(match[0].length):definition};
+}
+function keyConflict(raw){
+ const match=String(raw.definition||'').trim().match(answerPrefix);if(!match)return '';
+ const labels=match[1].match(/[A-L]/g),inferred=labels.map(letter=>letter.charCodeAt(0)-65).sort((a,b)=>a-b),answer=[...(raw.answer||[])].sort((a,b)=>a-b);
+ return JSON.stringify(inferred)===JSON.stringify(answer)?'':'Supplied answer key conflicts with the explanation label. The supplied key was preserved; review the original source.';
+}
 export class PluginCourse extends CourseModel {
  constructor(data){data=structuredClone(data);super({get:()=>({name:data.name}),update:()=>{}},data.id);this.nameData=data.name;for(const k of ['questions','concepts','sources'])this[k]=new Map((data[k]||[]).map(x=>[x.id,x]));this.texts=new Map(data.texts||[]);this.objectives=data.objectives||[];this.folderNames=data.folderNames||{};this.folderTags=data.folderTags||{};this.session=data.session;this.generation=data.generation;this.explanationRequest=data.explanationRequest||null;this.history=data.history||[];this.preferences=data.preferences||{};this.project=data.project||null;this.customTests=data.customTests||[];this.completedRequests=data.completedRequests||[];this.sourceSync=data.sourceSync||null;this.loaded=true;}
  get name(){return this.nameData;}
  index(){if(!this._index)this._index=new GroundedIndex([...this.sources.values()],this.texts);return this._index;}
  materialFor(query,budget,opts={}){const onlySids=this.session?.opts?.sourceIds??null;const g=grounding(this,query,Math.min(budget||10000,10000),{onlySids,...opts});const formatted=formatGrounding(g);this._lastGrounding=provenance(g);return formatted;}
  objectivesForPrompt(){const q=this.questions.get(this.session?.stack?.at(-1)?.qid)||{};return JSON.stringify(relevantObjectives(this,`${q.term||''} ${q.stem||''}`,q).map(o=>({...o,text:o.text.slice(0,350)}))).replace(/</g,'\\u003c');}
- ingestQuestion(raw,opts){const generated=['followup','variant'].includes(opts?.origin);if(generated)validateProvenance(raw,this,this.generation?.grounding||this._lastGrounding);const q=super.ingestQuestion(raw,opts);if(q&&generated){if(raw.sourceId)q.sourceId=raw.sourceId;if(raw.page)q.page=raw.page;q.grounding=this.generation?.grounding||this._lastGrounding;}return q;}
+ ingestQuestion(raw,opts){const generated=['followup','variant'].includes(opts?.origin);if(generated)validateProvenance(raw,this,this.generation?.grounding||this._lastGrounding);const q=super.ingestQuestion(suppliedQuestion(raw),opts);if(q){const conflict=keyConflict(raw);if(conflict){q.flagged=true;q.flagReason=conflict;}}if(q&&generated){if(raw.sourceId)q.sourceId=raw.sourceId;if(raw.page)q.page=raw.page;q.grounding=this.generation?.grounding||this._lastGrounding;}return q;}
 
  scheduleSummary(){} saveConcept(){} saveSession(){if(this.session)this.session.updatedAt=Date.now();} clearSession(){this.session=null;} touch(){}
  serialize(){return {id:this.id,name:this.nameData,questions:[...this.questions.values()],concepts:[...this.concepts.values()],sources:[...this.sources.values()],texts:[...this.texts],objectives:this.objectives,folderNames:this.folderNames,folderTags:this.folderTags,session:this.session,generation:this.generation,explanationRequest:this.explanationRequest,history:this.history,preferences:this.preferences,project:this.project,customTests:this.customTests,completedRequests:this.completedRequests,sourceSync:this.sourceSync};}
+}
+export function createSession(model,options){
+ if(options.size!=='all'){const session=createEngineSession(model,options);session.opts.examMode=options.examMode||'custom';return session;}
+ const eligible=model.rootQuestions().filter(q=>q.keyed&&(isInteractive(q)||q.answer?.length)&&(options.questionIds==null||options.questionIds.includes(q.id))&&(options.sourceIds==null||options.sourceIds.includes(q.sourceId))&&(options.types==null||options.types.includes(questionType(q))));
+ const session=createEngineSession(model,{...options,size:Math.max(1,eligible.length+model.concepts.size)}),byId=new Map(eligible.map(q=>[q.id,q])),used=new Set(),queue=[];
+ const add=id=>{if(byId.has(id)&&!used.has(id)){queue.push({k:'q',id});used.add(id);}};
+ // Keep the scheduler's priority order, but All examines every saved question
+ // once. A due concept's review slot uses an eligible bank question, rather than
+ // adding a generated variant alongside the same bank question.
+ for(const item of session.queue){
+  if(item.k==='q')add(item.id);
+  else {const candidates=eligible.filter(q=>q.conceptId===item.id&&!used.has(q.id)).sort((a,b)=>Number(a.attempts>0)-Number(b.attempts>0)||(a.lastSeen||0)-(b.lastSeen||0)||(a.order||0)-(b.order||0));if(candidates.length)add(candidates[0].id);}
+ }
+ eligible.forEach(q=>add(q.id));
+ session.queue=queue;session.total=queue.length;session.phase=queue.length?'loading':'done';session.opts.size=queue.length;session.opts.sizeMode='all';session.opts.examMode=options.examMode||'custom';
+ model.saveSession();return session;
 }
 export function createExam(model){
  const exam=new Exam(model,{aiAvailable:()=>true,autoExplain:false,askJSON:async prompt=>{
@@ -30,14 +58,15 @@ export function validateQuestion(raw){
   if(raw.type==='label'&&(!raw.figure?.dataUrl||!raw.targets||raw.targets.length<2||new Set(raw.targets.map(t=>t.answer)).size!==raw.targets.length))throw new Error('Labeling needs an embedded diagram and at least two distinct labels.');
   return raw;
  }
+ if(raw.type==='image'&&!raw.figure?.dataUrl&&!raw.image)throw new Error('Image questions need an embedded image or figure.');
  if(!raw||!Array.isArray(raw.answer)||raw.answer.length===0||raw.answer.some(i=>!Number.isInteger(i)||i<0||i>=raw.options?.length)||new Set(raw.answer).size!==raw.answer.length)throw new Error('Each question needs a valid answer array of zero-based option indexes.');
- const q=cleanQuestion(raw);if(!q||!q.keyed)throw new Error('Each question needs a stem, 2–12 choices, and a correct answer.');return q;
+ const q=cleanQuestion(suppliedQuestion(raw));if(!q||!q.keyed)throw new Error('Each question needs a stem, 2–12 choices, and a correct answer.');return q;
 }
 export function ingest(model,raw,i=0){
- const opts={origin:raw.origin||'practice',order:i,sourceId:raw.sourceId||null,lecture:raw.lecture||'',objectiveId:raw.objective||raw.objectiveId||null,figure:raw.figure||null};
+ const opts={origin:raw.origin||'practice',order:i,sourceId:raw.sourceId||null,lecture:raw.lecture||'',objectiveId:raw.objective||raw.objectiveId||null,figure:raw.figure||(raw.image?{dataUrl:raw.image,file:'Attached diagram',unit:'page',page:raw.page||1,marks:[]}:null)};
  const q=isInteractive(raw)?model.ingestInteractive(raw,opts):model.ingestQuestion(raw,opts);
  if(!q)throw new Error('This question could not be imported.');
- q.order=i;q.type=raw.type==='image'?'mcq':raw.type||'mcq';q.image=raw.image||null;q.flagged=!!raw.flagged;q.flagReason=raw.flagReason||'';q.weekId=raw.weekId||null;q.setId=raw.setId||null;q.explanation=raw.explanation||null;
+ q.order=i;q.type=raw.type==='image'?'mcq':raw.type||'mcq';q.image=raw.figure?raw.image||null:null;q.flagged=q.flagged||!!raw.flagged;q.flagReason=[raw.flagReason,q.flagReason].filter(Boolean).join('\n');q.weekId=raw.weekId||null;q.setId=raw.setId||null;q.explanation=raw.explanation||null;
  if(raw.progress)Object.assign(q,raw.progress);
  return q;
 }
@@ -55,12 +84,16 @@ function publicQuestion(model,q,depth,reveal,session){
 }
 export function reviewResults(model,results){return (results||[]).map(r=>{const q=model.questions.get(r.qid);const active=model.session?.phase==='question'&&model.session.stack?.at(-1)?.qid===q?.id;return {...r,question:q?publicQuestion(model,q,r.depth,!active,model.session):null};});}
 export function archiveSession(model){const s=model.session;if(!s)return;if(!model.history.some(h=>h.id===s.id)){model.history.unshift({id:s.id,date:s.finishedAt||Date.now(),total:s.total,done:s.done,firstTry:s.firstTry,resolved:s.resolved,unresolved:s.unresolved,results:s.results});model.history=model.history.slice(0,15);}}
+export function isStrugglingQuestion(model,q){
+ const status=bucket(model.concepts.get(q.conceptId));
+ return status!=='retained'&&(status==='learning'||q.lastResult==='wrong');
+}
 export function view(model,revision){
  const s=model.session,q=s?.stack?.length?model.questions.get(s.stack.at(-1).qid):null;
  const feedback=s?.phase==='feedback'&&s.last?.qid===q?.id;
  const concepts=[...model.concepts.values()].map(c=>({id:c.id,name:c.name,status:bucket(c),due:c.due,interval:c.interval,attempts:c.attempts,correct:c.correct,sourceIds:c.sourceIds,prereqOf:c.prereqOf,summary:c.summary}));
- return {courseId:model.id,name:model.name,revision,questionCount:model.rootQuestions().filter(q=>q.keyed).length,
- preferences:model.preferences,project:model.project,customTests:model.customTests,folderNames:model.folderNames,folderTags:model.folderTags,questionIndex:model.rootQuestions().filter(q=>q.keyed).map(q=>({id:q.id,term:q.term,stem:q.stem,type:questionType(q),sourceId:q.sourceId,objectiveId:q.objectiveId,weekId:q.weekId,lecture:q.lecture,setId:q.setId})),hasMaterials:[...model.texts.values()].some(t=>t.trim()),sources:[...model.sources.values()].map(({id,name,weekId,lecture,rank,sourceType,contentHash,createdAt,updatedAt,lastSyncedAt,syncStatus,metadata})=>({id,name,weekId,lecture,rank,sourceType,contentHash,createdAt,updatedAt,lastSyncedAt,syncStatus,metadata})),sourceSync:model.sourceSync,questionImports:model.completedRequests.filter(r=>r.tool==='add_questions').map(r=>({requestId:r.id,addedCount:r.addedCount,completedAt:r.completedAt})),objectives:model.objectives,
+ return {courseId:model.id,name:model.name,revision,questionCount:model.rootQuestions().filter(q=>q.keyed).length,storedQuestionCount:model.questions.size,
+ preferences:model.preferences,project:model.project,customTests:model.customTests,folderNames:model.folderNames,folderTags:model.folderTags,questionIndex:model.rootQuestions().filter(q=>q.keyed).map(q=>({id:q.id,term:q.term,stem:q.stem,type:questionType(q),origin:q.origin,struggling:isStrugglingQuestion(model,q),sourceId:q.sourceId,objectiveId:q.objectiveId,weekId:q.weekId,lecture:q.lecture,setId:q.setId})),hasMaterials:[...model.texts.values()].some(t=>t.trim()),sources:[...model.sources.values()].map(({id,name,weekId,lecture,rank,sourceType,contentHash,createdAt,updatedAt,lastSyncedAt,syncStatus,metadata})=>({id,name,weekId,lecture,rank,sourceType,contentHash,createdAt,updatedAt,lastSyncedAt,syncStatus,metadata})),sourceSync:model.sourceSync,questionImports:model.completedRequests.filter(r=>r.tool==='add_questions').map(r=>({requestId:r.id,addedCount:r.addedCount,questionIds:r.questionIds,completedAt:r.completedAt})),objectives:model.objectives,
  session:s?{id:s.id,phase:s.phase,adaptive:s.opts.adaptive!==false,opts:s.opts,total:s.total,done:s.done,firstTry:s.firstTry,resolved:s.resolved,unresolved:s.unresolved,rootMissed:s.rootMissed,maxDepth:s.maxDepth,streak:s.streak,results:reviewResults(model,s.results),feedback:feedback?{correct:s.last.correct,chosen:s.last.chosen}:null,nextType:s.next?.type,next:s.next?{type:s.next.type,outOfScope:s.next.outOfScope,gap:s.next.gap,ready:!!s.next.qid}:null,masteryNotices:s.masteryNotices||[],stack:s.stack.map(x=>({depth:x.depth,term:model.questions.get(x.qid)?.term})),retrying:!!s.retrying,queueLeft:s.queue.length,deferredCount:s.deferred?.length||0}:null,
  question:q?publicQuestion(model,q,s.stack.at(-1).depth,feedback,s):null,
  generation:model.generation?{id:model.generation.id,sessionId:model.generation.sessionId,prompt:model.generation.prompt,instruction:'Read the latest read_course_state. Generate a grounded question and call provide_question. For unsupported foundations, include a replacement in outOfScope to avoid another round trip; otherwise complete any replacement generation returned by the tool. Keep the new key hidden and wait for student Next.'}:null,
@@ -68,4 +101,4 @@ export function view(model,revision){
  progress:{due:[...model.concepts.values()].filter(c=>isDue(c)).length,learning:concepts.filter(c=>c.status==='learning').map(c=>c.name),retained:concepts.filter(c=>c.status==='retained').length,counts:summarize([...model.concepts.values()]).counts,objectives:model.objectives.map(o=>{const cs=objectiveConcepts(model,o.id),retained=cs.filter(c=>bucket(c)==='retained').length;return {id:o.id,total:cs.length,retained,mastered:cs.length>0&&retained===cs.length};}),concepts},
  };
 }
-export {createSession,isInteractive};
+export {isInteractive};

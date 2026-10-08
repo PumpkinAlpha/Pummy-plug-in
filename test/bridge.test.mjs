@@ -28,3 +28,24 @@ test('host authorization errors remain errors, never switch to direct network',a
  const {api}=setup(async()=>{throw Error('Not in trusted tool scope');});
  await assert.rejects(api.call('create_course'),/controls cached/);assert.equal(api.latest.state,undefined);
 });
+test('background read errors are reported without replacing the visible saved course',async()=>{
+ const {api,host}=setup(async()=>({isError:true,content:[{type:'text',text:'Could not read the saved course.'}]}));
+ host.app.ontoolresult({structuredContent:{state:{courseId:'saved',revision:9}}});
+ await assert.rejects(api.call('read_course_state',{courseId:'saved'},{background:true}),/Could not read the saved course/);
+ assert.equal(api.latest.state.courseId,'saved');assert.equal(api.latest.state.revision,9);
+});
+test('a failed initial read still rejects after host hydration so callers can handle the failure',async()=>{
+ let finish;const {api,host}=setup(()=>new Promise(r=>{finish=r;}));
+ const pending=api.call('read_course_state',{}, {initial:true});await new Promise(r=>setImmediate(r));
+ host.app.ontoolresult({structuredContent:{state:{courseId:'saved',revision:9}}});
+ finish({isError:true,content:[{type:'text',text:'Not in trusted tool scope'}]});
+ await assert.rejects(pending,/controls cached/);assert.equal(api.latest.state.revision,9);
+});
+test('stale background course responses cannot navigate away from a newly opened course',async()=>{
+ let finish;const {api,host}=setup(()=>new Promise(r=>{finish=r;}));
+ host.app.ontoolresult({structuredContent:{state:{courseId:'old',revision:4}}});
+ const pending=api.call('read_course_state',{courseId:'old'},{background:true});await new Promise(r=>setImmediate(r));
+ host.app.ontoolresult({structuredContent:{state:{courseId:'new',revision:1}}});
+ finish({structuredContent:{state:{courseId:'old',revision:5}}});await pending;
+ assert.equal(api.latest.state.courseId,'new');
+});

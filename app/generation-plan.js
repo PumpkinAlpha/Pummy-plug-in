@@ -9,7 +9,7 @@ const DIFFICULTY_GUIDANCE={
  mcat:'Write MCAT-style questions that emphasize reasoning from short passages, data, or scenarios when the sources support them. Do not imply AAMC affiliation or introduce facts not supported by the selected material.'
 };
 
-export function generationCapacity(state){return Math.max(0,500-(state.questionCount||0));}
+export function generationCapacity(state){return Math.max(0,500-(state.storedQuestionCount??state.questionCount??0));}
 
 export function gapSignals(state){
  const concepts=(state.progress?.concepts||[])

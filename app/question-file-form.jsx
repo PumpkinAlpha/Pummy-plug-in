@@ -8,7 +8,7 @@ export function QuestionFileForm({file,state,folder,busy,connected,call,message,
  const send=()=>run(async()=>{
   setImportError('');try{
   if(!connected)throw new Error('Open Pummy in ChatGPT to convert this file into questions.');
-  if(!staged.current)staged.current={courseId:state.courseId,file:{...file,text:minimizeContacts(text),sourceType,rank},sourceId:sourceId||await fileSourceId(file.name),syncId:crypto.randomUUID(),id:crypto.randomUUID()};
+  if(!staged.current)staged.current={courseId:state.courseId,file:{...file,text:minimizeContacts(text),sourceType,rank},sourceId:sourceId||await fileSourceId(file.name,folder),syncId:crypto.randomUUID(),id:crypto.randomUUID()};
   const request=staged.current;const result=await stageQuestionFile(call,request.courseId,request.file,request.sourceId,request.syncId,folder);
   await message(result.state,questionFileMessage(request.courseId,request.sourceId,request.id,folder));setSent(true);onWait({id:request.id,courseId:request.courseId,sentAt:Date.now()});
   }catch(e){setImportError(e.message);throw e;}

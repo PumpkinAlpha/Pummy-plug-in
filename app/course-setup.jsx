@@ -43,15 +43,15 @@ export function CourseForm({state,busy,folderScope,onSave,onCreateFolder,onAddSo
 export function NewCourse({busy,onCreate}){const [name,setName]=useState(''),[url,setUrl]=useState('');return <form className="course-form" onSubmit={e=>{e.preventDefault();onCreate({requestId:crypto.randomUUID(),name,project:url?{name,url}:null});}}><label>Course name<input autoFocus required maxLength={160} value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Thoracic Anatomy"/></label><label>ChatGPT Project link (optional)<input type="url" maxLength={800} value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://chatgpt.com/g/g-p-…/project"/></label><p className="fine">You can link the project and add references later.</p><button className="primary" disabled={busy||!name.trim()}>Create course</button></form>;}
 
 export function BuildQuestions({state,busy,connected,onBuild,initialSourceIds,launchAfterBuild=false,examSettings=null}){
- const [mode,setMode]=useState('coverage');
+ const [mode,setMode]=useState(launchAfterBuild&&examSettings?.examMode==='struggling'?'gaps':launchAfterBuild&&examSettings?.examMode==='custom'?'custom':'coverage');
  const [instructions,setInstructions]=useState('');
- const [count,setCount]=useState(launchAfterBuild?Math.min(30,Number(examSettings?.size)||10):10);
+ const [count,setCount]=useState(launchAfterBuild?Math.min(generationCapacity(state),Number(examSettings?.size)||10):10);
  const [sourceIds,setSourceIds]=useState(initialSourceIds||state.sources.map(source=>source.id));
  const [generateExplanations,setGenerateExplanations]=useState(!!examSettings?.generateExplanations);
  const [difficulty,setDifficulty]=useState('exam');
  const [questionModel,setQuestionModel]=useState('current'),[questionEffort,setQuestionEffort]=useState('current');
  const [explanationModel,setExplanationModel]=useState('current'),[explanationEffort,setExplanationEffort]=useState('current');
- const capacity=generationCapacity(state),customMax=Math.min(200,capacity),gaps=gapSignals(state);
+ const capacity=generationCapacity(state),customMax=capacity,gaps=gapSignals(state);
  const invalidCount=mode==='custom'&&(!Number.isInteger(count)||count<1||count>customMax);
  const submit=event=>{event.preventDefault();if(!capacity||invalidCount)return;onBuild({mode,instructions:instructions.trim(),count:mode==='custom'?count:null,sourceIds,generateExplanations,difficulty,questionModel,questionEffort,explanationModel,explanationEffort,launchAfterBuild,examSettings});};
  return <form className="course-form build-questions-form" onSubmit={submit}>

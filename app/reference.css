@@ -441,6 +441,13 @@ input::placeholder,textarea::placeholder { color:var(--faint); }
 .adaptive-start-actions { display:flex; flex-wrap:wrap; gap:10px; margin:2px 0 8px; }
 .adaptive-start-actions button { min-height:46px; }
 .adaptive-setup .settings-grid { margin:0; }
+.exam-size-control { display:grid; gap:10px; align-content:start; }
+.exam-size-control .fine { margin:0; }
+.exam-mode-options { margin:0; padding:14px; border:1px solid var(--line-2); border-radius:10px; }
+.exam-mode-options legend { padding:0 6px; font-size:14px; font-weight:650; }
+.generation-mode-grid.exam-mode-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+@media(max-width:900px) { .generation-mode-grid.exam-mode-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:650px) { .generation-mode-grid.exam-mode-grid { grid-template-columns:1fr; } }
 .adaptive-setup .toggle { display:flex; align-items:center; gap:10px; }
 .adaptive-setup details { padding:12px 0; border-top:1px solid var(--line); }
 .adaptive-setup details summary { color:var(--accent); font-weight:650; }
