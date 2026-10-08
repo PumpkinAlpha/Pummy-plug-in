@@ -9,6 +9,10 @@ const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control
 export default {async fetch(request,env){
  const url=new URL(request.url),user=request.headers.get('oai-authenticated-user-id');
  try{
+  if(url.pathname==='/.well-known/openai-apps-challenge'){
+   if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
+   return new Response(request.method==='HEAD'?null:'gn2KBwViuw2s8d8rlzY5aeqndqneMWONWyJucixXcEw',{headers:{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
+  }
   const info=publicPage(url.pathname,publicationInfo);
   if(info){
    if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
