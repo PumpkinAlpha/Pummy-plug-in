@@ -1,3 +1,4 @@
+import {connectedProfile} from './identity.js';
 import page from '../app/view.html';
 import logoDataUrl from '../app/pummy-logo.png';
 import { handleMcp } from './mcp.js';
@@ -28,14 +29,14 @@ export default {async fetch(request,env){
     body=await request.clone().json();
     if(!user&&body.method==='tools/call')return json({jsonrpc:'2.0',id:body.id,error:{code:-32001,message:'Authentication required.'}},401);
    }
-   return handleMcp(request,env,user,body);
+   return handleMcp(request,env,user,body,connectedProfile(request));
   }
   if(url.pathname==='/api/tool'&&request.method==='POST'){
    if(!user)return json({error:'Sign in to continue.'},401);
    if(request.headers.get('origin')!==url.origin)return json({error:'Use the test interface to perform this action.'},403);
    if(Number(request.headers.get('content-length')||0)>1500000)return json({error:'Import fewer questions.'},413);
    const bodyText=await request.text();if(bodyText.length>1500000)return json({error:'Import fewer questions.'},413);
-   const body=JSON.parse(bodyText);const data=await executeTool(new CourseRepository(env.DB,user,configuredConverter(env)),body.name,body.arguments);
+   const body=JSON.parse(bodyText);const data=await executeTool(new CourseRepository(env.DB,user,configuredConverter(env),env.ASSETS,connectedProfile(request)),body.name,body.arguments);
    return json({structuredContent:data});
   }
   if(url.pathname==='/'){

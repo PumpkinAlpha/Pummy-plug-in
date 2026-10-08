@@ -1,5 +1,5 @@
 import {encode64} from '../lib/tutor/presentations.js';
-import {loadAsset,downloadFile} from './tutor-files.js';
+import {uploadPresentationFile,loadAsset,downloadFile} from './tutor-files.js';
 import React,{useEffect,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {bridge,embedded,latest,subscribe,call,context,askPending,message,pendingStatus} from './bridge.js';
@@ -35,6 +35,7 @@ import {saveDraftCustomTest} from './custom-test-save.js';
 import {GenerationProgress} from './generation-progress.jsx';
 import {GenerationConfetti} from './generation-confetti.jsx';
 import {applyTheme,DEFAULT_CUSTOM_THEME} from './themes.js';
+import {ConnectedProfile} from './connected-profile.jsx';
 import {briefChoiceExplanation} from './explanation-display.js';
 const ORIGIN={practice:'Professor question',generated:'Bank question',own:'Your question',followup:'Foundation check',variant:'New version'};
 const INTER=['label','order','match'];
@@ -83,7 +84,6 @@ function Exam(){
    if(!state)throw new Error('Open or create a course first, then add your TXT, Word or PDF question bank.');
    const extracted=await extractQuestionFile(file);setImportJob(null);setModal({type:'question-file',file:extracted,courseId:state.courseId,folder});return;
   }
-  if(file.size>24*1024*1024)throw new Error('Choose a backup smaller than 24 MB or export a smaller course.');
   const banks=banksFromFile(JSON.parse(await file.text()),file.name);
   if(!banks.length)throw new Error('No keyed questions with available images were found.');
   if(append&&banks.length!==1)throw new Error('Add one bank at a time to this course.');
@@ -148,10 +148,10 @@ function Exam(){
  };
  const attachSourcePdf=file=>run(async()=>{
   if(!file)return;
-  if(!/\.pdf$/i.test(file.name)||file.size>350000)throw new Error('Choose the original PDF for this source, smaller than 350 KB.');
-  const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Could not read the PDF.'));reader.readAsDataURL(file);});
-  const id=modal.source.id,page=modal.page;
-  await call('attach_source_pdf',{courseId:state.courseId,revision:latest.state.revision,sourceId:id,dataUrl});
+  if(!/\.pdf$/i.test(file.name))throw new Error('Choose the original PDF for this source.');
+  const id=modal.source.id,page=modal.page,assetId=await uploadPresentationFile(call,state.courseId,file,{source:true});
+  const fresh=(await call('read_course_state',{courseId:state.courseId})).state;
+  await call('attach_source_original',{courseId:state.courseId,revision:fresh.revision,sourceId:id,assetId});
   await source(id,{page});
  });
  const explain=choice=>run(()=>act('request_explanation',{questionId:q.id,...(choice==null?{}:{choice})}));
@@ -207,7 +207,7 @@ function Exam(){
  modal.type==='delete-folder'?<div className="course-action-form"><p>Remove <strong>{modal.displayName}</strong> from this course? Its sources and questions will remain in the course's unfiled study resources.</p><div className="course-action-buttons"><button className="secondary" onClick={()=>setModal(null)}>Cancel</button><button className="primary course-delete-confirm" disabled={busy} onClick={()=>run(async()=>{await call('manage_folder',{courseId:state.courseId,revision:state.revision,kind:modal.folder.kind,label:modal.folder.label,action:'delete'});setModal(null);})}>Delete folder</button></div></div>:
  modal.type==='folder-tags'?<form className="course-action-form" onSubmit={e=>{e.preventDefault();const form=new FormData(e.currentTarget);const assignments=modal.folders.map((f,i)=>({kind:f.kind,label:f.label,tags:[...new Set(String(form.get(`tags-${i}`)||'').split(',').map(t=>t.trim()).filter(Boolean))]}));run(async()=>{await call('set_folder_tags',{courseId:state.courseId,revision:state.revision,assignments});setModal(null);});}}><p>Add comma-separated tags to any folder. Select a tag on the course page to filter the folders.</p><div className="tag-assignment-list">{modal.folders.map((f,i)=><label className="tag-assignment-row" key={`${f.kind}:${f.label}`}><span>{f.displayName}</span><input name={`tags-${i}`} aria-label={`Tags for ${f.displayName}`} defaultValue={(state.folderTags?.[`${f.kind}:${f.label}`]||[]).join(', ')} placeholder="e.g. anatomy, exam 1"/></label>)}</div><div className="course-action-buttons"><button className="secondary" type="button" onClick={()=>setModal(null)}>Cancel</button><button className="primary" disabled={busy}>Save tags</button></div></form>:
  modal.type==='build'?<BuildQuestions state={state} busy={busy} connected={!!bridge} initialSourceIds={modal.sourceIds} launchAfterBuild={modal.launchAfterBuild} examSettings={modal.examSettings} onBuild={buildBank}/>:
- modal.type==='display'?<div className="display-settings"><label>Theme<select value={theme} onChange={e=>setTheme(e.target.value)}><option value="navy">Pummy navy</option><option value="warm">Warm dark</option><option value="light">Paper light</option><option value="custom">Custom colors</option></select></label>{theme==='custom'&&<fieldset className="custom-theme-controls"><legend>Custom theme</legend><p className="fine">Text contrast is adjusted for readability. Your colors stay on this device.</p><div>{[['background','Background'],['surface','Surfaces'],['text','Text'],['accent','Accent']].map(([key,label])=><label key={key}>{label}<input type="color" aria-label={`Custom ${label.toLowerCase()} color`} value={customColors?.[key]||DEFAULT_CUSTOM_THEME[key]} onChange={e=>setCustomColors({...customColors,[key]:e.target.value})}/></label>)}</div><button className="secondary" onClick={()=>setCustomColors(DEFAULT_CUSTOM_THEME)}>Reset custom colors</button></fieldset>}<label>Reading size: {reading}px<input type="range" min="15" max="24" value={reading} onChange={e=>setReading(Number(e.target.value))}/></label><label className="toggle"><input type="checkbox" checked={instant} onChange={e=>setInstant(e.target.checked)}/>Answer single-choice immediately</label><label className="toggle"><input type="checkbox" checked={autoExplain} onChange={e=>setAutoExplain(e.target.checked)}/>Automatically request full explanations</label><label className="toggle"><input type="checkbox" checked={animations} onChange={e=>setAnimations(e.target.checked)}/>Feedback and streak celebrations</label><p className="fine">Number keys select answers; Enter submits or continues. Display preferences stay on this device. Host support may limit audio and file downloads.</p></div>:
+ modal.type==='display'?<div className="display-settings"><ConnectedProfile/><label>Theme<select value={theme} onChange={e=>setTheme(e.target.value)}><option value="navy">Pummy navy</option><option value="warm">Warm dark</option><option value="light">Paper light</option><option value="custom">Custom colors</option></select></label>{theme==='custom'&&<fieldset className="custom-theme-controls"><legend>Custom theme</legend><p className="fine">Text contrast is adjusted for readability. Your colors stay on this device.</p><div>{[['background','Background'],['surface','Surfaces'],['text','Text'],['accent','Accent']].map(([key,label])=><label key={key}>{label}<input type="color" aria-label={`Custom ${label.toLowerCase()} color`} value={customColors?.[key]||DEFAULT_CUSTOM_THEME[key]} onChange={e=>setCustomColors({...customColors,[key]:e.target.value})}/></label>)}</div><button className="secondary" onClick={()=>setCustomColors(DEFAULT_CUSTOM_THEME)}>Reset custom colors</button></fieldset>}<label>Reading size: {reading}px<input type="range" min="15" max="24" value={reading} onChange={e=>setReading(Number(e.target.value))}/></label><label className="toggle"><input type="checkbox" checked={instant} onChange={e=>setInstant(e.target.checked)}/>Answer single-choice immediately</label><label className="toggle"><input type="checkbox" checked={autoExplain} onChange={e=>setAutoExplain(e.target.checked)}/>Automatically request full explanations</label><label className="toggle"><input type="checkbox" checked={animations} onChange={e=>setAnimations(e.target.checked)}/>Feedback and streak celebrations</label><p className="fine">Number keys select answers; Enter submits or continues. Display preferences stay on this device. Host support may limit audio and file downloads.</p></div>:
  modal.type==='delete-source'?<><p>Delete <strong>{modal.source.name}</strong> from active course sources?</p><p>Your saved questions and exam progress are kept. You can restore this source from Recently deleted.</p><button className="primary" disabled={busy} onClick={()=>run(async()=>{await call('delete_source',{courseId:state.courseId,revision:latest.state.revision,sourceId:modal.source.id});setModal(null);})}>Delete source</button></>:
  modal.type==='end'?<><p>Recorded attempts and completed results are kept. An unfinished concept stays unresolved.</p><button className="primary" disabled={busy} onClick={()=>run(async()=>{await act('end_test');setModal(null);setTab('exam');})}>End now</button></>:
  modal.type==='skip'?<><p>This concept remains unresolved and returns in a future exam. No answer will be submitted.</p><button className="primary" disabled={busy} onClick={()=>run(async()=>{await act('skip_question');setModal(null);})}>Skip and continue</button></>:

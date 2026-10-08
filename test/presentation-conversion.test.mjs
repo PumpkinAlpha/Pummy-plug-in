@@ -36,9 +36,9 @@ test('concurrent conversion and interrupted writes produce one complete PDF with
 test('converter configuration requires HTTPS and an authentication secret; local binding stays local',async()=>{
  assert.equal(configuredConverter({}),null);assert.equal(configuredConverter({PRESENTATION_CONVERTER_URL:'https://example.com'}),null);const binding={fetch(){}};assert.equal(configuredConverter({PRESENTATION_CONVERTER:binding}),binding);const bad=configuredConverter({PRESENTATION_CONVERTER_URL:'http://example.com',PRESENTATION_CONVERTER_TOKEN:'secret'});await assert.rejects(bad.fetch(new Request('https://converter',{method:'POST',body:'file'})),/HTTPS/);
 });
-test('native converter rejects corrupt, macro-enabled and oversized input before starting Office',async()=>{
+test('native converter rejects corrupt, macro-enabled input before starting Office',async()=>{
  const converter=createPresentationConverter({executable:'/missing/soffice'});
  assert.equal((await converter.fetch(new Request('https://converter',{method:'GET'}))).status,405);
  const request=(bytes,type='application/vnd.ms-powerpoint',extra={})=>new Request('https://converter',{method:'POST',headers:{'Content-Type':type,...extra},body:bytes});
- assert.equal((await converter.fetch(request(new Uint8Array([1])))).status,400);assert.equal((await converter.fetch(request(fixtureLegacyPPT({macro:true})))).status,400);assert.equal((await converter.fetch(request('x','text/plain'))).status,415);assert.equal((await converter.fetch(request('x','application/vnd.ms-powerpoint',{'Content-Length':String(25*1024*1024)}))).status,413);
+ assert.equal((await converter.fetch(request(new Uint8Array([1])))).status,400);assert.equal((await converter.fetch(request(fixtureLegacyPPT({macro:true})))).status,400);assert.equal((await converter.fetch(request('x','text/plain'))).status,415);assert.equal((await converter.fetch(request('x','application/vnd.ms-powerpoint',{'Content-Length':String(25*1024*1024)}))).status,400);
 });

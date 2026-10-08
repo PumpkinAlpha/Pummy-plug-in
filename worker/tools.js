@@ -2,6 +2,7 @@ import {grounding,refreshGrounding,explanationPrompt,provenance,pagesOf,validate
 import {syncFields,syncSources,syncSource,SOURCE_TYPES} from './source-sync.js';
 import { z } from 'zod/v4';
 import {executeBankExplanations} from './bank-explanations.js';
+import {TutorRepository} from './tutor-repository.js';
 import {tutorDefinitions,executeTutor} from './tutor-tools.js';
 import { PluginCourse,emptyCourse,validateQuestion,createExam,createSession,settle,view,ingest,isInteractive,archiveSession,isStrugglingQuestion } from './course.js';
 const id=z.string().min(1).max(180),revision=z.number().int().min(1),text=z.string().trim().min(1).max(4000),num=z.number().finite().min(0);
@@ -41,6 +42,8 @@ export const definitions=[
  {name:'read_course_state',title:'Read saved course state',description:'Read the same saved course/exam state as open_test without opening an app tab. No courseId lists courses. Use for background polling, revision checks, sync and tutor prompts; unsubmitted keys stay hidden. Does not change progress.',schema:z.object({courseId:id.optional()}),readOnly:true},
  {name:'open_test',title:'Read saved exam (legacy)',description:'Legacy read-only alias of read_course_state. Returns saved library/course/exam state WITHOUT opening a panel. Prefer read_course_state for sync, tutoring and checks. Unsubmitted answer keys stay hidden; progress is never changed.',schema:z.object({courseId:id.optional()}),readOnly:true},
  {name:'open_interface',title:'Adaptive exam',description:'User-initiated interface launcher for the Pummy sidebar or conversation panel. Returns saved state without restarting exams. This app-only entrypoint must not be used by the model for source sync, tutoring, background checks or completion reports.',schema:z.object({courseId:id.optional()}),readOnly:true,opener:true,appOnly:true},
+ {name:'read_connected_profile',title:'Read connected ChatGPT profile',description:'Read only the authenticated account supplied by the hosting boundary. Does not enumerate other accounts or change identity.',schema:z.object({}).strict(),readOnly:true,appOnly:true},
+ {name:'attach_source_original',title:'Attach original source file',description:'Keep an uploaded original beside existing source text and provenance.',schema:z.object({...stateArgs,sourceId:id,assetId:z.string().uuid()}),readOnly:false,appOnly:true},
  {name:'list_courses',title:'List courses',description:'List your question banks and saved test progress.',schema:z.object({}),readOnly:true},
  {name:'import_questions',title:'Import question bank',description:'Import student-requested questions and course references. Supports MCQ, select-all, embedded images, diagram labeling, ordering and matching. Indexes are zero-based. Reuse requestId on retry. Existing banks are never overwritten.',schema:z.object({requestId:z.string().uuid(),name:z.string().trim().min(1).max(160),questions:z.array(question).min(1).max(200),sources:z.array(syncSource.extend({deletedAt:z.number().finite().positive().optional(),id,text:z.string().max(60000),rank:z.number().int().min(1).max(6).default(3),pages:z.union([syncSource.shape.pages,z.number().int().nonnegative()]).nullish()}).strip()).max(30).default([]),objectives:z.array(objective).max(200).default([]),conceptProgress:z.array(conceptProgress).max(400).default([])}),readOnly:false},
  {name:'start_test',title:'Start adaptive exam',description:'Start a new exam or resume an active one. Set size to all for the full eligible bank or a custom count up to the bank size (maximum 500 stored questions). examMode selects all, professor (original practice questions), struggling (learning concepts or latest wrong answers, excluding retained concepts), or custom. Source, week, objective, type and set filters are strict: empty includes none. Never restart unless the student requests it.',schema:preferences.extend({...stateArgs,customTestId:z.string().uuid().optional(),questionIds:z.array(id).min(1).max(500).optional(),restart:z.boolean().default(false)}),readOnly:false},
@@ -65,7 +68,7 @@ export const definitions=[
 definitions.push({...definitions.find(t=>t.name==='import_questions'),name:'add_questions',title:'Add course questions',description:'Append a bank to an existing course without replacing questions, sources, or saved progress. Use only student-supplied or accessible Project sources; reuse requestId on retries.',schema:definitions.find(t=>t.name==='import_questions').schema.omit({name:true}).extend(stateArgs)});
 const tutorDefs=tutorDefinitions(question),tutorNames=new Set(tutorDefs.map(d=>d.name));
 definitions.push(...tutorDefs);
-export const outputShape={request:z.record(z.string(),z.unknown()).optional(),presentations:z.array(z.record(z.string(),z.unknown())).optional(),presentation:z.record(z.string(),z.unknown()).optional(),asset:z.record(z.string(),z.unknown()).optional(),tutor:z.record(z.string(),z.unknown()).optional(),visual:z.record(z.string(),z.unknown()).optional(),versions:z.array(z.record(z.string(),z.unknown())).optional(),state:z.record(z.string(),z.unknown()).optional(),courses:z.array(z.object({id:z.string(),name:z.string(),revision:z.number(),updated_at:z.number()})).optional(),message:z.string().optional(),source:z.record(z.string(),z.unknown()).optional(),export:z.record(z.string(),z.unknown()).optional(),sync:z.record(z.string(),z.unknown()).optional(),context:z.record(z.string(),z.unknown()).optional()};
+export const outputShape={profile:z.record(z.string(),z.unknown()).optional(),request:z.record(z.string(),z.unknown()).optional(),presentations:z.array(z.record(z.string(),z.unknown())).optional(),presentation:z.record(z.string(),z.unknown()).optional(),asset:z.record(z.string(),z.unknown()).optional(),tutor:z.record(z.string(),z.unknown()).optional(),visual:z.record(z.string(),z.unknown()).optional(),versions:z.array(z.record(z.string(),z.unknown())).optional(),state:z.record(z.string(),z.unknown()).optional(),courses:z.array(z.object({id:z.string(),name:z.string(),revision:z.number(),updated_at:z.number()})).optional(),message:z.string().optional(),source:z.record(z.string(),z.unknown()).optional(),export:z.record(z.string(),z.unknown()).optional(),sync:z.record(z.string(),z.unknown()).optional(),context:z.record(z.string(),z.unknown()).optional()};
 function same(a,b){if(Array.isArray(a)&&Array.isArray(b))return JSON.stringify([...a].sort())===JSON.stringify([...b].sort());return JSON.stringify(Object.entries(a||{}).sort())===JSON.stringify(Object.entries(b||{}).sort());}
 function requireChoiceExplanations(q){if(!Array.isArray(q.optionNotes)||q.optionNotes.length!==q.options.length||q.optionNotes.some(note=>!note.trim()))throw new Error('Prepare one optionNotes explanation for every answer choice in the same question response.');}
 function checkResponse(q,args){
@@ -84,6 +87,7 @@ async function saveNewCourse(repo,model){
 }
 export async function executeTool(repo,name,raw){
  const def=definitions.find(t=>t.name===name);if(!def)throw new Error('Unknown tool.');const parsed=def.schema.safeParse(raw);if(!parsed.success){const issue=parsed.error.issues[0];throw Object.assign(new Error(`Check ${issue.path.join('.')||'the request'}: ${issue.message}. ${name==='sync_course_sources'?'Sync rejected; no changes were saved.':'For imports, use a supported question format with a complete key.'}`),name==='sync_course_sources'?{sync:{added:[],updated:[],unchanged:[],rejected:parsed.error.issues.map(i=>({path:i.path.join('.'),message:i.message}))}}:{});}let args=parsed.data;
+ if(name==='read_connected_profile')return {profile:repo.profile||{name:'Connected ChatGPT account'}};
  if(tutorNames.has(name))return executeTutor(repo,name,args,executeTool);
  if(name==='list_courses'||(['open_test','read_course_state','open_interface'].includes(name)&&!args.courseId))return {courses:await repo.list()};
  if(name==='delete_course'){await repo.delete(args.courseId,args.revision);return {courses:await repo.list()};}
@@ -187,6 +191,12 @@ export async function executeTool(repo,name,raw){
   for(const q of model.questions.values())if(q.sourceId===source.id){q.weekId=weekId;q.lecture=lecture;}
   for(const objective of model.objectives)if(objective.sourceId===source.id){objective.weekId=weekId;objective.lecture=lecture;}
   model._index=null;refreshGrounding(model);
+ }
+ else if(name==='attach_source_original'){
+  const source=model.sources.get(args.sourceId);if(!source)throw new Error('Source not found.');
+  const files=new TutorRepository(repo),a=await files.validateAsset(args.courseId,args.assetId);
+  source.originalFile={id:a.id,name:a.name,kind:a.kind,chunks:a.chunks,bytes:a.bytes};
+  await files.query('UPDATE tutor_assets SET ready=1 WHERE user_id=? AND course_id=? AND id=?',args.courseId,a.id).run();
  }
  else if(name==='attach_source_pdf'){
   const source=model.sources.get(args.sourceId);if(!source)throw new Error('Source not found.');

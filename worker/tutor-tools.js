@@ -1,7 +1,7 @@
 import {z} from 'zod/v4';
 import {TutorRepository} from './tutor-repository.js';
 import {annotationList,regionSchema} from '../lib/tutor/annotations.js';
-import {CHUNK_SIZE,MAX_ASSET,decode64,encode64,pdfMetadata,pptxMetadata,pairedMetadata} from '../lib/tutor/presentations.js';
+import {CHUNK_SIZE,decode64,encode64,pdfMetadata,pptxMetadata,pairedMetadata} from '../lib/tutor/presentations.js';
 import {legacyPptSlides} from '../lib/tutor/legacy-ppt.js';
 import {convertBytes} from './presentation-converter.js';
 import {PluginCourse} from './course.js';
@@ -10,14 +10,14 @@ const id=z.string().min(1).max(180),uuid=z.string().uuid(),course={courseId:id},
 const image=z.string().max(700000).regex(/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$/);
 export function tutorDefinitions(question){return [
  ['list_presentations','List course presentations',z.object(course),true,false],
- ['begin_presentation_upload','Begin immutable presentation upload',z.object({...course,assetId:uuid,name:z.string().min(1).max(300),kind:z.enum(['pdf','ppt','pptx','docx','txt','md']),bytes:z.number().int().positive().max(MAX_ASSET),chunks:z.number().int().positive().max(150)}),false,true],
- ['upload_presentation_chunk','Upload presentation file chunk',z.object({...course,assetId:uuid,index:z.number().int().min(0).max(149),data:z.string().min(4).max(CHUNK_SIZE).regex(/^[A-Za-z0-9+/]+={0,2}$/)}),false,true],
+ ['begin_presentation_upload','Begin immutable presentation upload',z.object({...course,assetId:uuid,name:z.string().min(1).max(300),kind:z.enum(['pdf','ppt','pptx','docx','txt','md']),bytes:z.number().int().positive(),chunks:z.number().int().positive()}),false,true],
+ ['upload_presentation_chunk','Upload presentation file chunk',z.object({...course,assetId:uuid,index:z.number().int().min(0),data:z.string().min(4).max(CHUNK_SIZE).regex(/^[A-Za-z0-9+/]+={0,2}$/)}),false,true],
  ['convert_presentation','Generate and store a slide PDF from an uploaded PowerPoint',z.object({...course,assetId:uuid}),false,true],
  ['import_presentation','Import course presentation',z.object({...course,presentationId:uuid,originalAssetId:uuid,pdfAssetId:uuid,sourceId:id.optional()}),false,true],
  ['import_course_presentation','Open an existing attached course PDF',z.object({...course,presentationId:uuid,sourceId:id}),false,true],
  ['read_presentation','Read presentation and editable annotations',z.object(presentation),true,true],
  ['read_slide_context','Read professor slide context for answering in the conversation',z.object({...slide,query:z.string().max(4000).default(''),region:regionSchema.optional(),annotationIds:z.array(uuid).max(30).default([]),allowGeneral:z.boolean().default(false)}),true,false],
- ['read_presentation_chunk','Read original presentation file chunk',z.object({...course,assetId:uuid,index:z.number().int().min(0).max(149)}),true,true],
+ ['read_presentation_chunk','Read original presentation file chunk',z.object({...course,assetId:uuid,index:z.number().int().min(0)}),true,true],
  ['save_slide_annotations','Save editable slide annotations',z.object({...slide,revision:z.number().int().positive(),requestId:uuid,annotations:annotationList.optional(),upserts:annotationList.default([]),deleted:z.array(uuid).max(300).default([])}).refine(a=>!!a.annotations||!!a.upserts.length||!!a.deleted.length,'Provide annotation changes'),false,true],
  ['list_annotation_versions','List recoverable presentation versions',z.object(presentation),true,true],
  ['restore_annotation_version','Restore a presentation annotation version',z.object({...presentation,revision:z.number().int().positive(),targetRevision:z.number().int().positive(),requestId:uuid}),false,true],
@@ -36,15 +36,19 @@ export async function executeTutor(courseRepo,name,args,append){
  if(name==='begin_presentation_upload'){
   if(args.chunks!==Math.ceil(Math.ceil(args.bytes/3)*4/CHUNK_SIZE))throw new Error('Invalid upload chunk count.');
   const {results}=await repo.query('SELECT id FROM tutor_assets WHERE user_id=? AND course_id=?',args.courseId).all();if(results.length>=100&&!results.some(a=>a.id===args.assetId))throw new Error('Use up to 100 presentation files per course.');
-  await repo.query('INSERT OR IGNORE INTO tutor_assets(user_id,course_id,id,kind,name,chunks,bytes,created_at) VALUES(?,?,?,?,?,?,?,?)',args.courseId,args.assetId,args.kind,args.name,args.chunks,args.bytes,Date.now()).run();
+  await repo.query('INSERT OR IGNORE INTO tutor_assets(user_id,course_id,id,kind,name,chunks,bytes,storage,created_at) VALUES(?,?,?,?,?,?,?,?,?)',args.courseId,args.assetId,args.kind,args.name,args.chunks,args.bytes,repo.assetStore?'r2':'d1',Date.now()).run();
   const asset=await repo.asset(args.courseId,args.assetId);if(asset.bytes!==args.bytes||asset.chunks!==args.chunks||asset.kind!==args.kind)throw new Error('Upload ID already belongs to a different file.');return {asset};
  }
  if(name==='upload_presentation_chunk'){
-  const a=await repo.asset(args.courseId,args.assetId);if(args.index>=a.chunks||args.data.length%4||args.index<a.chunks-1&&args.data.length!==CHUNK_SIZE)throw new Error('Invalid file chunk.');
-  const old=await repo.query('SELECT data FROM tutor_asset_chunks WHERE user_id=? AND course_id=? AND asset_id=? AND chunk_index=?',args.courseId,args.assetId,args.index).first();if(old&&old.data!==args.data)throw new Error('Original files cannot be overwritten.');
-  if(!old)await repo.query('INSERT OR IGNORE INTO tutor_asset_chunks(user_id,course_id,asset_id,chunk_index,data) VALUES(?,?,?,?,?)',args.courseId,args.assetId,args.index,args.data).run();return {message:'Chunk confirmed.'};
+  const a=await repo.asset(args.courseId,args.assetId),expected=Math.min(CHUNK_SIZE,Math.ceil(a.bytes/3)*4-args.index*CHUNK_SIZE);
+  if(args.index>=a.chunks||args.data.length!==expected||decode64(args.data).length!==Math.min(CHUNK_SIZE/4*3,a.bytes-args.index*CHUNK_SIZE/4*3)||encode64(decode64(args.data))!==args.data||args.index<a.chunks-1&&args.data.includes('='))throw new Error('Invalid file chunk.');
+  const old=await repo.query('SELECT data FROM tutor_asset_chunks WHERE user_id=? AND course_id=? AND asset_id=? AND chunk_index=?',args.courseId,args.assetId,args.index).first();
+  if(old){if(a.storage==='r2'){const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(args.data)))].map(b=>b.toString(16).padStart(2,'0')).join('');if(old.data!==hash)throw new Error('Original files cannot be overwritten.');await repo.chunkRecord(args.courseId,a,args.index,args.data);}else if(old.data!==args.data)throw new Error('Original files cannot be overwritten.');return {message:'Chunk confirmed.'};}
+  const record=await repo.chunkRecord(args.courseId,a,args.index,args.data);
+  await repo.query('INSERT OR IGNORE INTO tutor_asset_chunks(user_id,course_id,asset_id,chunk_index,data) VALUES(?,?,?,?,?)',args.courseId,args.assetId,args.index,record).run();
+  const confirmed=await repo.chunkData(args.courseId,a,args.index);if(confirmed!==args.data)throw new Error('Original files cannot be overwritten.');return {message:'Chunk confirmed.'};
  }
- if(name==='read_presentation_chunk'){const a=await repo.asset(args.courseId,args.assetId);if(!a.ready)throw new Error('File import has not been validated.');const r=await repo.query('SELECT data FROM tutor_asset_chunks WHERE user_id=? AND course_id=? AND asset_id=? AND chunk_index=?',args.courseId,args.assetId,args.index).first();if(!r)throw new Error('Chunk not found.');return {asset:{id:a.id,kind:a.kind,chunks:a.chunks,data:r.data}};}
+ if(name==='read_presentation_chunk'){const a=await repo.asset(args.courseId,args.assetId);if(!a.ready)throw new Error('File import has not been validated.');if(args.index>=a.chunks)throw new Error('Chunk not found.');return {asset:{id:a.id,kind:a.kind,chunks:a.chunks,data:await repo.chunkData(args.courseId,a,args.index)}};}
  if(name==='convert_presentation'){
   const original=await repo.asset(args.courseId,args.assetId);if(!['ppt','pptx'].includes(original.kind))throw new Error('Choose a PPT or PPTX file to convert.');
   const receipt=()=>repo.query('SELECT pdf_asset_id FROM tutor_conversions WHERE user_id=? AND course_id=? AND original_asset_id=?',args.courseId,original.id).first();
@@ -53,8 +57,8 @@ export async function executeTutor(courseRepo,name,args,append){
   const meta=original.kind==='pptx'?pptxMetadata(bytes):legacyPptSlides(bytes);
   const pdf=await convertBytes(courseRepo.converter,original.kind,bytes),rendered=await pdfMetadata(pdf);
   if(original.kind==='pptx')pairedMetadata(meta,rendered);else if(meta.length!==rendered.slides.length)throw new Error('The generated PDF does not contain every slide.');
-  const data=encode64(pdf),pdfId=crypto.randomUUID(),chunks=Math.ceil(data.length/CHUNK_SIZE),statements=[repo.query('INSERT INTO tutor_assets(user_id,course_id,id,kind,name,chunks,bytes,created_at) VALUES(?,?,?,?,?,?,?,?)',args.courseId,pdfId,'pdf',original.name.replace(/\.pptx?$/i,'')+'.pdf',chunks,pdf.length,Date.now())];
-  for(let index=0;index<chunks;index++)statements.push(repo.query('INSERT INTO tutor_asset_chunks(user_id,course_id,asset_id,chunk_index,data) VALUES(?,?,?,?,?)',args.courseId,pdfId,index,data.slice(index*CHUNK_SIZE,(index+1)*CHUNK_SIZE)));
+  const data=encode64(pdf),pdfId=crypto.randomUUID(),chunks=Math.ceil(data.length/CHUNK_SIZE),storage=repo.assetStore?'r2':'d1',statements=[repo.query('INSERT INTO tutor_assets(user_id,course_id,id,kind,name,chunks,bytes,storage,created_at) VALUES(?,?,?,?,?,?,?,?,?)',args.courseId,pdfId,'pdf',original.name.replace(/\.pptx?$/i,'')+'.pdf',chunks,pdf.length,storage,Date.now())];
+  for(let index=0;index<chunks;index++)statements.push(repo.query('INSERT INTO tutor_asset_chunks(user_id,course_id,asset_id,chunk_index,data) VALUES(?,?,?,?,?)',args.courseId,pdfId,index,await repo.chunkRecord(args.courseId,{id:pdfId,storage},index,data.slice(index*CHUNK_SIZE,(index+1)*CHUNK_SIZE))));
   // A lost response reuses the completed PDF; a competing conversion rolls back entirely.
   statements.push(repo.query('INSERT INTO tutor_conversions(user_id,course_id,original_asset_id,pdf_asset_id) VALUES(?,?,?,?)',args.courseId,original.id,pdfId));
   try{await repo.db.batch(statements);}catch(e){const winner=await receipt();if(winner)return {asset:await repo.asset(args.courseId,winner.pdf_asset_id)};throw e;}

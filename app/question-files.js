@@ -1,7 +1,7 @@
 import {uploadPresentationFile} from './tutor-files.js';
 import {unzipSync} from 'fflate';
 export const QUESTION_FILE_ACCEPT='.json,.txt,.md,.docx,.pdf,application/json,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf';
-export const MAX_FILE_BYTES=24*1024*1024,MAX_TEXT=60000;
+export const MAX_TEXT=60000;
 const WORD='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 function checked(text){text=text.replace(/\r\n?/g,'\n').trim();if(!text)throw new Error('No readable text found. For scanned PDFs, attach the original to ChatGPT for OCR first.');if(text.length>MAX_TEXT)throw new Error('This file contains more than 60,000 characters. Split it into smaller files; nothing was imported.');if(/\u0000/.test(text))throw new Error('This does not look like a supported text document. Save it as UTF-8 TXT or DOCX.');return text;}
 export function minimizeContacts(text){return text.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,'[email omitted]').replace(/^.*(?:phone|telephone|contact number)\s*[:：].*$/gim,'[contact line omitted]');}
@@ -20,7 +20,6 @@ export function docxText(bytes,Parser=globalThis.DOMParser){
  return paragraphs.map(content).join('\n');
 }
 export async function extractQuestionFile(file,{Parser,pdfLoader}={}){
- if(file.size>MAX_FILE_BYTES)throw new Error('Choose a file smaller than 24 MB.');
  const extension=file.name.split('.').at(-1).toLowerCase();if(extension==='doc')throw new Error('For legacy Word .doc files, save as .docx first.');
  if(!['txt','md','docx','pdf'].includes(extension))throw new Error('Choose JSON, TXT, Markdown, Word (.docx), or PDF.');
  const bytes=new Uint8Array(await file.arrayBuffer()),warnings=[];let text,pageCount,mimeType;

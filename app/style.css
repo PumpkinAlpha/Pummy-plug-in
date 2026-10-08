@@ -12,3 +12,5 @@ body{background:var(--bg);background-size:auto}.workspace{max-width:1180px}.topb
 .source-sync-control{display:grid;gap:12px;margin-bottom:24px}.source-sync-control p{margin:0}.reference-row{display:grid;grid-template-columns:minmax(0,1fr);gap:4px;overflow-wrap:anywhere}.reference-row .fine{font-size:14px}.source-sync-control [role=alert]{color:var(--bad)}
 
 .course-sources>.section-heading{flex-wrap:wrap}.source-import-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}.source-file-form input[type=file]{width:100%}.source-file-form textarea{min-height:220px;resize:vertical}@media(max-width:760px){.source-import-actions{justify-content:flex-start}.source-import-actions button{flex:1}}
+
+.connected-profile>label{display:grid;gap:8px;font-size:13px}.connected-profile{padding-bottom:8px;border-bottom:1px solid var(--line-2)}

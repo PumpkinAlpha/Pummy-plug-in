@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {zipSync,strToU8} from 'fflate';
 import {DOMParser} from '@xmldom/xmldom';
-import {extractQuestionFile,fileSourceId,questionFileMessage,stageQuestionFile,MAX_FILE_BYTES,QUESTION_FILE_ACCEPT,docxText} from '../app/question-files.js';
+import {extractQuestionFile,fileSourceId,questionFileMessage,stageQuestionFile,QUESTION_FILE_ACCEPT,docxText} from '../app/question-files.js';
 import {executeTool} from '../worker/tools.js';
 import {LocalD1} from '../scripts/local-db.mjs';
 import {CourseRepository} from '../worker/repository.js';
@@ -28,7 +28,7 @@ test('actual PDF parser extracts text with real page markers; no automatic binar
  assert.equal(extracted.pageCount,1);assert.match(extracted.text,/^--- Page 1 ---\nMock question\?/);assert.equal(extracted.mimeType,'application/pdf');
 });
 test('empty, oversized, binary and unsupported documents fail without silent truncation',async()=>{
- for(const [f,pattern] of [[file('blank.txt','  '),/No readable/],[file('huge.txt','x'.repeat(60001)),/60,000/],[file('binary.txt',new Uint8Array([0,1])),/supported text/],[file('legacy.doc',quiz),/save as .docx/],[file('image.png','png'),/Choose JSON/],[{name:'large.pdf',size:MAX_FILE_BYTES+1},/24 MB/]])await assert.rejects(extractQuestionFile(f),pattern);
+ for(const [f,pattern] of [[file('blank.txt','  '),/No readable/],[file('huge.txt','x'.repeat(60001)),/60,000/],[file('binary.txt',new Uint8Array([0,1])),/supported text/],[file('legacy.doc',quiz),/save as .docx/],[file('image.png','png'),/Choose JSON/]])await assert.rejects(extractQuestionFile(f),pattern);
  assert.ok(QUESTION_FILE_ACCEPT.includes('.txt,.md,.docx,.pdf'));
 });
 test('PDF bounds, scanned pages and password protection are reported; parser destroyed',async()=>{

@@ -9,7 +9,7 @@ export const tutorConversions = sqliteTable('tutor_conversions', {
  userId:text('user_id').notNull(),courseId:text('course_id').notNull(),originalAssetId:text('original_asset_id').notNull(),pdfAssetId:text('pdf_asset_id').notNull(),
 },t=>[primaryKey({columns:[t.userId,t.courseId,t.originalAssetId]})]);
 export const tutorAssets = sqliteTable('tutor_assets', {
- userId:text('user_id').notNull(),courseId:text('course_id').notNull(),id:text('id').notNull(),kind:text('kind').notNull(),name:text('name').notNull(),chunks:integer('chunks').notNull(),bytes:integer('bytes').notNull(),ready:integer('ready').notNull().default(0),createdAt:integer('created_at').notNull(),
+ userId:text('user_id').notNull(),courseId:text('course_id').notNull(),id:text('id').notNull(),kind:text('kind').notNull(),name:text('name').notNull(),chunks:integer('chunks').notNull(),bytes:integer('bytes').notNull(),ready:integer('ready').notNull().default(0),storage:text('storage').notNull().default('d1'),createdAt:integer('created_at').notNull(),
 },t=>[primaryKey({columns:[t.userId,t.courseId,t.id]})]);
 export const tutorAssetChunks = sqliteTable('tutor_asset_chunks', {
  userId:text('user_id').notNull(),courseId:text('course_id').notNull(),assetId:text('asset_id').notNull(),chunkIndex:integer('chunk_index').notNull(),data:text('data').notNull(),

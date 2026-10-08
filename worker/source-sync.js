@@ -1,5 +1,4 @@
 import {TutorRepository} from './tutor-repository.js';
-import {decode64} from '../lib/tutor/presentations.js';
 import {z} from 'zod/v4';
 export const SOURCE_TYPES=['professor_slides','objectives','group_activity','professor_quiz','course_supplement','approved_external','other'];
 export const DEFAULT_RANKS={professor_slides:1,objectives:2,group_activity:2,professor_quiz:3,course_supplement:4,approved_external:5,other:6};
@@ -34,7 +33,7 @@ export async function syncSources(repo,saved,model,args,view,refresh){
   const rank=src.rank??old?.rank??DEFAULT_RANKS[src.sourceType||'other'];
   const {text,metadata:meta,originalAssetId,...info}=src;
   let originalFile=old?.originalFile;
-  if(originalAssetId){const files=new TutorRepository(repo),a=await files.asset(model.id,originalAssetId),bytes=decode64(await files.assetData(model.id,a.id));if(bytes.length!==a.bytes)throw new Error('Original source upload is incomplete or has a size mismatch.');originalFile={id:a.id,name:a.name,kind:a.kind,chunks:a.chunks,bytes:a.bytes};await files.query('UPDATE tutor_assets SET ready=1 WHERE user_id=? AND course_id=? AND id=?',model.id,a.id).run();}
+  if(originalAssetId){const files=new TutorRepository(repo),a=await files.validateAsset(model.id,originalAssetId);originalFile={id:a.id,name:a.name,kind:a.kind,chunks:a.chunks,bytes:a.bytes};await files.query('UPDATE tutor_assets SET ready=1 WHERE user_id=? AND course_id=? AND id=?',model.id,a.id).run();}
   const next={...old,...info,...(originalFile?{originalFile}:{}),id:src.id,name:src.name,rank,sourceType:src.sourceType||old?.sourceType||'other',kind:'material',contentHash,metadata:{...semanticMetadata(old?.metadata),...semanticMetadata(meta)}};
   // Omitted metadata/pages retain the stored value; clients explicitly resend changed pages.
   if(src.pages===undefined&&old?.pages){if(oldText===text)next.pages=old.pages;else delete next.pages;}

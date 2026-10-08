@@ -1,10 +1,9 @@
 import {uploadPresentationFile} from './tutor-files.js';
-import {extractQuestionFile,minimizeContacts,MAX_FILE_BYTES,MAX_TEXT} from './question-files.js';
+import {extractQuestionFile,minimizeContacts,MAX_TEXT} from './question-files.js';
 import {pptxMetadata} from '../lib/tutor/presentations.js';
 import {legacyPptSlides} from '../lib/tutor/legacy-ppt.js';
 export const SOURCE_FILE_ACCEPT='.ppt,.pptx,.pdf,.docx,.txt,.md,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown';
 export async function extractSourceFile(file,options={}){
- if(file.size>MAX_FILE_BYTES)throw new Error('Choose a source file no larger than 24 MB.');
  const extension=file.name.split('.').at(-1).toLowerCase();let extracted;
  if(['ppt','pptx'].includes(extension)){
   const bytes=new Uint8Array(await file.arrayBuffer()),slides=extension==='ppt'?legacyPptSlides(bytes):pptxMetadata(bytes,{truncate:false}).slides;

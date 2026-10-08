@@ -1,20 +1,20 @@
 import {getDocumentProxy} from 'unpdf';
 import {PDFDocument} from 'pdf-lib';
 import {zipSync,unzipSync,strToU8,strFromU8} from 'fflate';
-import {CHUNK_SIZE,MAX_ASSET,encode64,decode64,pptxMetadata} from '../lib/tutor/presentations.js';
+import {CHUNK_SIZE,encode64,decode64,pptxMetadata} from '../lib/tutor/presentations.js';
 import {annotationSVG} from '../lib/tutor/annotations.js';
 const assets=new Map(),uploads=new WeakMap();let documentCache=null;
 export async function uploadPresentationFile(call,courseId,file,{source=false}={}){
- if(!file||!file.size||file.size>MAX_ASSET)throw new Error('Choose a PDF, PPT or PPTX up to 24 MB.');
+ if(!file||!file.size)throw new Error('Choose a nonempty file.');
  const extension=file.name.toLowerCase().split('.').at(-1),kind=(source?['pdf','ppt','pptx','docx','txt','md']:['pdf','ppt','pptx']).includes(extension)?extension:null;
  if(!kind)throw new Error(source?'Choose a PDF, PowerPoint, Word, TXT or Markdown file.':'Choose a PDF, PPT or PPTX file.');
  let transfer=uploads.get(file)?.get(courseId);
- if(!transfer){const data=encode64(new Uint8Array(await file.arrayBuffer()));transfer={data,assetId:crypto.randomUUID(),chunks:Math.ceil(data.length/CHUNK_SIZE),next:0};if(!uploads.has(file))uploads.set(file,new Map());uploads.get(file).set(courseId,transfer);}
+ if(!transfer){transfer={assetId:crypto.randomUUID(),chunks:Math.ceil(file.size/(CHUNK_SIZE/4*3)),next:0};if(!uploads.has(file))uploads.set(file,new Map());uploads.get(file).set(courseId,transfer);}
  await call('begin_presentation_upload',{courseId,assetId:transfer.assetId,name:file.name,kind,bytes:file.size,chunks:transfer.chunks});
- for(let index=transfer.next;index<transfer.chunks;index++){await call('upload_presentation_chunk',{courseId,assetId:transfer.assetId,index,data:transfer.data.slice(index*CHUNK_SIZE,(index+1)*CHUNK_SIZE)});transfer.next=index+1;}
+ for(let index=transfer.next;index<transfer.chunks;index++){await call('upload_presentation_chunk',{courseId,assetId:transfer.assetId,index,data:encode64(new Uint8Array(await (file.slice?file.slice(index*CHUNK_SIZE/4*3,(index+1)*CHUNK_SIZE/4*3).arrayBuffer():file.arrayBuffer().then(buffer=>buffer.slice(index*CHUNK_SIZE/4*3,(index+1)*CHUNK_SIZE/4*3)))))});transfer.next=index+1;}
  return transfer.assetId;
 }
-export async function loadAsset(call,courseId,asset){const key=courseId+':'+asset.id;if(assets.has(key))return assets.get(key);let data='';for(let index=0;index<asset.chunks;index++)data+=(await call('read_presentation_chunk',{courseId,assetId:asset.id,index})).asset.data;const bytes=decode64(data);if(assets.size>=3)assets.delete(assets.keys().next().value);assets.set(key,bytes);return bytes;}
+export async function loadAsset(call,courseId,asset){const key=courseId+':'+asset.id;if(assets.has(key))return assets.get(key);const parts=[];for(let index=0;index<asset.chunks;index++)parts.push(decode64((await call('read_presentation_chunk',{courseId,assetId:asset.id,index})).asset.data));const bytes=new Uint8Array(parts.reduce((n,c)=>n+c.length,0));let offset=0;for(const part of parts){bytes.set(part,offset);offset+=part.length;}if(assets.size>=3)assets.delete(assets.keys().next().value);assets.set(key,bytes);return bytes;}
 export async function renderSlide(call,presentation,page,width=1500){
  const key=presentation.courseId+':'+presentation.pdfAssetId;
  if(documentCache?.key!==key){const old=documentCache;const promise=(async()=>{if(old)await (await old.promise).loadingTask.destroy();const bytes=await loadAsset(call,presentation.courseId,presentation.assets.pdf);return getDocumentProxy(bytes.slice(),{isEvalSupported:false,stopAtErrors:true});})();documentCache={key,promise};}
@@ -22,6 +22,19 @@ export async function renderSlide(call,presentation,page,width=1500){
 }
 export function downloadFile(bytes,name,type){const url=URL.createObjectURL(new Blob([bytes],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
 async function loadImage(src){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('Could not render annotations.'));img.src=src;});}
+export async function annotationImage(file){
+ if(!file||!['image/png','image/jpeg'].includes(file.type))throw new Error('Choose a PNG or JPEG.');
+ const url=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Could not read this image.'));reader.readAsDataURL(file);});
+  const image=await loadImage(url),canvas=document.createElement('canvas');
+  let scale=Math.min(1,1600/Math.max(image.naturalWidth,image.naturalHeight));
+  for(let attempt=0;attempt<18;attempt++){
+   canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+   canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);
+   const data=canvas.toDataURL(file.type,.85);if(data.length<=350000)return data;
+   scale*=.75;
+  }
+  throw new Error('Could not prepare this image for the annotation canvas.');
+}
 export async function composeSlide(call,p,s,objects,{overlayOnly=false,width=2000}={}){const canvas=document.createElement('canvas');canvas.width=width;canvas.height=Math.round(width*s.height/s.width);const ctx=canvas.getContext('2d');if(!overlayOnly)ctx.drawImage(await loadImage(await renderSlide(call,p,s.page,width)),0,0,canvas.width,canvas.height);const svg=annotationSVG(objects,canvas.width,canvas.height);ctx.drawImage(await loadImage('data:image/svg+xml;base64,'+encode64(new TextEncoder().encode(svg))),0,0);return canvas.toDataURL('image/png');}
 export async function exportPDF(call,p,annotations){const doc=await PDFDocument.create();for(const s of p.slides){const data=await composeSlide(call,p,s,annotations[s.id]||[]),img=await doc.embedPng(decode64(data.split(',')[1]));doc.addPage([s.width,s.height]).drawImage(img,{x:0,y:0,width:s.width,height:s.height});}return doc.save();}
 const xml=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));

@@ -27,7 +27,6 @@ test('legacy import rejects corrupt containers, cyclic edits, encrypted files an
  assert.throws(()=>legacyPptSlides(new Uint8Array([1,2,3])),/fresh .pptx/);
  for(const [options,pattern] of [[{cycle:true},/fresh .pptx/],[{encrypted:true},/Encrypted/],[{macro:true},/Macro/],[{macro:'storage'},/Macro/]])assert.throws(()=>legacyPptSlides(fixtureLegacyPPT(options)),pattern);
  const broken=fixtureLegacyPPT();new DataView(broken.buffer).setUint32(48,0x7fffffff,true);assert.throws(()=>legacyPptSlides(broken),/fresh .pptx/);
- await assert.rejects(extractSourceFile({name:'large.ppt',size:24*1024*1024+1}),/24 MB/);
  await assert.rejects(extractSourceFile(file('bad.pptx',new Uint8Array([1,2,3]))),/valid PPTX/);
 });
 test('manual import accepts PDF and plain text and minimizes contact details',async()=>{
