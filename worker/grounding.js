@@ -16,7 +16,7 @@ export function pagesOf(src,text){
 export class GroundedIndex extends MaterialIndex{
  constructor(sources,texts){
   const segments=[],segmentTexts=new Map(),info=new Map();
-  for(const s of sources){if(s.kind!=='material')continue;pagesOf(s,texts.get(s.id)||'').forEach((p,i)=>{const id=`segment-${segments.length}`;segments.push({...s,id});segmentTexts.set(id,p.text);info.set(id,{sourceId:s.id,page:p.page,unit:p.unit,sourceType:s.sourceType,weekId:s.weekId,contentHash:s.contentHash});});}
+  for(const s of sources){if(s.deletedAt||s.kind!=='material')continue;pagesOf(s,texts.get(s.id)||'').forEach((p,i)=>{const id=`segment-${segments.length}`;segments.push({...s,id});segmentTexts.set(id,p.text);info.set(id,{sourceId:s.id,page:p.page,unit:p.unit,sourceType:s.sourceType,weekId:s.weekId,contentHash:s.contentHash});});}
   super(segments,segmentTexts,1800);
   this.chunks.forEach(c=>Object.assign(c,info.get(c.sid),{sid:info.get(c.sid).sourceId}));
  }

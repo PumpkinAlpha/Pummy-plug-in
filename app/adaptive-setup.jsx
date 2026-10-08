@@ -7,7 +7,7 @@ const TYPES=[['mcq','Single choice'],['multi','Select all'],['image','Image / id
 const defaults={size:'all',examMode:'all',adaptive:true,generateExplanations:false,explanationDepth:'comprehensive',practiceFirst:true,includeReviews:true,types:null,sourceIds:null,objectiveIds:null,weekId:'all',setId:null};
 function savedSettings(state){const saved=state.preferences||{};return {...defaults,...saved,examMode:saved.examMode||(saved.size==null||saved.size==='all'?'all':'custom'),size:saved.size==='all'||saved.size==null?'all':Math.min(saved.size,state.questionIndex?.length||500)};}
 
-export function AdaptiveSetup({state,busy,connected,resume,onResume,onStart,onBuild,onSave,buildJob,onExplain,onContinueExplanations}){
+export function AdaptiveSetup({state,busy,connected,resume,onResume,onEnd,onStart,onBuild,onSave,buildJob,onExplain,onContinueExplanations}){
  const [p,setP]=useState(()=>savedSettings(state));
  const [customSize,setCustomSize]=useState(()=>savedSettings(state).size==='all'?Math.min(20,state.questionIndex?.length||20):savedSettings(state).size);
  useEffect(()=>{const saved=savedSettings(state);setP(saved);setCustomSize(saved.size==='all'?Math.min(20,state.questionIndex?.length||20):saved.size);},[state.courseId]);
@@ -24,7 +24,7 @@ export function AdaptiveSetup({state,busy,connected,resume,onResume,onStart,onBu
   <span className="eyebrow">Exam configuration</span><h2>Adaptive exam</h2>
   <p className="muted">Choose what to study. Start with saved questions or generate a fresh set from your course sources.</p>
   <fieldset className="generation-mode-options exam-mode-options"><legend>Which questions should be in this exam?</legend><div className="generation-mode-grid exam-mode-grid">{Object.entries(EXAM_MODES).map(([mode,{label,description}])=><button type="button" key={mode} className={'generation-mode'+(p.examMode===mode?' selected':'')} aria-pressed={p.examMode===mode} disabled={busy||!!buildJob} onClick={()=>chooseMode(mode)}><strong>{label}</strong><span>{description}</span></button>)}</div></fieldset>
-  {resume&&<div className="notice"><span>Your current exam is saved.</span><button className="primary" disabled={busy} onClick={onResume}>Resume exam</button></div>}
+  {resume&&<div className="notice"><span>Your current exam is saved.</span><div className="exam-resume-actions"><button className="secondary" disabled={busy} onClick={onEnd}>End exam</button><button className="primary" disabled={busy} onClick={onResume}>Resume exam</button></div></div>}
   {buildJob&&<ExamGenerationProgress job={buildJob} state={state}/>}
   <div className="adaptive-start-actions"><button className="primary" disabled={busy||bad||resume||!matching.length||!!buildJob} onClick={()=>onStart(settings)}>{connected&&p.adaptive?'Start adaptive exam':'Start bank practice'}</button><button className="secondary" disabled={busy||bad||resume||!connected||p.examMode==='professor'||!!buildJob} onClick={()=>onBuild(settings)}>Generate questions and start exam</button>{missing.length>0&&<button className="secondary" disabled={busy||!!state.bankExplanationRequest?.pending||!!buildJob} onClick={()=>onExplain(missing)}>Generate missing explanations ({missing.length})</button>}</div>
   <BankExplanationStatus request={state.bankExplanationRequest} connected={connected} busy={busy} onContinue={onContinueExplanations}/>

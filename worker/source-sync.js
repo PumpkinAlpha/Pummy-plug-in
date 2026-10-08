@@ -35,7 +35,8 @@ export async function syncSources(repo,saved,model,args,view,refresh){
   // Omitted metadata/pages retain the stored value; clients explicitly resend changed pages.
   if(src.pages===undefined&&old?.pages){if(oldText===text)next.pages=old.pages;else delete next.pages;}
   next.contentHash=await digest(sourceContent(next,text));
-  const sameContent=old&&await digest(sourceContent(old,oldText))===next.contentHash;
+  delete next.deletedAt;
+  const sameContent=old&&!old.deletedAt&&await digest(sourceContent(old,oldText))===next.contentHash;
   const equalMeta=old&&old.name===next.name&&old.rank===rank&&(old.sourceType||'other')===next.sourceType&&old.lecture===next.lecture&&old.weekId===next.weekId&&JSON.stringify(canonical(semanticMetadata(old.metadata)))===JSON.stringify(canonical(next.metadata));
   if(sameContent&&equalMeta){summary.unchanged.push(src.id);continue;}
   next.createdAt=old?.createdAt||now;next.updatedAt=now;next.lastSyncedAt=now;next.syncStatus=old?'updated':'synced';next.chars=text.length;
