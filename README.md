@@ -1,6 +1,6 @@
 # Pummy Adaptive Test — ChatGPT plugin
 
-Version 0.4.5 fixes import key preservation, custom-test limits and retries, course switching, and background-refresh errors. It recreates the adaptive exam and its warm HUD-style interface inside a fullscreen ChatGPT/Codex MCP App. It reuses the original Pummy engine and does not change the desktop app.
+Version 0.4.6 updates the official MCP and MCP Apps SDKs to support current publishing discovery and authenticated tool calls while retaining legacy clients. It also includes import key preservation, custom-test limits and retries, course switching, and background-refresh fixes. It recreates the adaptive exam and its warm HUD-style interface inside a fullscreen ChatGPT/Codex MCP App. It reuses the original Pummy engine and does not change the desktop app.
 
 This maintenance release preserves explicit supplied answer keys and flags conflicting explanation labels for review. TXT imports tolerate blank lines within questions and preserve drafts after a parse error. References with more than 60,000 characters are rejected before import instead of silently shortened. Exam setup offers All questions, Struggling questions, Professor questions and Custom; exams and saved selections can use the full bank. Custom tests include bank search and reuse saved questions on a failed-save retry. Study actions clear unrelated saved filters; course and session changes reset local selections. Background tool errors are surfaced and incomplete Markdown tables cannot crash the view.
 
@@ -86,4 +86,4 @@ Automated tests cover adaptive chains/depth, returns, deferred retries, skip/end
 
 Reuse `.openai/hosting.json` and the existing private Site/plugin identity. Build produces a self-contained HTML resource and a Cloudflare-compatible `dist/server/index.js` default.fetch. Keep the Site audience unchanged and do not create a replacement plugin.
 
-The publishing scanner can begin with the newer `server/discover` request. Pummy answers this metadata-only probe using the SDK's actual initialization metadata and supported versions, allowing clients to negotiate the existing MCP protocol. Other requests retain normal protocol validation and private tool calls still require Sites-authenticated identity. A domain verification success does not replace a successful connection and MCP scan.
+The publishing scanner uses MCP `2026-07-28` and the `server/discover` request. The official MCP v2 handler serves current per-request metadata, discovery, tools and resources. Existing clients retain the legacy initialization handshake and JSON responses. Private tool calls still require Sites-authenticated identity. A domain verification success does not replace a successful connection and MCP scan.

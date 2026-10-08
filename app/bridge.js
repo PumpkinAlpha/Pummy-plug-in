@@ -2,7 +2,7 @@ import {App} from '@modelcontextprotocol/ext-apps';
 import {pendingKey,tutorContext,requestTracker} from './pending.js';
 import {hasLoaded} from './startup.js';
 export const embedded=window.parent!==window;
-export const bridge=embedded?new App({name:'pummy-adaptive-test',version:'0.4.5'},{availableDisplayModes:['fullscreen']},{autoResize:true}):null;
+export const bridge=embedded?new App({name:'pummy-adaptive-test',version:'0.4.6'},{availableDisplayModes:['fullscreen']},{autoResize:true}):null;
 export let latest={};let listener=()=>{},ready;
 export function subscribe(fn){listener=fn;fn(latest);return ()=>{listener=()=>{};};}
 function checkResult(r){if(r?.isError)throw new Error(r.content?.find(c=>c.type==='text')?.text||'Could not complete the action.');}

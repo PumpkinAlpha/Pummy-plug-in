@@ -1,4 +1,4 @@
-import {z} from 'zod';
+import {z} from 'zod/v4';
 export const SOURCE_TYPES=['professor_slides','objectives','group_activity','professor_quiz','course_supplement','approved_external','other'];
 export const DEFAULT_RANKS={professor_slides:1,objectives:2,group_activity:2,professor_quiz:3,course_supplement:4,approved_external:5,other:6};
 const sourceId=z.string().min(1).max(180).regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/,'Use a stable source ID containing letters, numbers, dots, hyphens, underscores or colons.');

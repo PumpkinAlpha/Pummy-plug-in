@@ -1,6 +1,6 @@
 import {grounding,refreshGrounding,explanationPrompt,provenance,pagesOf,validateProvenance} from './grounding.js';
 import {syncFields,syncSources,syncSource,SOURCE_TYPES} from './source-sync.js';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 import { PluginCourse,emptyCourse,validateQuestion,createExam,createSession,settle,view,ingest,isInteractive,archiveSession,isStrugglingQuestion } from './course.js';
 const id=z.string().min(1).max(180),revision=z.number().int().min(1),text=z.string().trim().min(1).max(4000),num=z.number().finite().min(0);
 const responseText=z.string().min(1).max(4000); // Saved legacy label banks may include surrounding whitespace.
@@ -56,7 +56,7 @@ export const definitions=[
  {name:'provide_explanation',title:'Save grounded explanation',description:'Complete explanationRequest with a course-grounded explanation for a submitted question. Do not change answers or test phase.',schema:z.object({...stateArgs,requestId:id,explanation}),readOnly:false},
 ];
 definitions.push({...definitions.find(t=>t.name==='import_questions'),name:'add_questions',title:'Add course questions',description:'Append a bank to an existing course without replacing questions, sources, or saved progress. Use only student-supplied or accessible Project sources; reuse requestId on retries.',schema:definitions.find(t=>t.name==='import_questions').schema.omit({name:true}).extend(stateArgs)});
-export const outputShape={state:z.record(z.unknown()).optional(),courses:z.array(z.object({id:z.string(),name:z.string(),revision:z.number(),updated_at:z.number()})).optional(),message:z.string().optional(),source:z.record(z.unknown()).optional(),export:z.record(z.unknown()).optional(),sync:z.record(z.unknown()).optional(),context:z.record(z.unknown()).optional()};
+export const outputShape={state:z.record(z.string(),z.unknown()).optional(),courses:z.array(z.object({id:z.string(),name:z.string(),revision:z.number(),updated_at:z.number()})).optional(),message:z.string().optional(),source:z.record(z.string(),z.unknown()).optional(),export:z.record(z.string(),z.unknown()).optional(),sync:z.record(z.string(),z.unknown()).optional(),context:z.record(z.string(),z.unknown()).optional()};
 function same(a,b){if(Array.isArray(a)&&Array.isArray(b))return JSON.stringify([...a].sort())===JSON.stringify([...b].sort());return JSON.stringify(Object.entries(a||{}).sort())===JSON.stringify(Object.entries(b||{}).sort());}
 function requireChoiceExplanations(q){if(!Array.isArray(q.optionNotes)||q.optionNotes.length!==q.options.length||q.optionNotes.some(note=>!note.trim()))throw new Error('Prepare one optionNotes explanation for every answer choice in the same question response.');}
 function checkResponse(q,args){

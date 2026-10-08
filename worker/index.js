@@ -18,7 +18,7 @@ export default {async fetch(request,env){
    if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
    return new Response(request.method==='HEAD'?null:info,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; style-src 'unsafe-inline'; img-src 'self'; object-src 'none'; base-uri 'none'"}});
   }
-  if(url.pathname==='/health')return json({ok:true,app:'Pummy Adaptive Test',version:'0.4.5'});
+  if(url.pathname==='/health')return json({ok:true,app:'Pummy Adaptive Test',version:'0.4.6'});
   if(url.pathname==='/pummy-logo.png')return new Response(Uint8Array.from(atob(logoDataUrl.split(',')[1]),c=>c.charCodeAt(0)),{headers:{'Content-Type':'image/png','Cache-Control':'public, max-age=86400','X-Content-Type-Options':'nosniff'}});
   if(url.pathname==='/mcp'){
    // Discovery is public; the hosting boundary supplies authenticated identity for private calls.
