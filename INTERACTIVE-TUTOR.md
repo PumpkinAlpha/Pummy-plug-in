@@ -70,25 +70,19 @@ Downloads depend on host support. When the host blocks file downloads, use the a
 
 ## Tutor and adaptive integration
 
-The existing MCP Apps `updateModelContext`, `sendMessage` and `callServerTool` bridge is used. Current slide, selection and region identifiers update the model context. A request stores bounded current-slide text, speaker notes, relevant existing objectives and retrieved course excerpts. The original professor visual, or a cropped original region, is supplied as an actual MCP image content block. Student notes are supplied separately and marked untrusted/student-authored. Annotation overlays are not baked into the authoritative visual.
+The slide editor shares the visible slide with the conversation. Type questions in the ChatGPT or Codex chat beside Pummy. The compact **Ask in this chat** indicator replaces the in-app question box and transcript. The editor sends no automatic user messages and creates no pending tutor requests.
 
-The conversation model calls `read_slide_tutor` and completes a request with `provide_slide_tutor`. Answers appear in the right panel with source/page citations. A short recent history supports follow-ups. Polling uses `summaryOnly` and does not repeatedly transmit image/context payloads. Unsupported details must be reported as “The provided materials do not explicitly state this.” General knowledge requires the explicit checkbox; bank questions still require professor provenance.
+In an MCP Apps host, `updateModelContext` supplies current slide text, speaker notes, original professor pixels (cropped to a selected region when present), relevant objectives and course excerpts. Student annotations remain separately labeled untrusted notes. Slide and region changes refresh the context. Leaving the editor clears the slide context. The browser also registers a read-only `read_visible_slide` WebMCP tool while a presentation is open; it reads the current slide and can include its original visual on request.
 
-Practice questions require a supplied professor citation and slide text or original visual. Visual-only questions can carry the original figure. Server validation rejects invented source/page citations; semantic factual grounding remains the model's responsibility. Questions are reviewed in the widget, then **Save to Question Bank** uses the existing idempotent `add_questions` engine. Large lecture text is split into stable source parts under the existing 60,000-character source limit. Existing 30-source/500-question/900-KB course limits remain enforced. An explicitly linked existing source must contain the slide text before questions can be appended under that source ID.
+`read_slide_context` lets the conversation retrieve grounded professor context by course, presentation and slide IDs, with an optional query, region and annotation selection. Answer directly in the conversation and cite the supplied source and slide/page. General knowledge requires the checkbox or an explicit request in chat. If a claim is unsupported by the sources, say so. These reads never change exam progress or create a tutor request. Ordinary browsers without MCP Apps or WebMCP cannot automatically attach context; use the open browser view in Codex or open Pummy through its ChatGPT plugin.
 
-Comprehension conversations live separately from formal exam mastery. Opening the tutor, asking questions and saving annotations never starts, resets or advances an exam. Saving practice questions appends rather than replaces the bank. Existing progress remains intact, though a new question can add source metadata to its existing concept.
-
-The standalone editor can save pending requests; its AI responses require opening Pummy in ChatGPT. No new model API key is required. The deployed host handoff has not been exercised in a live ChatGPT conversation during this implementation; browser tests complete replies through the same server tools.
+The older `request_slide_tutor`, `read_slide_tutor`, `provide_slide_tutor` and `save_tutor_questions` remain compatible with stored requests and history. They continue to validate supplied source/page citations and append reviewed questions without replacing progress. No new model API key is required. The editor no longer provides its own dictation or read-aloud controls; conversation voice is managed by the host.
 
 Integration references: [official MCP App UI documentation](https://developers.openai.com/plugins/build/chatgpt-ui). The Update Plugin workflow was used from the installed plugin-creator skill.
 
-## Voice
-
-Where available, browser SpeechRecognition provides user-triggered dictation with transcript and permission/error fallback. Browser speech synthesis provides read-aloud, pause, resume and stop. No credentials are shipped to the browser. The host/browser may deny microphone permission or lack recognition. Text always works. Native ChatGPT Voice and continuous realtime bidirectional audio are not claimed or implemented. Live microphone and speech playback were not tested on the user's account.
-
 ## New tools
 
-The 30 existing tools remain, plus these 15. The new widget resource is `ui://pummy/adaptive-test-v12.html`; all older resource addresses, including v11, remain aliases. Tools other than the existing `open_interface` do not open new panels.
+The 30 existing tools remain, plus these 16. The new widget resource is `ui://pummy/adaptive-test-v12.html`; all older resource addresses, including v11, remain aliases. Tools other than the existing `open_interface` do not open new panels.
 
 | Tool | Visibility/purpose |
 | --- | --- |
@@ -99,6 +93,7 @@ The 30 existing tools remain, plus these 15. The new widget resource is `ui://pu
 | `import_presentation` | App; validate and parse PDF or PowerPoint/PDF pair |
 | `import_course_presentation` | App; reuse existing attached source PDF |
 | `read_presentation` | App; metadata, editable layers and conversation |
+| `read_slide_context` | Model/app; read-only grounded context for conversation answers |
 | `read_presentation_chunk` | App; authorized original-file retrieval |
 | `save_slide_annotations` | App; expected-revision upserts/deletions |
 | `list_annotation_versions` | App; revision metadata |
@@ -110,7 +105,7 @@ The 30 existing tools remain, plus these 15. The new widget resource is `ui://pu
 
 ## Files
 
-Added: `app/interactive-tutor.jsx`, `app/interactive-tutor.css`, `app/tutor-session.js`, `app/tutor-files.js`, `lib/tutor/annotations.js`, `lib/tutor/presentations.js`, `worker/tutor-repository.js`, `worker/tutor-tools.js`, `drizzle/0001_interactive_tutor.sql`, `drizzle/meta/0001_snapshot.json`, `test/interactive-tutor.test.mjs`, `test/tutor-migrations.test.mjs`, `test/tutor-fixtures.mjs`, `test/tutor-browser.mjs`, `app/source-files.js`, `app/source-file-form.jsx`, `lib/tutor/legacy-ppt.js`, `test/source-fixtures.mjs`, `test/source-files.test.mjs`, `worker/presentation-converter.js`, `scripts/presentation-converter.mjs`, `scripts/converter-server.mjs`, `drizzle/0002_freezing_hemingway.sql`, `test/presentation-conversion.test.mjs`, `app/view-history.js`, `app/use-view-history.js`, `lib/tutor/audio.js`, `app/slide-audio.jsx`, `test/view-history.test.mjs`, `test/slide-audio.test.mjs`, `test/audio-fixture.mjs`, and this guide.
+Added: `app/slide-chat.jsx`, `app/interactive-tutor.jsx`, `app/interactive-tutor.css`, `app/tutor-session.js`, `app/tutor-files.js`, `lib/tutor/annotations.js`, `lib/tutor/presentations.js`, `worker/tutor-repository.js`, `worker/tutor-tools.js`, `drizzle/0001_interactive_tutor.sql`, `drizzle/meta/0001_snapshot.json`, `test/interactive-tutor.test.mjs`, `test/tutor-migrations.test.mjs`, `test/tutor-fixtures.mjs`, `test/tutor-browser.mjs`, `app/source-files.js`, `app/source-file-form.jsx`, `lib/tutor/legacy-ppt.js`, `test/source-fixtures.mjs`, `test/source-files.test.mjs`, `worker/presentation-converter.js`, `scripts/presentation-converter.mjs`, `scripts/converter-server.mjs`, `drizzle/0002_freezing_hemingway.sql`, `test/presentation-conversion.test.mjs`, `app/view-history.js`, `app/use-view-history.js`, `lib/tutor/audio.js`, `app/slide-audio.jsx`, `test/view-history.test.mjs`, `test/slide-audio.test.mjs`, `test/audio-fixture.mjs`, and this guide.
 
 Updated: course navigation/main widget and bridge, `worker/tools.js`, MCP registration/resource aliases/version, worker health version, `worker/course.js` to retain imported question page provenance, `db/schema.ts`, the local database migration/batch adapter, MCP discovery tests, package/dependency files, README, and generated `app/view.html`/`dist` build outputs.
 
@@ -162,6 +157,6 @@ Before production release:
 - Check a representative professor deck with tables, equations, charts and speaker notes against its PowerPoint-exported companion PDF.
 - Edit/group/rotate/undo, reopen, restore a revision and verify original download bytes.
 - Open an editable annotated PPTX in PowerPoint and select/change its text/shape objects, especially for unusual namespaces/fonts.
-- Verify downloads, mobile touch, stylus pressure, microphone denial, dictation and speech playback on intended hosts.
+- Verify downloads, mobile touch, stylus pressure and conversation context sharing on intended hosts.
 
 Dependency audit found five existing development-tool advisories (four moderate, one high), in Drizzle tooling and its nested esbuild. The new PDF/export/Playwright dependencies did not add reported production advisories. Address Drizzle tooling upgrades in a separate compatibility-reviewed change; this implementation does not force unrelated major upgrades.
