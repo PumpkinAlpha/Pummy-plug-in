@@ -1,6 +1,6 @@
 {
   "name": "pummy-adaptive-plugin",
-  "version": "0.4.6",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,20 +8,27 @@
     "validate": "node scripts/validate-artifact.mjs",
     "test": "node --test test/*.test.mjs",
     "dev": "node scripts/dev.mjs",
-    "db:generate": "drizzle-kit generate"
+    "converter": "node scripts/converter-server.mjs",
+    "db:generate": "drizzle-kit generate",
+    "test:browser": "node test/tutor-browser.mjs",
+    "test:explanations-browser": "node test/explanations-browser.mjs",
+    "test:workspace-browser": "node test/workspace-browser.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/core": "^2.3.1",
     "@modelcontextprotocol/ext-apps": "^2.0.3",
     "@modelcontextprotocol/server": "^2.3.1",
+    "@xmldom/xmldom": "^0.9.12",
     "fflate": "^0.8.3",
+    "pdf-lib": "^1.17.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "unpdf": "^1.8.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@xmldom/xmldom": "^0.9.12",
+    "@playwright/test": "^1.64.0",
+    "cfb": "^1.2.2",
     "drizzle-kit": "^0.31.0",
     "drizzle-orm": "^0.44.0",
     "esbuild": "^0.25.0"

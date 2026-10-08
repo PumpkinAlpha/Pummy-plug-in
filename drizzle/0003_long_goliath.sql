@@ -1,0 +1,1 @@
+ALTER TABLE `tutor_assets` ADD `storage` text DEFAULT 'd1' NOT NULL;

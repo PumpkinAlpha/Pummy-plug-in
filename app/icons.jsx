@@ -99,6 +99,7 @@ const paths = {
   reports: <path d="M5 20V12M10 20V5M15 20v-9M20 20V8M3 20.5h18" />,
   infographic: <><rect x="3.5" y="4.5" width="17" height="15" rx="2" /><path d="m7 15.5 3-3.5 2.5 2.5L17 9.5" /><circle cx="8" cy="8.5" r="1.2" /></>,
   table: <><rect x="3.5" y="4.5" width="17" height="15" rx="2" /><path d="M3.5 9.5h17M3.5 14.5h17M9.5 4.5v15" /></>,
+  powerpoint: <><path d="M10 3.5h10v17H10M15 7.5h2M15 11.5h2M15 15.5h2"/><rect x="2.5" y="6.5" width="10" height="11" rx="1.5"/><path d="M6 14v-4h2a1.3 1.3 0 0 1 0 2.6H6"/></>,
   slides: <><rect x="3.5" y="4" width="17" height="12" rx="1.5" /><path d="M12 16v4M8 20h8M8.5 8.5h7M8.5 11.5h4.5" /></>,
   bank: <><path d="M4 7.5 12 4l8 3.5-8 3.5Z" /><path d="M4 12l8 3.5 8-3.5M4 16.5 12 20l8-3.5" /></>,
   chat: <path d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v8.5A1.5 1.5 0 0 1 19 17H10l-4.5 3.5V17H5A1.5 1.5 0 0 1 3.5 15.5V7A1.5 1.5 0 0 1 5 5.5Z" />,
@@ -115,6 +116,7 @@ export function Icon({ name, size = 20, className = '', label }) {
 export const FILE_KINDS = {
   pdf: { label: 'PDF', tone: 'red' },
   pptx: { label: 'PPT', tone: 'orange' },
+  ppt: { label: 'PPT', tone: 'orange' },
   docx: { label: 'DOC', tone: 'blue' },
   image: { label: 'IMG', tone: 'purple' },
   text: { label: 'TXT', tone: 'gray' },
