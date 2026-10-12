@@ -30,3 +30,15 @@ export async function saveManualSource(call,courseId,file,folder,attempt){
  const source={id:attempt.sourceId,originalAssetId:attempt.originalAssetId,name:file.name.trim(),text,sourceType:file.sourceType,rank:file.rank,...grouping,...(pages?.length?{pages}:{}),metadata:{originalFileName:file.originalFileName||file.name,mimeType:file.mimeType,sourceOrigin:'student_upload',...(file.pageCount?{pageCount:file.pageCount}:{})}};
  return call('sync_course_sources',{courseId,revision:state.revision,requestId:attempt.requestId,sources:[source]});
 }
+
+// Keep each file's receipt across retries; a failed file must not block the others.
+export async function saveManualSources(call,courseId,entries,folder,onProgress=()=>{}){
+ for(const entry of entries){
+  if(!entry.file||entry.status==='saved')continue;
+  entry.status='saving';entry.error='';onProgress();
+  try{entry.result=await saveManualSource(call,courseId,entry.file,folder,entry.attempt);entry.status='saved';}
+  catch(e){entry.status='failed';entry.error=e.message||'Could not import this file. Retry.';}
+  onProgress();
+ }
+ return entries;
+}

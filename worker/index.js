@@ -36,7 +36,7 @@ export default {async fetch(request,env){
    if(request.headers.get('origin')!==url.origin)return json({error:'Use the test interface to perform this action.'},403);
    if(Number(request.headers.get('content-length')||0)>1500000)return json({error:'Import fewer questions.'},413);
    const bodyText=await request.text();if(bodyText.length>1500000)return json({error:'Import fewer questions.'},413);
-   const body=JSON.parse(bodyText);const data=await executeTool(new CourseRepository(env.DB,user,configuredConverter(env),env.ASSETS,connectedProfile(request)),body.name,body.arguments);
+   const body=JSON.parse(bodyText);const data=await executeTool(new CourseRepository(env.DB,user,configuredConverter(env),env.BUCKET,connectedProfile(request)),body.name,body.arguments);
    return json({structuredContent:data});
   }
   if(url.pathname==='/'){

@@ -1,6 +1,8 @@
 # Pummy Adaptive Test — ChatGPT plugin
 
-Uploads have no fixed file-byte cap. Files transfer in 180 KB slices into the `ASSETS` R2 binding; D1 stores ownership and immutable chunk receipts, and legacy D1 files remain readable. Processing limits on extracted text, pages, annotations and course snapshots remain. Display settings show only the authenticated ChatGPT profile; other sign-ins are selected in ChatGPT’s account menu, then Pummy must be reopened. The sidebar toggle precedes Back.
+Course file imports accept multiple files in one selection, with individual text review and upload results. Failed uploads can be retried without duplicating successful imports. Upload storage uses BUCKET so it cannot collide with the hosted static-assets service. The interface resource is v14, retaining all earlier aliases.
+
+Uploads have no fixed file-byte cap. Files transfer in 180 KB slices into the `BUCKET` R2 binding; D1 stores ownership and immutable chunk receipts, and legacy D1 files remain readable. Processing limits on extracted text, pages, annotations and course snapshots remain. Display settings show only the authenticated ChatGPT profile; other sign-ins are selected in ChatGPT’s account menu, then Pummy must be reopened. The sidebar toggle precedes Back.
 
 Figma Make integration (`PumpkinAlpha/Figma-Plug-in`, commit `d7b0b29142c48baeef17bd786086bbffa8399ea3`) adds an expanded slide editor, collapsible presentation imports, a movable slide-control toolbar, an Explain the slide conversation handoff, and editable copies of original slide text. Attached PowerPoint sources open using the configured converter or a companion PDF. Original files and exam progress stay intact. The plugin retains its production MCP bridge and current exam-selector fixes; Figma-only Vite scaffolding and portable Linux Office installation are excluded. The UI resource advances to v13 with existing resource aliases retained.
 
