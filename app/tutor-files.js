@@ -20,6 +20,31 @@ export async function renderSlide(call,presentation,page,width=1500){
  if(documentCache?.key!==key){const old=documentCache;const promise=(async()=>{if(old)await (await old.promise).loadingTask.destroy();const bytes=await loadAsset(call,presentation.courseId,presentation.assets.pdf);return getDocumentProxy(bytes.slice(),{isEvalSupported:false,stopAtErrors:true});})();documentCache={key,promise};}
  const doc=await documentCache.promise,p=await doc.getPage(page),base=p.getViewport({scale:1}),viewport=p.getViewport({scale:width/base.width}),canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);await p.render({canvasContext:canvas.getContext('2d'),viewport}).promise;return canvas.toDataURL('image/png');
 }
+// Finds the original slide text block (line or paragraph) at a normalized point, read from the
+// rendered PDF so it works for PDF and converted PowerPoint slides. The source file is never changed.
+export async function slideTextAt(call,presentation,page,px,py){
+ await renderSlide(call,presentation,page,200);
+ const doc=await documentCache.promise,pg=await doc.getPage(page),v=pg.getViewport({scale:1}),{items}=await pg.getTextContent();
+ const runs=items.filter(t=>t.str&&t.str.trim()).map(t=>{const size=Math.hypot(t.transform[2],t.transform[3])||t.height||10,[x,base]=v.convertToViewportPoint(t.transform[4],t.transform[5]);return {str:t.str,x:x/v.width,y:(base-size*.9)/v.height,w:Math.max(t.width,1)/v.width,h:size*1.15/v.height,size:size/v.width,base:base/v.height};});
+ const lines=[];for(const r of runs.sort((a,b)=>a.base-b.base||a.x-b.x)){const line=lines.find(l=>Math.abs(l.base-r.base)<r.h*.35&&Math.abs(l.size-r.size)<r.size*.25&&r.x<=l.x+l.w+r.size*3&&r.x+r.w>=l.x-r.size*3);if(line){line.runs.push(r);const right=Math.max(line.x+line.w,r.x+r.w);line.x=Math.min(line.x,r.x);line.w=right-line.x;line.y=Math.min(line.y,r.y);line.h=Math.max(line.h,r.y+r.h-line.y);}else lines.push({runs:[r],x:r.x,y:r.y,w:r.w,h:r.h,base:r.base,size:r.size});}
+ const pad=.006,hit=lines.find(l=>px>=l.x-pad&&px<=l.x+l.w+pad&&py>=l.y-pad&&py<=l.y+l.h+pad);if(!hit)return null;
+ // Grow to the surrounding paragraph: neighbouring lines with the same size, left edge and line spacing.
+ const block=[hit],near=(a,b)=>Math.abs(a.size-b.size)<a.size*.15&&Math.abs(a.x-b.x)<a.size*2&&Math.abs(a.base-b.base)<a.size*1.9*(v.width/v.height);
+ for(let grew=true;grew;){grew=false;for(const l of lines)if(!block.includes(l)&&block.some(b=>near(b,l))){block.push(l);grew=true;}}
+ block.sort((a,b)=>a.base-b.base);const x=Math.min(...block.map(l=>l.x)),y=Math.min(...block.map(l=>l.y)),right=Math.max(...block.map(l=>l.x+l.w)),bottom=Math.max(...block.map(l=>l.y+l.h));
+ return {text:block.map(l=>l.runs.sort((a,b)=>a.x-b.x).map(r=>r.str).join('').replace(/\s+/g,' ').trim()).join('\n'),box:{x,y,w:right-x,h:bottom-y},fontSize:hit.size};
+}
+// Background and ink colours of a slide region, sampled from the rendered slide image.
+export async function sampleColors(dataUrl,box){
+ const img=await new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=reject;i.src=dataUrl;});
+ const c=document.createElement('canvas'),W=c.width=img.naturalWidth,H=c.height=img.naturalHeight,ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0);
+ const x0=Math.max(0,Math.floor(box.x*W)),y0=Math.max(0,Math.floor(box.y*H)),w=Math.max(1,Math.min(W-x0,Math.ceil(box.w*W))),h=Math.max(1,Math.min(H-y0,Math.ceil(box.h*H))),d=ctx.getImageData(x0,y0,w,h).data;
+ const counts=new Map();for(let i=0;i<d.length;i+=4){const k=(d[i]>>3)<<10|(d[i+1]>>3)<<5|(d[i+2]>>3);counts.set(k,(counts.get(k)||0)+1);}
+ const bgKey=[...counts].sort((a,b)=>b[1]-a[1])[0][0],bg=[(bgKey>>10&31)<<3|4,(bgKey>>5&31)<<3|4,(bgKey&31)<<3|4];
+ let ink=bg,best=-1;for(let i=0;i<d.length;i+=4){const diff=Math.abs(d[i]-bg[0])+Math.abs(d[i+1]-bg[1])+Math.abs(d[i+2]-bg[2]);if(diff>best){best=diff;ink=[d[i],d[i+1],d[i+2]];}}
+ const hex=v=>'#'+v.map(n=>Math.max(0,Math.min(255,n)).toString(16).padStart(2,'0')).join('');
+ return {background:hex(bg),ink:best>60?hex(ink):(bg[0]+bg[1]+bg[2]>384?'#000000':'#ffffff')};
+}
 export function downloadFile(bytes,name,type){const url=URL.createObjectURL(new Blob([bytes],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
 async function loadImage(src){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('Could not render annotations.'));img.src=src;});}
 export async function annotationImage(file){

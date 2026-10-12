@@ -1,5 +1,5 @@
-.tutor-library h1{margin-top:8px}.tutor-import{padding:20px;border:1px solid var(--line,var(--line-2));border-radius:14px;display:grid;gap:15px;margin:24px 0;max-width:none}.tutor-import label{display:grid;gap:7px}.tutor-import input,.tutor-import select{max-width:100%}.tutor-import .secondary{cursor:pointer}.tutor-presentation{width:100%;display:flex;justify-content:space-between;text-align:left;padding:18px;margin:8px 0;border:1px solid var(--line,var(--line-2));border-radius:10px;gap:20px}.tutor-presentation span{color:var(--muted,#9cabc0);font-size:13px}.interactive-tutor{display:flex;flex-direction:column;min-width:0;gap:8px;color:var(--ink)}.interactive-tutor button,.interactive-tutor select{font-size:12px;min-height:32px;border:1px solid var(--line,var(--line-2));border-radius:6px;padding:5px 9px;cursor:pointer;background:var(--panel,#14233b);color:inherit}.interactive-tutor button:disabled{opacity:.4;cursor:default}.interactive-tutor button[aria-pressed=true]{background:var(--accent-soft);color:var(--ink);border-color:var(--accent)}.interactive-tutor input,.interactive-tutor textarea,.interactive-tutor select{color:var(--ink);background:var(--panel,#14233b)}.interactive-tutor .primary{background:var(--primary);color:var(--on-primary)}.tutor-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.tutor-heading>div{flex:1;min-width:160px}.tutor-heading h1{font-size:19px;margin:0;overflow-wrap:anywhere}.tutor-heading .fine{font-size:11px}.tutor-save{color:var(--good);font-size:12px;white-space:nowrap}.tutor-save.failed{color:var(--bad)}.tutor-ribbon{border:1px solid var(--line,var(--line-2));border-radius:9px;padding:7px;background:var(--raised)}.tutor-ribbon-tabs{display:flex;gap:5px;border-bottom:1px solid var(--line-2);padding-bottom:7px}.tutor-ribbon-tabs button{border:0}.tutor-tools{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding-top:8px;min-height:42px}.tutor-tools label{font-size:10px;display:flex;gap:4px;align-items:center}.tutor-tools input[type=color]{width:30px;height:29px;padding:0;border:0}.tutor-tools input[type=range]{width:70px}.tutor-tools input[type=number]{width:55px;padding:4px;font-size:11px}.tutor-navigation{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.tutor-navigation span{flex:1;font-size:12px;color:var(--muted)}.tutor-body{display:flex;align-items:stretch;gap:12px;min-width:0}.tutor-navigator{width:104px;flex-shrink:0;max-height:72vh;overflow-y:auto;padding:5px;background:var(--sunk);border-radius:8px}.tutor-thumbnail{width:100%;padding:5px!important;margin:0 0 7px;display:block;border:2px solid transparent!important;background:var(--raised)!important}.tutor-thumbnail.active{border-color:var(--accent)!important}.tutor-thumbnail img,.thumb-placeholder{width:100%;aspect-ratio:16/9;object-fit:contain;background:#e8ecf3}.tutor-thumbnail span{font-size:11px;display:block;margin-top:3px}.tutor-canvas-column{flex:1;min-width:0}.tutor-canvas-scroll{overflow:auto;max-height:70vh;min-height:260px;background:var(--sunk);border-radius:9px;padding:10px;display:block}.tutor-slide-wrap{margin:auto;position:relative}.tutor-canvas{display:block;width:100%;background:#fff;box-shadow:0 6px 18px #0006;touch-action:none;user-select:none;overflow:visible}.tutor-canvas.tool-select{cursor:default}.tutor-canvas:not(.tool-select){cursor:crosshair}.tutor-canvas [data-handle=resize]{cursor:nwse-resize}.tutor-canvas [data-handle=rotate]{cursor:grab}.tutor-canvas-column>.fine{font-size:11px;padding:8px}.tutor-notes{font-size:12px;padding:10px;margin-top:10px;border:1px solid var(--line-2);border-radius:8px}.tutor-notes pre{white-space:pre-wrap;font:12px/1.5 inherit;overflow-wrap:anywhere;max-height:140px;overflow:auto}.tutor-text-editor{padding:12px;display:flex;gap:8px;flex-wrap:wrap;border:1px solid var(--accent);margin:10px 0;border-radius:8px}.tutor-text-editor label{flex-basis:100%}.tutor-text-editor textarea{display:block;width:100%;min-height:85px;margin-top:6px}.tutor-versions{padding:12px;border:1px solid var(--line-2);border-radius:8px;max-height:250px;overflow:auto}.tutor-versions h3{margin:0 0 8px}.tutor-versions button{display:block;width:100%;text-align:left;margin:5px 0}.interactive-tutor:fullscreen{background:var(--sunk);padding:18px;overflow:auto}.workspace.tutor-workspace .surface{padding:16px}.workspace.tutor-workspace .layout{max-width:none}.tutor-workspace .app-sidebar{width:195px}.tutor-workspace.shell-course.sidebar-open .layout{margin-left:0}
-@media(min-width:1300px){.tutor-navigator{width:125px}}@media(max-width:1100px){.tutor-workspace .app-sidebar{display:none}.tutor-workspace.shell-course.sidebar-open .layout{margin-left:0}.tutor-navigator{width:85px}}@media(max-width:none){.tutor-body{flex-wrap:wrap}.tutor-navigator{width:72px;max-height:380px}.tutor-canvas-column{width:calc(100% - 84px);min-height:230px}.tutor-heading h1{font-size:15px}.tutor-canvas-scroll{padding:5px;min-height:180px}.tutor-presentation{flex-direction:column;gap:5px}}
+.tutor-library h1{margin-top:8px}.tutor-library .tutor-library-title{box-shadow:rgba(0,0,0,.25) 0 4px 4px 0;filter:none}.tutor-import-section>h2{margin:12px 0}.tutor-import-toggle{display:flex;width:100%;align-items:center;justify-content:space-between;padding:8px 0;border:0;background:transparent;color:inherit;text-align:left;font:inherit}.tutor-import{padding:20px;border:1px solid var(--line,var(--line-2));border-radius:14px;display:grid;gap:15px;margin:0 0 24px;max-width:none}.tutor-import label{display:grid;gap:7px}.tutor-import input,.tutor-import select{max-width:100%}.tutor-import .secondary{cursor:pointer}.tutor-presentation{width:100%;display:flex;justify-content:space-between;text-align:left;padding:18px;margin:8px 0;border:1px solid var(--line,var(--line-2));border-radius:10px;gap:20px}.tutor-presentation span{color:var(--muted,#9cabc0);font-size:13px}.interactive-tutor{display:flex;flex-direction:column;min-width:0;gap:8px;color:var(--ink)}.interactive-tutor button,.interactive-tutor select{font-size:12px;min-height:32px;border:1px solid var(--line,var(--line-2));border-radius:6px;padding:5px 9px;cursor:pointer;background:var(--panel,#14233b);color:inherit}.interactive-tutor button:disabled{opacity:.4;cursor:default}.interactive-tutor button[aria-pressed=true]{background:var(--accent-soft);color:var(--ink);border-color:var(--accent)}.interactive-tutor input,.interactive-tutor textarea,.interactive-tutor select{color:var(--ink);background:var(--panel,#14233b)}.interactive-tutor .primary{background:var(--primary);color:var(--on-primary)}.tutor-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.tutor-heading>div{flex:1;min-width:160px}.tutor-heading h1{font-size:19px;margin:0;overflow-wrap:anywhere}.tutor-heading .fine{font-size:11px}.tutor-save{color:var(--good);font-size:12px;white-space:nowrap}.tutor-save.failed{color:var(--bad)}.tutor-ribbon{border:1px solid var(--line,var(--line-2));border-radius:9px;padding:7px;background:var(--raised)}.tutor-ribbon-tabs{display:flex;gap:5px;border-bottom:1px solid var(--line-2);padding-bottom:7px}.tutor-ribbon-tabs button{border:0}.tutor-tools{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding-top:8px;min-height:42px}.tutor-tools label{font-size:10px;display:flex;gap:4px;align-items:center}.tutor-tools input[type=color]{width:30px;height:29px;padding:0;border:0}.tutor-tools input[type=range]{width:70px}.tutor-tools input[type=number]{width:55px;padding:4px;font-size:11px}.tutor-navigation{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.tutor-navigation span{flex:1;font-size:12px;color:var(--muted)}.tutor-body{display:flex;align-items:stretch;gap:12px;min-width:0}.tutor-navigator{width:104px;flex-shrink:0;max-height:72vh;overflow-y:auto;padding:5px;background:var(--sunk);border-radius:8px}.tutor-thumbnail{width:100%;padding:5px!important;margin:0 0 7px;display:block;border:2px solid transparent!important;background:var(--raised)!important}.tutor-thumbnail.active{border-color:var(--accent)!important}.tutor-thumbnail img,.thumb-placeholder{width:100%;aspect-ratio:16/9;object-fit:contain;background:#e8ecf3}.tutor-thumbnail span{font-size:11px;display:block;margin-top:3px}.tutor-canvas-column{flex:1;min-width:0}.tutor-canvas-scroll{overflow:auto;max-height:70vh;min-height:260px;background:var(--sunk);border-radius:9px;padding:10px;display:block}.tutor-slide-wrap{margin:auto;position:relative}.tutor-canvas{display:block;width:100%;background:#fff;box-shadow:0 6px 18px #0006;touch-action:none;user-select:none;overflow:visible}.tutor-canvas.tool-select{cursor:default}.tutor-canvas:not(.tool-select){cursor:crosshair}.tutor-canvas [data-handle=resize]{cursor:nwse-resize}.tutor-canvas [data-handle=rotate]{cursor:grab}.tutor-canvas-column>.fine{font-size:11px;padding:8px}.tutor-notes{font-size:12px;padding:10px;margin-top:10px;border:1px solid var(--line-2);border-radius:8px}.tutor-notes pre{white-space:pre-wrap;font:12px/1.5 inherit;overflow-wrap:anywhere;max-height:140px;overflow:auto}.tutor-text-editor{padding:12px;display:flex;gap:8px;flex-wrap:wrap;border:1px solid var(--accent);margin:10px 0;border-radius:8px}.tutor-text-editor label{flex-basis:100%}.tutor-text-editor textarea{display:block;width:100%;min-height:85px;margin-top:6px}.tutor-versions{padding:12px;border:1px solid var(--line-2);border-radius:8px;max-height:250px;overflow:auto}.tutor-versions h3{margin:0 0 8px}.tutor-versions button{display:block;width:100%;text-align:left;margin:5px 0}.interactive-tutor:fullscreen{background:var(--sunk);padding:18px;overflow:auto}.workspace.tutor-workspace .surface{padding:16px}.workspace.tutor-workspace .layout{max-width:none}.tutor-workspace .app-sidebar{width:195px}.tutor-workspace.shell-course.sidebar-open .layout{margin-left:0}
+@media(min-width:1300px){.tutor-navigator{width:125px}}@media(max-width:1100px){.tutor-workspace .app-sidebar{display:none}.tutor-workspace.shell-course.sidebar-open .layout{margin-left:0}.tutor-navigator{width:85px}}@media(max-width:700px){.tutor-body{flex-wrap:wrap}.tutor-navigator{width:72px;max-height:380px}.tutor-canvas-column{width:calc(100% - 84px);min-height:230px}.tutor-heading h1{font-size:15px}.tutor-canvas-scroll{padding:5px;min-height:180px}.tutor-presentation{flex-direction:column;gap:5px}}
 
 .interactive-tutor select{width:auto;max-width:100%;flex-shrink:1}.tutor-heading select{max-width:235px}.tutor-tools select{max-width:160px}.workspace.shell-course.tutor-workspace{grid-template-columns:195px minmax(0,1fr)}.workspace.shell-course.tutor-workspace.sidebar-closed{grid-template-columns:minmax(0,1fr)}.workspace.shell-course.tutor-workspace .layout{width:100%;min-width:0;padding:15px 20px}.workspace.shell-course.tutor-workspace .surface{min-width:0;padding:0}.tutor-heading>div{min-width:130px}
 @media(max-width:1100px){.workspace.shell-course.tutor-workspace{display:block}.workspace.shell-course.tutor-workspace .layout{padding:15px}.workspace.shell-course.tutor-workspace .sidebar-scrim{display:none}}
@@ -13,3 +13,171 @@
 
 /* The expanded editor sits above shell layers; controls remain in its own viewport. */
 .interactive-tutor.is-expanded{z-index:1000;width:100%;height:100dvh;overflow:auto;isolation:isolate}.interactive-tutor.is-expanded .tutor-heading{top:0;z-index:20;pointer-events:auto}.interactive-tutor .tutor-canvas-scroll,.interactive-tutor.is-expanded .tutor-canvas-scroll{max-height:none;min-height:120px;flex:none}.tutor-canvas-column{min-width:0}.tutor-slide-wrap{max-width:none}.tutor-navigator{max-height:none;height:100%;max-height:70dvh}.tutor-chat-context{padding:6px 12px;margin:0;align-items:center}.tutor-chat-context>details{flex:1;min-width:0}.tutor-chat-context summary{cursor:pointer;font-size:14px;color:var(--ink);display:list-item}.tutor-chat-context summary small{display:inline;margin-left:8px}.tutor-chat-settings{display:flex;gap:12px;flex-wrap:wrap;padding:10px 0 4px}.tutor-chat-settings>span{flex-basis:100%}.tutor-chat-settings label{font-size:12px}.interactive-tutor.is-expanded .tutor-body{flex:none}.interactive-tutor>.tutor-heading{flex:none}.tutor-slide-wrap{min-width:0}
+
+/* PowerPoint-style editor shell */
+.interactive-tutor{--ppt-red:#c43e1c;--ppt-red-dark:#a33216;--ppt-ribbon:#f3f2f1;--ppt-line:#d2d0ce;--ppt-canvas:#e6e6e6;--ppt-ink:#252423;--ppt-muted:#605e5c;gap:0;color:var(--ppt-ink);background:var(--ppt-canvas);border:1px solid var(--ppt-line);border-radius:8px;overflow:hidden;font-family:"Segoe UI",system-ui,-apple-system,sans-serif}
+.interactive-tutor button,.interactive-tutor select{background:transparent;border:1px solid transparent;border-radius:4px;color:var(--ppt-ink);min-height:30px}
+.interactive-tutor button:hover:not(:disabled){background:#e1dfdd}
+.interactive-tutor button[aria-pressed=true]{background:#e1dfdd;border-color:#c8c6c4;color:var(--ppt-ink)}
+.interactive-tutor input,.interactive-tutor textarea,.interactive-tutor select{background:#fff;color:var(--ppt-ink);border:1px solid var(--ppt-line)}
+.interactive-tutor .primary{background:var(--ppt-red);color:#fff}
+.interactive-tutor .ppt-titlebar{background:var(--ppt-red);color:#fff;padding:6px 10px;gap:4px;flex-wrap:wrap}
+.ppt-titlebar h1{font-size:14px;font-weight:600;color:#fff}
+.ppt-titlebar .fine{color:#fde7e0;font-size:11px}
+.ppt-titlebar button,.ppt-titlebar select{color:#fff;font-size:12px}
+.ppt-titlebar button:hover:not(:disabled){background:var(--ppt-red-dark)!important}
+.ppt-titlebar select{background:var(--ppt-red-dark);border-color:#ffffff40}
+.ppt-titlebar select option{color:var(--ppt-ink);background:#fff}
+.ppt-titlebar .tutor-save{color:#fff;opacity:.9}
+.ppt-titlebar .tutor-save.failed{color:#ffd8cc;font-weight:600}
+.interactive-tutor .ppt-ribbon{border:0;border-bottom:1px solid var(--ppt-line);border-radius:0;padding:0 8px;background:var(--ppt-ribbon)}
+.ppt-ribbon .tutor-ribbon-tabs{gap:2px;border:0;padding:0;align-items:center}
+.ppt-ribbon .tutor-ribbon-tabs button{border-radius:0;border:0;border-bottom:3px solid transparent;padding:8px 12px 5px;font-size:13px;background:transparent}
+.ppt-ribbon .tutor-ribbon-tabs button[aria-pressed=true]{background:transparent;border-color:transparent;border-bottom-color:var(--ppt-red);color:var(--ppt-red);font-weight:600}
+.ppt-ribbon .ppt-ribbon-collapse{margin-left:auto;font-size:14px!important}
+.ppt-ribbon .tutor-tools{background:#fff;border:1px solid var(--ppt-line);border-radius:6px;margin:0 0 8px;padding:6px 8px;gap:2px 4px;min-height:58px;box-shadow:0 1px 2px #0000000d}
+.ppt-ribbon .tutor-tools button{font-size:12px;padding:4px 8px}
+.ppt-ribbon .tutor-tools label{font-size:11px;color:var(--ppt-muted);padding:0 6px;border-left:1px solid #edebe9}
+.interactive-tutor .tutor-body{gap:0;background:var(--ppt-canvas)}
+.interactive-tutor .tutor-navigator{background:var(--ppt-ribbon);border-radius:0;border-right:1px solid var(--ppt-line);padding:10px 8px 10px 4px;max-height:none}
+.interactive-tutor .tutor-thumbnail{display:flex!important;gap:6px;align-items:flex-start;background:transparent!important;border:0!important;padding:4px!important;flex-direction:row-reverse}
+.interactive-tutor .tutor-thumbnail img,.interactive-tutor .thumb-placeholder{flex:1;min-width:0;border:1px solid var(--ppt-line);background:#fff}
+.interactive-tutor .tutor-thumbnail span{margin:0;color:var(--ppt-muted);width:14px;text-align:right;font-size:11px}
+.interactive-tutor .tutor-thumbnail.active img,.interactive-tutor .tutor-thumbnail.active .thumb-placeholder{outline:2px solid var(--ppt-red);outline-offset:1px}
+.interactive-tutor .tutor-thumbnail.active span{color:var(--ppt-red);font-weight:600}
+.interactive-tutor .tutor-canvas-column{padding:0}
+.interactive-tutor .tutor-canvas-scroll{background:var(--ppt-canvas);border-radius:0;padding:24px}
+.interactive-tutor .tutor-canvas{box-shadow:0 1px 3px #0000002e,0 4px 14px #0000001f}
+.interactive-tutor .tutor-chat-context{border-radius:0;border:0;border-bottom:1px solid var(--ppt-line);background:#faf9f8;color:var(--ppt-ink)}
+.interactive-tutor .tutor-canvas-column>.fine{color:var(--ppt-muted)}
+.interactive-tutor .ppt-notes{margin:0;border:0;border-top:1px solid var(--ppt-line);border-radius:0;background:#fff;padding:10px 24px}
+.ppt-notes b{font-size:11px;color:var(--ppt-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.ppt-notes pre{margin:6px 0 0;font:13px/1.5 "Segoe UI",system-ui,sans-serif;max-height:120px}
+.interactive-tutor .tutor-audio,.interactive-tutor .tutor-text-editor{margin:10px 24px;background:#fff}
+.interactive-tutor .notice,.interactive-tutor .tutor-versions{margin:8px;background:#fff}
+.interactive-tutor .ppt-statusbar{background:var(--ppt-ribbon);border-top:1px solid var(--ppt-line);padding:2px 10px;gap:2px;font-size:12px;flex-wrap:nowrap;overflow-x:auto}
+.ppt-statusbar button,.ppt-statusbar select{min-height:24px!important;font-size:12px!important;padding:1px 8px!important}
+.ppt-statusbar>span:not(.ppt-zoom){color:var(--ppt-muted);white-space:nowrap}
+.ppt-zoom{display:flex;align-items:center;gap:2px}
+.ppt-zoom input[type=range]{width:96px;accent-color:var(--ppt-muted);border:0;background:transparent}
+.ppt-zoom b{font-weight:400;min-width:38px;text-align:right;color:var(--ppt-muted)}
+.interactive-tutor.is-expanded{padding:0;border-radius:0;background:var(--ppt-canvas)}
+.interactive-tutor.is-expanded .tutor-heading{background:var(--ppt-red);padding:6px 10px}
+
+/* Floating "Explain the slide" trigger */
+.explain-slide-fab{position:fixed;z-index:1100;display:flex;flex-direction:column;align-items:flex-end;gap:6px;touch-action:none}
+.interactive-tutor .explain-slide-fab button{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 18px 0 12px;border:0;border-radius:999px;background:var(--ppt-red,#c43e1c);color:#fff;font:600 13px "Segoe UI",system-ui,sans-serif;box-shadow:0 6px 18px #0000003d,0 1px 3px #00000033;cursor:grab;user-select:none;touch-action:none}
+.interactive-tutor .explain-slide-fab button:hover:not(:disabled){background:var(--ppt-red-dark,#a33216)}
+.interactive-tutor .explain-slide-fab button:active{cursor:grabbing}
+.interactive-tutor .explain-slide-fab button:focus-visible{outline:3px solid #fff;outline-offset:2px;box-shadow:0 0 0 5px var(--ppt-red,#c43e1c)}
+.explain-slide-fab.is-sending button{opacity:.85}
+.explain-slide-grip{opacity:.7;letter-spacing:-3px;font-size:12px}
+.explain-slide-status{margin:0;max-width:240px;padding:6px 10px;border-radius:6px;background:#fff;color:#252423;font-size:12px;box-shadow:0 2px 8px #00000026}
+.explain-slide-fab.is-error .explain-slide-status{color:#a4262c}
+
+/* Slide box sizes to the slide itself: no scrolling, scales with the display */
+.interactive-tutor .tutor-canvas-scroll{overflow:hidden;min-height:0;padding:12px;box-sizing:border-box}
+.interactive-tutor .tutor-canvas-column{align-self:flex-start}
+
+/* Floating tutor control: Pummy mark when idle, full bar on hover/focus */
+.explain-slide-bar{display:flex;align-items:center;gap:2px;padding:4px;border-radius:999px;background:var(--ppt-red,#c43e1c);box-shadow:0 6px 18px #0000003d,0 1px 3px #00000033;transition:padding .15s}
+.explain-slide-fab.is-open .explain-slide-bar{padding-right:6px}
+.interactive-tutor .explain-slide-fab button{min-height:36px;border:0;background:transparent;color:#fff;font:600 13px "Segoe UI",system-ui,sans-serif;box-shadow:none;padding:0 10px;border-radius:999px;cursor:pointer}
+.interactive-tutor .explain-slide-fab button:hover:not(:disabled){background:#ffffff26}
+.interactive-tutor .explain-slide-fab button:disabled{opacity:.45}
+.interactive-tutor .explain-slide-fab .explain-slide-handle{width:44px;height:44px;padding:0;display:grid;place-items:center;background:#fff;cursor:grab;touch-action:none}
+.interactive-tutor .explain-slide-fab .explain-slide-handle:hover{background:#fff}
+.interactive-tutor .explain-slide-fab .explain-slide-handle:active{cursor:grabbing}
+.explain-slide-handle .pummy-mark{width:30px;height:30px;object-fit:contain;pointer-events:none}
+.interactive-tutor .explain-slide-fab .explain-slide-nav{width:34px;padding:0;font-size:20px;line-height:1}
+.explain-slide-count{color:#fff;font-size:12px;min-width:44px;text-align:center;font-variant-numeric:tabular-nums}
+.interactive-tutor .explain-slide-fab .explain-slide-action{background:#fff;color:var(--ppt-red,#c43e1c);margin-left:4px}
+.interactive-tutor .explain-slide-fab .explain-slide-action:hover:not(:disabled){background:#fde7e0}
+
+/* Ribbon: click the active tab (or empty tab strip) to minimize / reopen */
+.ppt-ribbon .tutor-ribbon-tabs{cursor:pointer;min-height:36px}
+.ppt-ribbon .tutor-ribbon-tabs button[aria-expanded=false]{border-bottom-color:#c8c6c4;color:var(--ppt-ink)}
+
+/* Fullscreen title bar collapses to a strip; hover, focus or Escape reveals it */
+.interactive-tutor.is-expanded .ppt-titlebar{transition:max-height 180ms ease,padding 180ms ease}
+.interactive-tutor.is-expanded .ppt-titlebar.is-collapsed{max-height:8px;min-height:8px;padding:0 10px;overflow:hidden;cursor:pointer}
+.interactive-tutor.is-expanded .ppt-titlebar.is-collapsed>*{visibility:hidden}
+.interactive-tutor.is-expanded .ppt-titlebar:not(.is-collapsed){max-height:200px}
+@media(prefers-reduced-motion:reduce){.interactive-tutor.is-expanded .ppt-titlebar{transition:none}}
+
+/* Editor fills the remaining screen; slide and thumbnails share the space with no page scroll */
+.interactive-tutor{overflow:hidden;box-sizing:border-box}
+.interactive-tutor>*{flex:none}
+.interactive-tutor>.tutor-body{flex:1 1 auto;min-height:0;align-items:stretch}
+.interactive-tutor .tutor-canvas-column{align-self:stretch;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.interactive-tutor .tutor-canvas-column>*{flex:none}
+.interactive-tutor .tutor-canvas-column>.tutor-canvas-scroll{flex:1 1 auto;min-height:120px;height:auto;display:grid;place-items:center;overflow:hidden}
+.interactive-tutor .tutor-slide-wrap{margin:0}
+.interactive-tutor .tutor-navigator{height:auto;max-height:none;align-self:stretch;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
+.interactive-tutor .ppt-notes pre{max-height:80px}
+.interactive-tutor.is-expanded{height:100dvh}
+.workspace.tutor-workspace .layout:has(.interactive-tutor){padding-bottom:0}
+
+/* Thumbnails keep the presentation's own aspect ratio and the panel scales with the screen */
+.interactive-tutor .tutor-navigator{width:clamp(110px,13vw,220px);box-sizing:border-box}
+.interactive-tutor .tutor-thumbnail{width:100%;align-items:center}
+.interactive-tutor .tutor-thumbnail img,.interactive-tutor .thumb-placeholder{width:auto;flex:1 1 0;min-width:0;height:auto;aspect-ratio:16/9;object-fit:contain;display:block}
+.interactive-tutor .tutor-thumbnail span{flex:none}
+
+/* Thumbnail panel height follows the slide box beside it */
+.interactive-tutor .tutor-navigator{align-self:flex-start;max-height:100%}
+.interactive-tutor.is-expanded .ppt-titlebar.is-collapsed{min-height:12px;max-height:12px}
+
+/* Measured area fills the column; the slide box inside fits the slide exactly and the thumbnails match it */
+.interactive-tutor .tutor-canvas-column>.tutor-canvas-fit{flex:1 1 auto;min-height:120px;overflow:hidden;display:flex;align-items:flex-start;justify-content:center}
+.interactive-tutor .tutor-canvas-fit>.tutor-canvas-scroll{flex:none;min-height:0;padding:12px;box-sizing:border-box;overflow:hidden;display:block}
+.interactive-tutor .tutor-navigator{max-height:none;box-sizing:border-box}
+
+/* Slide box is exactly the slide; spacing lives outside it */
+.interactive-tutor .tutor-canvas-column>.tutor-canvas-fit{padding:12px;box-sizing:border-box}
+.interactive-tutor .tutor-canvas-fit>.tutor-canvas-scroll{padding:0;background:transparent}
+.interactive-tutor .tutor-body>.tutor-navigator{margin:12px 0 12px 0;padding-top:0;padding-bottom:0}
+
+/* Slide area is sized by the visible screen, never by its own content, so it re-fits dynamically */
+.interactive-tutor.is-expanded{height:100dvh;max-height:100dvh}
+.interactive-tutor>.tutor-body{flex:1 1 0;min-height:0;overflow:hidden}
+.interactive-tutor .tutor-body>.tutor-canvas-column{flex:1 1 0;min-width:0;min-height:0;max-height:100%}
+.interactive-tutor .tutor-canvas-column>.tutor-canvas-fit{flex:1 1 0;min-height:80px}
+.interactive-tutor.is-expanded>.tutor-body{flex:1 1 0;min-height:0}
+
+/* No gap between the slide and the edge of its box */
+.interactive-tutor .tutor-canvas-column>.tutor-canvas-fit{padding:0}
+.interactive-tutor .tutor-body>.tutor-navigator{margin:0}
+
+/* In-place text editing on the slide */
+.interactive-tutor .tutor-inline-text{position:absolute;z-index:5;box-sizing:border-box;margin:0;padding:4px 6px;border:2px solid var(--ppt-red,#c43e1c);border-radius:2px;outline:none;resize:none;overflow:hidden;field-sizing:content;transform-origin:center;box-shadow:0 0 0 3px #c43e1c33;white-space:pre-wrap}
+
+/* Status-bar controls now live in the floating Pummy control */
+.interactive-tutor .explain-slide-fab select.explain-slide-count{min-height:30px;border:0;border-radius:999px;background:#ffffff26;color:#fff;font:600 12px "Segoe UI",system-ui,sans-serif;padding:0 6px;cursor:pointer}
+.interactive-tutor .explain-slide-fab select.explain-slide-count option{color:#252423;background:#fff}
+.interactive-tutor .explain-slide-fab .explain-slide-zoom{min-width:50px;padding:0 6px;font-variant-numeric:tabular-nums;font-weight:500}
+.interactive-tutor .explain-slide-fab .explain-slide-toggle{padding:0 9px;font-weight:500}
+.interactive-tutor .explain-slide-fab .explain-slide-toggle[aria-pressed=true]{background:#ffffff40;border:0}
+.explain-slide-divider{width:1px;height:22px;background:#ffffff59;margin:0 3px}
+.explain-slide-tool{color:#605e5c!important;font-size:11px!important;padding:3px 8px!important}
+/* Notes start minimized: a slim bar that expands on click */
+.interactive-tutor .ppt-notes{padding:0 24px}
+.interactive-tutor .ppt-notes>summary{cursor:pointer;padding:6px 0;list-style-position:inside}
+.interactive-tutor .ppt-notes[open]{padding-bottom:10px}
+
+/* Slide area hugs the slide; notes span the full width directly beneath it */
+.interactive-tutor.is-expanded>.tutor-body{flex:0 0 auto}
+.interactive-tutor .tutor-canvas-column>.tutor-canvas-fit{flex:0 0 auto;min-height:0}
+.interactive-tutor>.ppt-notes{flex:none;width:100%;box-sizing:border-box}
+
+/* Keep floating controls usable on narrow screens. */
+.explain-slide-fab{max-width:calc(100vw - 16px)}
+.explain-slide-bar{max-width:100%;flex-wrap:wrap;justify-content:flex-end;border-radius:24px;box-sizing:border-box}
+.explain-slide-status{max-width:min(320px,calc(100vw - 32px));overflow-wrap:anywhere}
+
+/* Retain the app's reading themes in the new presentation layout. */
+.interactive-tutor{--ppt-canvas:var(--sunk);--ppt-ink:var(--ink);--ppt-muted:var(--muted);--ppt-line:var(--line);--ppt-ribbon:var(--raised);color:var(--ink)}
+.interactive-tutor .ppt-ribbon{color:var(--ink)}
+.interactive-tutor .ppt-ribbon .tutor-tools,.interactive-tutor .ppt-notes{background:var(--panel);color:var(--ink)}
+.interactive-tutor .ppt-ribbon .tutor-tools label{border-color:var(--line)}
+.interactive-tutor .ppt-ribbon .tutor-ribbon-tabs button:not([aria-pressed=true]){color:var(--ink)}

@@ -17,6 +17,17 @@ test('PowerPoint conversion preserves original bytes and notes, caches retries a
  assert.deepEqual(decode64((await call('read_presentation_chunk',{courseId:state.courseId,assetId:p.originalAssetId,index:0})).asset.data),original);assert.deepEqual(await repo.get(state.courseId),before);
  await assert.rejects(executeTool(new CourseRepository(db,'outsider',repo.converter),'convert_presentation',args),/Course not found/);
 });
+test('attached PowerPoint opens as a tutor presentation, reuses conversion and preserves course state',async t=>{
+ let calls=0;const {call,state,repo}=await setup(t,{fetch:async()=>{calls++;return new Response(await fixturePDF());}}),bytes=fixturePPTX(),{assetId}=await upload(call,state.courseId,'pptx',bytes);
+ let current=(await call('sync_course_sources',{courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),sources:[{id:'lecture',name:'Lecture',text:'The jugular and subclavian veins unite.'}]})).state;
+ current=(await call('attach_source_original',{courseId:state.courseId,revision:current.revision,sourceId:'lecture',assetId})).state;
+ const before=await repo.get(state.courseId),args={courseId:state.courseId,presentationId:crypto.randomUUID(),sourceId:'lecture'};
+ const first=(await call('import_course_presentation',args)).presentation,again=(await call('import_course_presentation',args)).presentation;
+ assert.equal(first.id,again.id);assert.equal(first.originalAssetId,assetId);assert.equal(first.sourceId,'lecture');assert.equal(first.kind,'pptx');assert.equal(first.slides.length,2);assert.equal(calls,1);
+ assert.deepEqual(await repo.get(state.courseId),before);
+ assert.deepEqual(decode64((await call('read_presentation_chunk',{courseId:state.courseId,assetId,index:0})).asset.data),bytes);
+});
+
 test('legacy PPT converts and reopens with original text, order and downloadable immutable PPT bytes',async t=>{
  const pdf=await fixturePDF(),bytes=fixtureLegacyPPT(),{call,state}=await setup(t,{fetch:async r=>{assert.equal(r.headers.get('content-type'),'application/vnd.ms-powerpoint');return new Response(pdf);}}),args=await upload(call,state.courseId,'ppt',bytes),a=(await call('convert_presentation',args)).asset;
  const p=(await call('import_presentation',{courseId:state.courseId,presentationId:crypto.randomUUID(),originalAssetId:args.assetId,pdfAssetId:a.id})).presentation;assert.equal(p.kind,'ppt');assert.match(p.slides[0].text,/Second slide/);assert.match(p.slides[1].text,/Latest professor text/);assert.deepEqual(decode64((await call('read_presentation_chunk',{...args,index:0})).asset.data),bytes);
