@@ -1,4 +1,4 @@
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {bridge,call} from './bridge.js';
 import {PummyMark} from './dashboard.jsx';
 
@@ -47,12 +47,11 @@ export function SlideChatContext({p,slide,image,annotations,region}){
 const POSITION_KEY='pummy:explain-slide-button';
 const CORNERS=['tl','tr','bl','br'];
 const savedCorner=()=>{try{const v=localStorage.getItem(POSITION_KEY+':corner');return CORNERS.includes(v)?v:'br';}catch{return 'br';}};
-// Snap target: the visible slide box, inset so the control sits just inside its corners.
-const slideBox=el=>(el?.closest('.interactive-tutor')||document).querySelector('.tutor-canvas-scroll')?.getBoundingClientRect();
-const cornerPosition=(corner,el)=>{const b=slideBox(el);if(!b)return null;const w=el?.offsetWidth||52,h=el?.offsetHeight||52,inset=12;return {x:corner[1]==='l'?b.left+inset:b.right-w-inset,y:corner[0]==='t'?b.top+inset:b.bottom-h-inset};};
-const nearestCorner=(x,y,el)=>{const b=slideBox(el);if(!b)return 'br';const w=el?.offsetWidth||52,h=el?.offsetHeight||52,cx=x+w/2,cy=y+h/2;return (cy<b.top+b.height/2?'t':'b')+(cx<b.left+b.width/2?'l':'r');};
-// Keep the control inside the presentation box (the editor), falling back to the viewport.
-const clampToViewport=(x,y,el)=>{const w=el?.offsetWidth||52,h=el?.offsetHeight||52,box=el?.parentElement?.closest('.interactive-tutor')?.getBoundingClientRect(),left=Math.max(0,box?.left??0),top=Math.max(0,box?.top??0),right=Math.min(window.innerWidth,box?.right??window.innerWidth),bottom=Math.min(window.innerHeight,box?.bottom??window.innerHeight);return {x:Math.min(Math.max(left+8,x),Math.max(left+8,right-w-8)),y:Math.min(Math.max(top+8,y),Math.max(top+8,bottom-h-8))};};
+// Fixed controls dock to the visible screen, independently of the slide/editor bounds.
+const screenBox=()=>{const v=window.visualViewport,left=v?.offsetLeft||0,top=v?.offsetTop||0,width=v?.width||window.innerWidth,height=v?.height||window.innerHeight;return {left,top,width,height,right:left+width,bottom:top+height};};
+const cornerPosition=(corner,el)=>{const b=screenBox(),w=el?.offsetWidth||52,h=el?.offsetHeight||52,inset=12;return {x:corner[1]==='l'?b.left+inset:b.right-w-inset,y:corner[0]==='t'?b.top+inset:b.bottom-h-inset};};
+const nearestCorner=(x,y,el)=>{const b=screenBox(),w=el?.offsetWidth||52,h=el?.offsetHeight||52;return (y+h/2<b.top+b.height/2?'t':'b')+(x+w/2<b.left+b.width/2?'l':'r');};
+const clampToViewport=(x,y,el)=>{const b=screenBox(),w=el?.offsetWidth||52,h=el?.offsetHeight||52;return {x:Math.min(Math.max(b.left+8,x),Math.max(b.left+8,b.right-w-8)),y:Math.min(Math.max(b.top+8,y),Math.max(b.top+8,b.bottom-h-8))};};
 
 // Floating, draggable control: collapses to the Pummy mark and opens on hover or focus.
 // "Explain the slide." is sent to the conversation so the student keeps working in the editor.
@@ -61,9 +60,9 @@ export function ExplainSlideButton({p,slide,index,count,onIndex,zoom=1,onZoom,on
  const [corner,setCorner]=useState(savedCorner),cornerRef=useRef(corner),[pos,setPos]=useState({x:window.innerWidth-80,y:window.innerHeight-96});
  const [open,setOpen]=useState(false),[status,setStatus]=useState('idle'),[message,setMessage]=useState('');
  const place=(x,y)=>clampToViewport(x,y,ref.current);
- const snap=()=>{if(drag.current?.moved)return;const n=cornerPosition(corner,ref.current);if(n){const next=place(n.x,n.y);setPos(v=>v.x===next.x&&v.y===next.y?v:next);}};
- useEffect(()=>{snap();const box=ref.current?.closest('.interactive-tutor')?.querySelector('.tutor-canvas-scroll'),observer=new ResizeObserver(snap);if(box)observer.observe(box);if(ref.current)observer.observe(ref.current);window.addEventListener('resize',snap);window.addEventListener('scroll',snap,true);return()=>{observer.disconnect();window.removeEventListener('resize',snap);window.removeEventListener('scroll',snap,true);};},[corner]);
- useEffect(()=>{const frame=requestAnimationFrame(snap);return()=>cancelAnimationFrame(frame);},[open,message,slide.id]);
+ const snap=()=>{if(drag.current?.moved)return;const el=ref.current;if(!el)return;el.style.maxWidth=Math.max(52,screenBox().width-24)+'px';const n=cornerPosition(cornerRef.current,el),next=place(n.x,n.y);setPos(v=>v.x===next.x&&v.y===next.y?v:next);};
+ useEffect(()=>{const observer=new ResizeObserver(snap);if(ref.current)observer.observe(ref.current);const v=window.visualViewport;window.addEventListener('resize',snap);window.addEventListener('scroll',snap,true);v?.addEventListener('resize',snap);v?.addEventListener('scroll',snap);document.addEventListener('fullscreenchange',snap);return()=>{observer.disconnect();window.removeEventListener('resize',snap);window.removeEventListener('scroll',snap,true);v?.removeEventListener('resize',snap);v?.removeEventListener('scroll',snap);document.removeEventListener('fullscreenchange',snap);};},[]);
+ useLayoutEffect(snap,[corner,open,message,slide.id]);
  useEffect(()=>{if(status!=='sending'){setStatus('idle');setMessage('');}},[slide.id]);
  useEffect(()=>{if(!message)return;const t=setTimeout(()=>{setMessage('');setStatus(v=>v==='sending'?v:'idle');},10000);return()=>clearTimeout(t);},[message]);
  useEffect(()=>()=>clearTimeout(closeTimer.current),[]);
@@ -82,13 +81,13 @@ export function ExplainSlideButton({p,slide,index,count,onIndex,zoom=1,onZoom,on
  }
  const stick=c=>{cornerRef.current=c;try{localStorage.setItem(POSITION_KEY+':corner',c);}catch{}setCorner(c);const n=cornerPosition(c,ref.current);if(n)setPos(place(n.x,n.y));};
  function down(e){if(e.button!==0)return;e.currentTarget.setPointerCapture(e.pointerId);drag.current={id:e.pointerId,sx:e.clientX,sy:e.clientY,ox:pos.x,oy:pos.y,moved:false};}
- function move(e){const d=drag.current;if(!d||d.id!==e.pointerId)return;const dx=e.clientX-d.sx,dy=e.clientY-d.sy;if(!d.moved&&Math.hypot(dx,dy)<5)return;d.moved=true;setPos(place(d.ox+dx,d.oy+dy));}
- function up(e){const d=drag.current;if(!d||d.id!==e.pointerId)return;drag.current=null;if(d.moved)stick(nearestCorner(pos.x,pos.y,ref.current));else setOpen(v=>!v);}
+ function move(e){const d=drag.current;if(!d||d.id!==e.pointerId)return;const dx=e.clientX-d.sx,dy=e.clientY-d.sy;if(!d.moved&&Math.hypot(dx,dy)<5)return;d.moved=true;d.position=place(d.ox+dx,d.oy+dy);setPos(d.position);}
+ function up(e){const d=drag.current;if(!d||d.id!==e.pointerId)return;drag.current=null;if(d.moved)stick(nearestCorner(d.position.x,d.position.y,ref.current));else setOpen(v=>!v);}
  function key(e){const m={ArrowLeft:[null,'l'],ArrowRight:[null,'r'],ArrowUp:['t',null],ArrowDown:['b',null]}[e.key];if(m&&e.altKey){e.preventDefault();e.stopPropagation();stick((m[0]||cornerRef.current[0])+(m[1]||cornerRef.current[1]));}}
  const go=i=>onIndex(Math.min(count-1,Math.max(0,i)));
- return <div ref={ref} className={'explain-slide-fab is-'+status+(open?' is-open':'')} style={{left:pos.x,top:pos.y}} onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide} onKeyDown={key} role="toolbar" aria-label="Slide tutor controls">
+ return <div ref={ref} className={'explain-slide-fab is-'+status+(open?' is-open':'')} data-dock-corner={corner} style={{left:pos.x,top:pos.y}} onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide} onKeyDown={key} role="toolbar" aria-label="Slide tutor controls">
   <div className="explain-slide-bar">
-   <button type="button" className="explain-slide-handle" aria-label={open?'Slide tutor controls. Drag to a corner of the slide; Alt plus arrow keys also move it between corners.':'Open slide tutor controls'} aria-expanded={open} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={()=>{drag.current=null;}} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setOpen(v=>!v);}}}><PummyMark/></button>
+   <button type="button" className="explain-slide-handle" title="Drag to any screen corner. Alt + arrow keys also move the controls." aria-label={open?'Slide tutor controls. Drag to a corner of the screen; Alt plus arrow keys also move it between corners.':'Open slide tutor controls'} aria-expanded={open} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={()=>{drag.current=null;snap();}} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setOpen(v=>!v);}}}><PummyMark/></button>
    {open&&<>
     <button type="button" className="explain-slide-nav" aria-label="Previous slide" disabled={index<=0} onClick={()=>go(index-1)}>‹</button>
     <select className="explain-slide-count" aria-label="Go to slide" value={index} onChange={e=>go(Number(e.target.value))}>{Array.from({length:count},(_,i)=><option key={i} value={i}>{i+1} / {count}</option>)}</select>

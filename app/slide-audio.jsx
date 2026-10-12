@@ -9,7 +9,7 @@ export function SlideAudio({p,page,call,onOriginal}){
   return()=>{active=false;urls.forEach(url=>URL.revokeObjectURL(url));};
  },[p.id,page]);
  if(p.kind==='pdf')return null;
- if(p.kind==='ppt')return <div className="tutor-audio"><p className="fine">Audio remains in the original PPT. Open it in PowerPoint to play it.</p><button onClick={onOriginal}>Download original PowerPoint</button></div>;
+ if(p.kind==='ppt')return <section className="tutor-audio" aria-label="Slide audio"><p className="fine">Audio remains in the original PPT. Open it in PowerPoint to play it.</p><button onClick={onOriginal}>Download original PowerPoint</button></section>;
  if(!loading&&!error&&!tracks.length)return null;
  return <section className="tutor-audio" aria-label="Slide audio"><h3>Slide audio</h3>{loading&&<p role="status">Loading embedded audio…</p>}{error&&<p role="alert">Could not read the slide audio. Download the original PowerPoint to listen.</p>}{tracks.map((t,i)=><AudioTrack key={page+':'+i} track={t}/>)}<button onClick={onOriginal}>Download original PowerPoint</button></section>;
 }

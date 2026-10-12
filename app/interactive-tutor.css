@@ -164,9 +164,12 @@
 .interactive-tutor>.ppt-notes{flex:none;width:100%;box-sizing:border-box}
 
 /* Keep floating controls usable on narrow screens. */
-.explain-slide-fab{max-width:calc(100vw - 16px)}
+.explain-slide-fab{max-width:calc(100vw - 24px)}
 .explain-slide-bar{max-width:100%;flex-wrap:wrap;justify-content:flex-end;border-radius:24px;box-sizing:border-box}
 .explain-slide-status{max-width:min(320px,calc(100vw - 32px));overflow-wrap:anywhere}
+.explain-slide-fab[data-dock-corner$="l"]{align-items:flex-start}
+.explain-slide-fab[data-dock-corner$="l"] .explain-slide-bar{justify-content:flex-start}
+.explain-slide-fab[data-dock-corner^="b"]{flex-direction:column-reverse}
 
 /* Retain the app's reading themes in the new presentation layout. */
 .interactive-tutor{--ppt-canvas:var(--sunk);--ppt-ink:var(--ink);--ppt-muted:var(--muted);--ppt-line:var(--line);--ppt-ribbon:var(--raised);color:var(--ink)}
@@ -192,3 +195,13 @@
 
 .interactive-tutor .tutor-audio{background:var(--panel);color:var(--ink)}
 .interactive-tutor .tutor-audio .fine{color:var(--muted)}
+.interactive-tutor .tutor-audio{border-color:var(--line);max-height:30dvh;overflow:auto;scrollbar-width:thin;min-width:0}
+.interactive-tutor .tutor-audio h3{color:var(--ink)}
+.interactive-tutor .tutor-audio [role=alert]{color:var(--bad)}
+.interactive-tutor .tutor-audio button{background:var(--raised);color:var(--ink);border:1px solid var(--line-2);min-height:36px;padding:6px 10px}
+.interactive-tutor .tutor-audio button:hover:not(:disabled){background:var(--accent-soft);color:var(--ink);border-color:var(--accent)}
+.interactive-tutor .tutor-audio button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.interactive-tutor .tutor-audio-track{gap:8px 12px}
+.interactive-tutor .tutor-audio-track>span{color:var(--muted);max-width:100%}
+.interactive-tutor .tutor-audio-track audio{display:block;width:min(340px,100%);min-width:0;color-scheme:inherit;accent-color:var(--accent)}
+@media(max-width:650px){.interactive-tutor .tutor-audio{margin:8px;padding:10px}.interactive-tutor .tutor-audio-track>span{flex-basis:100%}}
