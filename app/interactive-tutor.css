@@ -181,3 +181,5 @@
 .interactive-tutor .ppt-ribbon .tutor-tools,.interactive-tutor .ppt-notes{background:var(--panel);color:var(--ink)}
 .interactive-tutor .ppt-ribbon .tutor-tools label{border-color:var(--line)}
 .interactive-tutor .ppt-ribbon .tutor-ribbon-tabs button:not([aria-pressed=true]){color:var(--ink)}
+.interactive-tutor .ppt-ribbon .tutor-tools select{background:var(--panel);color:var(--ink);border-color:var(--line)}
+.interactive-tutor .ppt-ribbon .tutor-ribbon-tabs button[aria-pressed=true]{color:var(--accent);border-bottom-color:var(--accent)}
