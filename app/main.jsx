@@ -4,6 +4,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {bridge,embedded,latest,subscribe,call,context,askPending,message,pendingStatus} from './bridge.js';
 import {banksFromFile,demo} from './import.js';
+import {importBankFiles} from './bank-import.js';
 import {QUESTION_FILE_ACCEPT,extractQuestionFile} from './question-files.js';
 import {QuestionFileForm} from './question-file-form.jsx';
 import {SourceFileForm} from './source-file-form.jsx';
@@ -49,7 +50,7 @@ function Exam(){
  useEffect(()=>{if(!generationCelebration)return;const timer=setTimeout(()=>setGenerationCelebration(null),4500);return()=>clearTimeout(timer);},[generationCelebration]);
  const [customColors,setCustomColors]=usePreference('custom-theme-v1',DEFAULT_CUSTOM_THEME);
  const [theme,setTheme]=usePreference('theme-v5','navy'),[reading,setReading]=usePreference('reading',17),[instant,setInstant]=usePreference('instant-v3',false),[autoExplain,setAutoExplain]=usePreference('auto-explain-v3',false),[animations,setAnimations]=usePreference('animations-v3',false);
- const lock=useRef(false),alive=useRef(true),pollErrors=useRef(0),homeImportRef=useRef(null),examRoot=useRef(null),buildLaunchRef=useRef(false),customDraftAttempt=useRef(null);
+ const lock=useRef(false),alive=useRef(true),pollErrors=useRef(0),homeImportRef=useRef(null),examRoot=useRef(null),buildLaunchRef=useRef(false),customDraftAttempt=useRef(null),bankImportAttempt=useRef(null);
  const state=data.state,s=state?.session,q=state?.question,feedback=s?.feedback,inter=INTER.includes(q?.type),pending=state?.generation||state?.explanationRequest;
  const navigation=useViewHistory({courseId:state?.courseId||null,tab:state?tab:'library',presentationId:tab==='tutor'?tutorId:null,slide:tab==='tutor'?tutorPage:1,folder:tab==='course'?sourceFolder:tab==='dashboard'?dashboardFolder:null},{ready:!!(data.state||data.courses),guard:async()=>{await viewGuard.current?.();},onError:e=>setError(e.message),apply:async view=>{
   if(view.courseId&&view.courseId!==latest.state?.courseId)await call('read_course_state',{courseId:view.courseId});else if(!view.courseId&&latest.state)await call('list_courses');
@@ -85,27 +86,7 @@ function Exam(){
    const extracted=await extractQuestionFile(file);setImportJob(null);setModal({type:'question-file',file:extracted,courseId:state.courseId,folder});return;
   }
   const banks=banksFromFile(JSON.parse(await file.text()),file.name);
-  if(!banks.length)throw new Error('No keyed questions with available images were found.');
-  if(append&&banks.length!==1)throw new Error('Add one bank at a time to this course.');
-  if(banks.length>20)throw new Error('Import up to 20 courses at a time.');
-  for(const bank of banks){
-   if(bank.questions.length>200)throw new Error(`${bank.name} has more than 200 questions; split it into smaller banks.`);
-   if((bank.sources?.length||0)>30)throw new Error(`${bank.name} has more than 30 sources; split it into smaller banks.`);
-   if((bank.objectives?.length||0)>200)throw new Error(`${bank.name} has more than 200 objectives; split it into smaller banks.`);
-  }
-  let n=0,skipped=0;
-  for(const bank of banks){
-   if(!bank.questions?.length)continue;
-   const {skipped:missing=[],format,version,...payload}=bank;
-   if(append){
-    const {name,...rawBank}=payload;
-    const assignSource=src=>{const {lecture,weekId,...rest}=src;return {...rest,...(folder.kind==='week'?{weekId:folder.label}:folder.kind==='lecture'?{lecture:folder.label}:{})};};
-    const assignQuestion=q=>({...q,weekId:folder.kind==='week'?folder.label:null,lecture:folder.kind==='lecture'?folder.label:''});
-    const bankData=folder?{...rawBank,sources:(rawBank.sources||[]).map(assignSource),questions:rawBank.questions.map(assignQuestion)}:rawBank;
-    await call('add_questions',{...bankData,courseId:state.courseId,revision:latest.state.revision,requestId:crypto.randomUUID()});
-   }else await call('import_questions',{...payload,requestId:crypto.randomUUID()});
-   n+=bank.questions.length;skipped+=missing.length;
-  }
+  const {count:n,skipped}=await importBankFiles({banks,appendCourseId:append?state.courseId:null,folder:append?folder:null,attemptRef:bankImportAttempt,call});
   setNote(`Imported ${n} questions, sources and spaced-review progress.${skipped?` ${skipped} questions omitted because their images were missing.`:''} Desktop exams are not automatically synced.`);
  };
  useEffect(()=>{if(error&&syncRequest)setSyncError(error);},[error,syncRequest?.id]);

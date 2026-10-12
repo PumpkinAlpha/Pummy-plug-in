@@ -32,7 +32,7 @@ Reference: original Pummy `src/ui/Exam.jsx`, `src/engine.js`, `src/ui/Interactiv
 
 ## Practical limits
 
-The current snapshot architecture caps each saved course at 900 KB. Embedded images count toward that budget; large image banks need compression or separate banks. Question-bank imports have explicit 200-question/30-source/200-objective limits. Missing backup images are reported as omissions. No original desktop files or cloud sessions are silently changed.
+The current snapshot architecture caps each saved course at 900 KB. Embedded images count toward that budget; large image banks need compression or separate banks. JSON files can restore up to 500 questions in resumable batches of at most 200 questions per tool call, with 30-source/200-objective limits. Missing backup images are reported as omissions. No original desktop files or cloud sessions are silently changed.
 
 ## Verification
 
