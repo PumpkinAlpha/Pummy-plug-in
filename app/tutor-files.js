@@ -17,7 +17,15 @@ export async function uploadPresentationFile(call,courseId,file,{source=false}={
 export async function loadAsset(call,courseId,asset){const key=courseId+':'+asset.id;if(assets.has(key))return assets.get(key);const parts=[];for(let index=0;index<asset.chunks;index++)parts.push(decode64((await call('read_presentation_chunk',{courseId,assetId:asset.id,index})).asset.data));const bytes=new Uint8Array(parts.reduce((n,c)=>n+c.length,0));let offset=0;for(const part of parts){bytes.set(part,offset);offset+=part.length;}if(assets.size>=3)assets.delete(assets.keys().next().value);assets.set(key,bytes);return bytes;}
 export async function renderSlide(call,presentation,page,width=1500){
  const key=presentation.courseId+':'+presentation.pdfAssetId;
- if(documentCache?.key!==key){const old=documentCache;const promise=(async()=>{if(old)await (await old.promise).loadingTask.destroy();const bytes=await loadAsset(call,presentation.courseId,presentation.assets.pdf);return getDocumentProxy(bytes.slice(),{isEvalSupported:false,stopAtErrors:true});})();documentCache={key,promise};}
+ if(documentCache?.key!==key){
+  const old=documentCache,entry={key,promise:null};
+  entry.promise=(async()=>{
+   if(old)try{await (await old.promise).loadingTask.destroy();}catch{/* A failed previous document must not block opening another. */}
+   const bytes=await loadAsset(call,presentation.courseId,presentation.assets.pdf);
+   return getDocumentProxy(bytes.slice(),{isEvalSupported:false,stopAtErrors:true});
+  })().catch(e=>{if(documentCache===entry)documentCache=null;throw e;});
+  documentCache=entry;
+ }
  const doc=await documentCache.promise,p=await doc.getPage(page),base=p.getViewport({scale:1}),viewport=p.getViewport({scale:width/base.width}),canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);await p.render({canvasContext:canvas.getContext('2d'),viewport}).promise;return canvas.toDataURL('image/png');
 }
 // Finds the original slide text block (line or paragraph) at a normalized point, read from the

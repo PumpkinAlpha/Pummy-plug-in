@@ -12,7 +12,7 @@ const db=new LocalD1(),objects=new Map(),bucket={put:async(k,v)=>objects.set(k,v
 const {state}=await executeTool(repo,'create_course',{requestId:crypto.randomUUID(),name:'Upload QA'});
 let fail=true;const errors=[];
 const server=createServer(async(req,res)=>{try{const chunks=[];for await(const c of req)chunks.push(c);const body=Buffer.concat(chunks);const headers=new Headers(req.headers);headers.set('oai-authenticated-user-id','browser-upload-test');
- if(req.method==='POST'){const data=JSON.parse(body);if(data.name==='sync_course_sources'&&data.arguments.sources[0].name==='second.md'&&fail){fail=false;res.writeHead(503,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Temporary upload failure'}));return;}}
+ if(req.method==='POST'){const data=JSON.parse(body);if(data.name==='sync_course_sources'&&(data.arguments.sources[0].name==='discard.txt'||data.arguments.sources[0].name==='second.md'&&fail)){fail=false;res.writeHead(503,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Temporary upload failure'}));return;}}
  const response=await worker.fetch(new Request(`http://127.0.0.1:${server.address().port}${req.url}`,{method:req.method,headers,...(body.length?{body}:{})}),{DB:db,BUCKET:bucket,ASSETS:new Proxy({},{get:()=>()=>{throw new Error('Wrong storage binding');}})});res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));
  }catch(e){res.writeHead(500);res.end(e.message);}});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;
@@ -28,9 +28,16 @@ try{
  await page.setViewportSize({width:390,height:844});assert.ok(await dialog.evaluate(el=>el.getBoundingClientRect().right<=innerWidth));await page.screenshot({path:fileURLToPath(new URL('batch-review-mobile.png',directory))});await page.setViewportSize({width:1400,height:1000});
  await dialog.getByRole('button',{name:'Import 3 sources',exact:true}).click();await dialog.getByText('Temporary upload failure',{exact:true}).waitFor();await dialog.getByRole('button',{name:'Retry failed uploads',exact:true}).waitFor();
  assert.equal((await repo.get(state.courseId)).data.sources.length,2);
+ await dialog.getByRole('button',{name:'first.txt',exact:true}).click();assert.equal(await dialog.getByRole('textbox',{name:'Source title',exact:true}).isDisabled(),true);
+ await dialog.getByRole('button',{name:'second.md',exact:true}).click();assert.equal(await dialog.getByRole('textbox',{name:'Source title',exact:true}).isEnabled(),true);assert.equal(await dialog.getByRole('button',{name:'Remove second.md',exact:true}).isVisible(),true);
+ await dialog.getByRole('textbox',{name:'Source title',exact:true}).fill('Corrected second source');
  await dialog.getByRole('button',{name:'Retry failed uploads',exact:true}).click();await dialog.getByText('3 of 4 files imported.',{exact:false}).waitFor();
  await dialog.getByRole('button',{name:'Remove invalid.bin',exact:true}).click();await dialog.getByRole('button',{name:'Done',exact:true}).click();await dialog.waitFor({state:'hidden'});
  const saved=(await repo.get(state.courseId)).data;assert.equal(saved.sources.length,3);assert.ok(saved.sources.every(s=>s.lecture==='Batch folder'));assert.equal(saved.questions.length,0);assert.equal(objects.size,3);
- for(const source of saved.sources){const chunk=await executeTool(repo,'read_presentation_chunk',{courseId:state.courseId,assetId:source.originalFile.id,index:0});assert.equal(Buffer.from(chunk.asset.data,'base64').toString(),'Professor reference for '+source.name);}
- await page.screenshot({path:fileURLToPath(new URL('batch-imported.png',directory))});assert.deepEqual(errors,[]);console.log('Batch upload browser QA passed: review, mobile layout, partial failure, retry, folder placement, exact originals, no duplicates.');
+ assert.ok(saved.sources.some(s=>s.name==='Corrected second source'));
+ for(const source of saved.sources){const chunk=await executeTool(repo,'read_presentation_chunk',{courseId:state.courseId,assetId:source.originalFile.id,index:0});assert.equal(Buffer.from(chunk.asset.data,'base64').toString(),'Professor reference for '+source.originalFile.name);}
+ await page.screenshot({path:fileURLToPath(new URL('batch-imported.png',directory))});
+ await page.getByRole('button',{name:'Manual import',exact:true}).click();await dialog.getByLabel('Choose source file').setInputFiles({name:'discard.txt',mimeType:'text/plain',buffer:Buffer.from('Discard this failed import')});await dialog.getByRole('button',{name:'Import source',exact:true}).click();await dialog.getByText('Temporary upload failure',{exact:true}).waitFor();
+ await dialog.getByRole('button',{name:'Remove discard.txt',exact:true}).click();assert.equal(await dialog.getByLabel('Choose source file').isEnabled(),true);assert.equal((await repo.get(state.courseId)).data.sources.length,3);
+ assert.deepEqual(errors,[]);console.log('Batch upload browser QA passed: mobile layout, failed-file edits/removal, stable original uploads, retry without duplicate sources, folder placement, exact originals.');
 }finally{await browser?.close();await new Promise(r=>server.close(r));db.close();}

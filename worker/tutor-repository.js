@@ -1,4 +1,5 @@
 import {decode64} from '../lib/tutor/presentations.js';
+import {retryStorage} from './storage-retry.js';
 const conflict=()=>Object.assign(new Error('Annotations changed in another window. Your local changes are kept. Reload before saving.'),{code:'conflict'});
 export class TutorRepository {
  constructor(courseRepo){this.db=courseRepo.db;this.userId=courseRepo.userId;this.courses=courseRepo;this.assetStore=courseRepo.assetStore;}
@@ -37,14 +38,14 @@ export class TutorRepository {
   if(!this.assetStore)throw new Error('File storage is temporarily unavailable. Retry shortly.');
   const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(data)))].map(b=>b.toString(16).padStart(2,'0')).join('');
   // Content-addressed keys prevent competing uploads from overwriting original bytes.
-  await this.assetStore.put(this.assetKey(courseId,a.id,index,hash),data);
+  await retryStorage(()=>this.assetStore.put(this.assetKey(courseId,a.id,index,hash),data));
   return hash;
  }
  async chunkData(courseId,a,index){
   const row=await this.query('SELECT data FROM tutor_asset_chunks WHERE user_id=? AND course_id=? AND asset_id=? AND chunk_index=?',courseId,a.id,index).first();
   if(!row)throw new Error('Upload is incomplete.');
   if(a.storage!=='r2')return row.data;
-  const object=await this.assetStore?.get(this.assetKey(courseId,a.id,index,row.data));
+  const object=this.assetStore?await retryStorage(()=>this.assetStore.get(this.assetKey(courseId,a.id,index,row.data))):null;
   if(!object)throw new Error('Upload is incomplete. Retry the file upload.');
   return object.text();
  }
