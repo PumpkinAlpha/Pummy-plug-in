@@ -1,10 +1,10 @@
 import React,{useEffect,useState} from 'react';
 import {ExamGenerationProgress} from './generation-progress.jsx';
-import {EXAM_MODES,matchingExamQuestions} from './exam-settings.js';
+import {EXAM_MODES,matchingExamQuestions,examFolderOptions,examPracticeOptions} from './exam-settings.js';
 
 import {ExplanationDepth,BankExplanationStatus} from './explanation-settings.jsx';
 const TYPES=[['mcq','Single choice'],['multi','Select all'],['image','Image / identify'],['label','Diagram labeling'],['order','Ordering'],['match','Matching']];
-const defaults={size:'all',examMode:'all',adaptive:true,generateExplanations:false,explanationDepth:'comprehensive',practiceFirst:true,includeReviews:true,types:null,sourceIds:null,objectiveIds:null,weekId:'all',setId:null};
+const defaults={size:'all',examMode:'all',adaptive:true,generateExplanations:false,explanationDepth:'comprehensive',practiceFirst:true,includeReviews:true,types:null,sourceIds:null,objectiveIds:null,weekId:'all',setId:null,studyFolder:null,practiceTestId:null};
 function savedSettings(state){const saved=state.preferences||{};return {...defaults,...saved,examMode:saved.examMode||(saved.size==null||saved.size==='all'?'all':'custom'),size:saved.size==='all'||saved.size==null?'all':Math.min(saved.size,state.questionIndex?.length||500)};}
 
 export function AdaptiveSetup({state,busy,connected,resume,onResume,onEnd,onStart,onBuild,onSave,buildJob,onExplain,onContinueExplanations}){
@@ -12,7 +12,11 @@ export function AdaptiveSetup({state,busy,connected,resume,onResume,onEnd,onStar
  const [customSize,setCustomSize]=useState(()=>savedSettings(state).size==='all'?Math.min(20,state.questionIndex?.length||20):savedSettings(state).size);
  useEffect(()=>{const saved=savedSettings(state);setP(saved);setCustomSize(saved.size==='all'?Math.min(20,state.questionIndex?.length||20):saved.size);},[state.courseId]);
  const bank=state.questionIndex||[];
- const weeks=[...new Set([...state.sources,...bank].map(item=>item.weekId).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+ const folders=examFolderOptions(state),practiceOptions=examPracticeOptions(state);
+ const folderValue=p.studyFolder?`${p.studyFolder.kind}:${p.studyFolder.label}`:p.weekId!=='all'?`week:${p.weekId}`:'';
+ const practiceValue=p.practiceTestId?`test:${p.practiceTestId}`:p.setId?`set:${p.setId}`:'';
+ const chooseFolder=value=>{const folder=folders.find(f=>f.key===value);setP(current=>({...current,weekId:folder?.kind==='week'?folder.label:'all',studyFolder:folder&&folder.kind!=='week'?{kind:folder.kind,label:folder.label}:null}));};
+ const choosePractice=value=>{const option=practiceOptions.find(o=>o.value===value);setP(current=>({...current,setId:option?.setId||null,practiceTestId:option?.practiceTestId||null}));};
  const patch=(key,value)=>setP(current=>({...current,[key]:value}));
  const toggle=(key,value,all)=>patch(key,p[key]===null?all.filter(item=>item!==value):p[key].includes(value)?p[key].filter(item=>item!==value):[...p[key],value]);
  const custom=p.examMode==='custom',matching=matchingExamQuestions(state,p),customMax=Math.max(1,bank.length?matching.length:500);
@@ -31,7 +35,9 @@ export function AdaptiveSetup({state,busy,connected,resume,onResume,onEnd,onStar
   {!matching.length&&bank.length>0&&<p className="fine">No saved questions match this mode and its filters.</p>}
   {p.examMode==='professor'&&<p className="fine">Professor questions use your imported bank.</p>}
   {!connected&&<p className="fine">Open Pummy in a ChatGPT conversation to generate questions and adaptive follow-ups. Saved bank questions can still be practiced here.</p>}
-  <div className="settings-grid">{custom?<label>Number of questions<input type="number" min="1" max={customMax} value={p.size} onChange={e=>{setCustomSize(e.target.value);patch('size',e.target.value);}}/></label>:<div className="exam-size-control"><span>Questions in this exam</span><strong>{matching.length} matching question{matching.length===1?'':'s'}</strong></div>}<label>Week<select value={p.weekId} onChange={e=>patch('weekId',e.target.value)}><option value="all">All weeks</option>{weeks.map(w=><option key={w}>{w}</option>)}</select></label><label>Practice set<select value={p.setId||''} onChange={e=>patch('setId',e.target.value||null)}><option value="">All sets</option>{[...new Set(bank.map(q=>q.setId).filter(Boolean))].map(id=><option key={id}>{id}</option>)}</select></label></div>
+  <div className="settings-grid">{custom?<label>Number of questions<input type="number" min="1" max={customMax} value={p.size} onChange={e=>{setCustomSize(e.target.value);patch('size',e.target.value);}}/></label>:<div className="exam-size-control"><span>Questions in this exam</span><strong>{matching.length} matching question{matching.length===1?'':'s'}</strong></div>}<label>Week / folder<select value={folderValue} onChange={e=>chooseFolder(e.target.value)}><option value="">All weeks and folders</option>{folderValue&&!folders.some(f=>f.key===folderValue)&&<option value={folderValue}>Unavailable folder</option>}{folders.map(folder=><option key={folder.key} value={folder.key}>{folder.displayName}</option>)}</select></label><label>Practice test / set<select value={practiceValue} onChange={e=>choosePractice(e.target.value)}><option value="">All tests and sets</option>{practiceValue&&!practiceOptions.some(o=>o.value===practiceValue)&&<option value={practiceValue}>Unavailable practice test</option>}{practiceOptions.map(option=><option key={option.value} value={option.value}>{option.label}</option>)}</select></label></div>
+  {!folders.length&&<p className="fine">Add a course subfolder to organize questions by week or lecture.</p>}
+  {!practiceOptions.length&&<p className="fine">Save a test in Custom tests to make it available here.</p>}
   <label className="toggle"><input type="checkbox" checked={connected&&p.adaptive} disabled={!connected} onChange={e=>patch('adaptive',e.target.checked)}/>Adaptive follow-ups after missed questions</label>
   <label className="toggle"><input type="checkbox" checked={connected&&p.generateExplanations} disabled={!connected} onChange={e=>patch('generateExplanations',e.target.checked)}/>Generate full explanations with new questions</label>
   {p.generateExplanations&&<ExplanationDepth value={p.explanationDepth} onChange={value=>patch('explanationDepth',value)}/>}

@@ -23,6 +23,22 @@ test('conversation slide reads are grounded, scoped and leave course, exam and t
  await assert.rejects(call('read_slide_context',{courseId:p.courseId,presentationId:p.id,slideId:'absent'}),/Slide not found/);
  const next=await call('read_slide_context',{courseId:p.courseId,presentationId:p.id,slideId:p.slides[1].id});assert.equal(next.context.page,2);assert.equal(next.context.studentAnnotations.length,0);
 });
+test('explain slide returns lecture context without changing annotations, requests or exam state',async t=>{
+ const {call,state,repo}=await setup(t),p=await presentation(call,state.courseId,'pptx');
+ await call('start_test',{courseId:state.courseId,revision:state.revision,size:1,adaptive:false});
+ const before=await repo.get(state.courseId),saved=(await call('read_presentation',{courseId:p.courseId,presentationId:p.id})).presentation;
+ const args={courseId:p.courseId,presentationId:p.id,slideId:p.slides[0].id};
+ assert.equal((await call('read_slide_context',args)).context.explainSkill,undefined);
+ const first=(await call('read_slide_context',{...args,explain:true})).context;
+ assert.match(first.explainSkill,/Check your understanding/);assert.match(first.explainSkill,/Do not advance slides/);
+ assert.equal(first.slideCount,2);assert.deepEqual(first.previousSlides,[]);assert.equal(first.nextSlides[0].page,2);
+ const second=(await call('read_slide_context',{...args,slideId:p.slides[1].id,explain:true})).context;
+ assert.equal(second.previousSlides[0].page,1);assert.match(second.previousSlides[0].notes,/Professor speaker note/);assert.deepEqual(second.nextSlides,[]);
+ assert.deepEqual(await repo.get(state.courseId),before);
+ assert.deepEqual((await call('read_presentation',{courseId:p.courseId,presentationId:p.id})).presentation,saved);
+ assert.deepEqual((await call('read_slide_tutor',{courseId:p.courseId,presentationId:p.id})).tutor.requests,[]);
+});
+
 test('presentation publication rolls back if validated files cannot become readable, and retries recover',async t=>{
  const {call,state,db}=await setup(t),pdfAssetId=await asset(call,state.courseId,await fixturePDF(),'pdf'),args={courseId:state.courseId,presentationId:crypto.randomUUID(),originalAssetId:pdfAssetId,pdfAssetId};
  db.db.exec("CREATE TRIGGER fail_asset_readiness BEFORE UPDATE OF ready ON tutor_assets BEGIN SELECT RAISE(ABORT,'simulated import interruption'); END");

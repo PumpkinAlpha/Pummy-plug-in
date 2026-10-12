@@ -1,6 +1,7 @@
 import {grounding,refreshGrounding,explanationPrompt,provenance,pagesOf,validateProvenance} from './grounding.js';
 import {syncFields,syncSources,syncSource,SOURCE_TYPES} from './source-sync.js';
 import { z } from 'zod/v4';
+import {matchesStudySelection} from '../lib/exam-filters.js';
 import {executeBankExplanations} from './bank-explanations.js';
 import {TutorRepository} from './tutor-repository.js';
 import {tutorDefinitions,executeTutor} from './tutor-tools.js';
@@ -24,7 +25,7 @@ const courseArgs={courseId:id},stateArgs={...courseArgs,revision},sessionArgs={.
 const folderKind=z.enum(['week','lecture','unassigned','all']);
 const folderKey=(kind,label)=>`${kind}:${label}`;
 const types=z.array(z.enum(['mcq','multi','image','order','match','label'])).max(6).nullable();
-const preferences=z.object({size:z.union([z.number().int().min(1).max(500),z.literal('all')]).default(20),examMode:z.enum(['all','struggling','professor','custom']).default('custom'),adaptive:z.boolean().default(true),generateExplanations:z.boolean().default(false),explanationDepth:z.enum(['quick','comprehensive','mcat_uworld']).default('comprehensive'),practiceFirst:z.boolean().default(true),includeReviews:z.boolean().default(true),types:types.default(null),sourceIds:z.array(id).max(30).nullable().default(null),objectiveIds:z.array(id).max(200).nullable().default(null),weekId:id.default('all'),setId:id.nullable().default(null)});
+const preferences=z.object({size:z.union([z.number().int().min(1).max(500),z.literal('all')]).default(20),examMode:z.enum(['all','struggling','professor','custom']).default('custom'),adaptive:z.boolean().default(true),generateExplanations:z.boolean().default(false),explanationDepth:z.enum(['quick','comprehensive','mcat_uworld']).default('comprehensive'),practiceFirst:z.boolean().default(true),includeReviews:z.boolean().default(true),types:types.default(null),sourceIds:z.array(id).max(30).nullable().default(null),objectiveIds:z.array(id).max(200).nullable().default(null),weekId:id.default('all'),setId:id.nullable().default(null),studyFolder:z.object({kind:folderKind,label:z.string().min(1).max(300)}).nullable().default(null),practiceTestId:z.string().uuid().nullable().default(null)});
 const objective=z.object({id,text:z.string().min(1).max(4000),num:z.union([z.string().max(40),z.number()]).optional(),lecture:z.string().max(300).optional(),sourceId:id.nullish(),weekId:id.nullish()});
 const conceptProgress=z.object({term:z.string().min(1).max(300),status:z.enum(['new','learning','review']),interval:num.max(10000),ease:z.number().min(1.3).max(3),due:num,reps:num,lapses:num,attempts:num,correct:num,lastSeen:num});
 export const definitions=[
@@ -209,7 +210,8 @@ export async function executeTool(repo,name,raw){
    if(args.customTestId){const t=model.customTests.find(t=>t.id===args.customTestId);if(!t)throw new Error('Custom test not found.');args={...args,...t.preferences,questionIds:t.questionIds};}
    if(args.questionIds?.some(id=>!model.rootQuestions().some(q=>q.id===id&&q.keyed)))throw new Error('This selection contains a missing course question.');
    archiveSession(model);model.generation=null;model.explanationRequest=null;model.preferences=preferences.parse(args);
-   const questionIds=model.rootQuestions().filter(q=>q.keyed&&(!args.questionIds||args.questionIds.includes(q.id))&&(args.examMode!=='professor'||q.origin==='practice')&&(args.examMode!=='struggling'||isStrugglingQuestion(model,q))&&(args.weekId==='all'||q.weekId===args.weekId||model.sources.get(q.sourceId)?.weekId===args.weekId)&&(args.setId===null||q.setId===args.setId)&&(args.objectiveIds===null||args.objectiveIds.includes(q.objectiveId||'__untagged__'))).map(q=>q.id);
+   const hasWeeks=[...model.sources.values(),...model.rootQuestions()].some(item=>item.weekId)||Object.keys(model.folderNames).some(key=>key.startsWith('week:'));
+   const questionIds=model.rootQuestions().filter(q=>q.keyed&&matchesStudySelection(q,model.sources.get(q.sourceId),args,model.customTests,hasWeeks)&&(!args.questionIds||args.questionIds.includes(q.id))&&(args.examMode!=='professor'||q.origin==='practice')&&(args.examMode!=='struggling'||isStrugglingQuestion(model,q))&&(args.weekId==='all'||q.weekId===args.weekId||model.sources.get(q.sourceId)?.weekId===args.weekId)&&(args.setId===null||q.setId===args.setId)&&(args.objectiveIds===null||args.objectiveIds.includes(q.objectiveId||'__untagged__'))).map(q=>q.id);
    if(!questionIds.length)throw new Error('No questions match these settings. Your saved exam has not changed.');
    createSession(model,{...model.preferences,questionIds});if(args.questionIds&&args.adaptive===false){const index=view(model,saved.revision).questionIndex;const ids=questionIds.filter(id=>{const q=index.find(q=>q.id===id);return (args.sourceIds===null||args.sourceIds.includes(q.sourceId))&&(args.types===null||args.types.includes(q.type));});model.session.queue=ids.slice(0,model.session.opts.size).map(id=>({k:'q',id}));model.session.total=model.session.queue.length;}if(!model.session.total)throw new Error('No questions match these settings. Choose a source and question type.');await exam.begin();
   }

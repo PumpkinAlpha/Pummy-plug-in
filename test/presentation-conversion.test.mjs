@@ -11,12 +11,23 @@ import {fixtureLegacyPPT} from './source-fixtures.mjs';
 async function setup(t,converter){const db=new LocalD1();t.after(()=>db.close());const repo=new CourseRepository(db,'conversion-student',converter),call=(name,args)=>executeTool(repo,name,args),state=(await call('create_course',{name:'Conversion course',requestId:crypto.randomUUID()})).state;return {db,repo,call,state};}
 async function upload(call,courseId,kind='pptx',bytes=fixturePPTX()){const data=encode64(bytes),assetId=crypto.randomUUID(),chunks=Math.ceil(data.length/CHUNK_SIZE);await call('begin_presentation_upload',{courseId,assetId,name:'Lecture.'+kind,kind,bytes:bytes.length,chunks});for(let index=0;index<chunks;index++)await call('upload_presentation_chunk',{courseId,assetId,index,data:data.slice(index*CHUNK_SIZE,(index+1)*CHUNK_SIZE)});return {courseId,assetId};}
 test('PowerPoint conversion preserves original bytes and notes, caches retries and leaves course state unchanged',async t=>{
- const pdf=await fixturePDF();let calls=0;const {repo,call,state,db}=await setup(t,{async fetch(r){calls++;assert.equal(r.headers.get('content-type'),'application/vnd.openxmlformats-officedocument.presentationml.presentation');assert.deepEqual(new Uint8Array(await r.arrayBuffer()),fixturePPTX());return new Response(pdf);}}),before=await repo.get(state.courseId),args=await upload(call,state.courseId);
+ const pdf=await fixturePDF(),original=fixturePPTX();let calls=0;const {repo,call,state,db}=await setup(t,{async fetch(r){calls++;assert.equal(r.headers.get('content-type'),'application/vnd.openxmlformats-officedocument.presentationml.presentation');assert.deepEqual(new Uint8Array(await r.arrayBuffer()),original);return new Response(pdf);}}),before=await repo.get(state.courseId),args=await upload(call,state.courseId,'pptx',original);
  const a=(await call('convert_presentation',args)).asset,b=(await call('convert_presentation',args)).asset;assert.equal(a.id,b.id);assert.equal(calls,1);assert.equal(a.kind,'pdf');assert.equal(a.ready,0);
  const p=(await call('import_presentation',{courseId:state.courseId,presentationId:crypto.randomUUID(),originalAssetId:args.assetId,pdfAssetId:a.id})).presentation;assert.equal(p.kind,'pptx');assert.equal(p.slides.length,2);assert.match(p.slides[0].notes,/Professor speaker note/);assert.match(p.slides[1].text,/first arch branch/);
- assert.deepEqual(decode64((await call('read_presentation_chunk',{courseId:state.courseId,assetId:p.originalAssetId,index:0})).asset.data),fixturePPTX());assert.deepEqual(await repo.get(state.courseId),before);
+ assert.deepEqual(decode64((await call('read_presentation_chunk',{courseId:state.courseId,assetId:p.originalAssetId,index:0})).asset.data),original);assert.deepEqual(await repo.get(state.courseId),before);
  await assert.rejects(executeTool(new CourseRepository(db,'outsider',repo.converter),'convert_presentation',args),/Course not found/);
 });
+test('attached PowerPoint opens as a tutor presentation, reuses conversion and preserves course state',async t=>{
+ let calls=0;const {call,state,repo}=await setup(t,{fetch:async()=>{calls++;return new Response(await fixturePDF());}}),bytes=fixturePPTX(),{assetId}=await upload(call,state.courseId,'pptx',bytes);
+ let current=(await call('sync_course_sources',{courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),sources:[{id:'lecture',name:'Lecture',text:'The jugular and subclavian veins unite.'}]})).state;
+ current=(await call('attach_source_original',{courseId:state.courseId,revision:current.revision,sourceId:'lecture',assetId})).state;
+ const before=await repo.get(state.courseId),args={courseId:state.courseId,presentationId:crypto.randomUUID(),sourceId:'lecture'};
+ const first=(await call('import_course_presentation',args)).presentation,again=(await call('import_course_presentation',args)).presentation;
+ assert.equal(first.id,again.id);assert.equal(first.originalAssetId,assetId);assert.equal(first.sourceId,'lecture');assert.equal(first.kind,'pptx');assert.equal(first.slides.length,2);assert.equal(calls,1);
+ assert.deepEqual(await repo.get(state.courseId),before);
+ assert.deepEqual(decode64((await call('read_presentation_chunk',{courseId:state.courseId,assetId,index:0})).asset.data),bytes);
+});
+
 test('legacy PPT converts and reopens with original text, order and downloadable immutable PPT bytes',async t=>{
  const pdf=await fixturePDF(),bytes=fixtureLegacyPPT(),{call,state}=await setup(t,{fetch:async r=>{assert.equal(r.headers.get('content-type'),'application/vnd.ms-powerpoint');return new Response(pdf);}}),args=await upload(call,state.courseId,'ppt',bytes),a=(await call('convert_presentation',args)).asset;
  const p=(await call('import_presentation',{courseId:state.courseId,presentationId:crypto.randomUUID(),originalAssetId:args.assetId,pdfAssetId:a.id})).presentation;assert.equal(p.kind,'ppt');assert.match(p.slides[0].text,/Second slide/);assert.match(p.slides[1].text,/Latest professor text/);assert.deepEqual(decode64((await call('read_presentation_chunk',{...args,index:0})).asset.data),bytes);
