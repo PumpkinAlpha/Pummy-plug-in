@@ -1,3 +1,4 @@
+import {executeBanks} from './practice-banks.js';
 import {grounding,refreshGrounding,explanationPrompt,provenance,pagesOf,validateProvenance} from './grounding.js';
 import {syncFields,syncSources,syncSource,SOURCE_TYPES} from './source-sync.js';
 import { z } from 'zod/v4';
@@ -67,9 +68,16 @@ export const definitions=[
  {name:'provide_explanation',title:'Save grounded explanation',description:'Complete explanationRequest with a course-grounded explanation for a submitted question. Do not change answers or test phase.',schema:z.object({...stateArgs,requestId:id,explanation}),readOnly:false},
 ];
 definitions.push({...definitions.find(t=>t.name==='import_questions'),name:'add_questions',title:'Add course questions',description:'Append a bank to an existing course without replacing questions, sources, or saved progress. Use only student-supplied or accessible Project sources; reuse requestId on retries.',schema:definitions.find(t=>t.name==='import_questions').schema.omit({name:true}).extend(stateArgs)});
+definitions.push(
+ {name:'list_practice_banks',title:'List saved practice question banks',description:'List all archived question banks without exposing answer keys.',schema:z.object(courseArgs),readOnly:true,appOnly:true},
+ {name:'read_practice_bank',title:'Open question bank for editing or download',description:'Student-requested archive editor and export. Contains keys; do not use for answering an active exam.',schema:z.object({...courseArgs,bankId:z.string().min(1).max(400)}),readOnly:true,appOnly:true},
+ {name:'edit_practice_bank',title:'Save an archived question',description:'Edit an archive copy, preserving active exam keys, course questions, results and progress.',schema:z.object({...courseArgs,bankId:z.string().min(1).max(400),bankRevision:z.number().int().min(0),name:z.string().trim().min(1).max(300),questionId:id,question}),readOnly:false,appOnly:true}
+);
 const tutorDefs=tutorDefinitions(question),tutorNames=new Set(tutorDefs.map(d=>d.name));
 definitions.push(...tutorDefs);
 export const outputShape={profile:z.record(z.string(),z.unknown()).optional(),request:z.record(z.string(),z.unknown()).optional(),presentations:z.array(z.record(z.string(),z.unknown())).optional(),presentation:z.record(z.string(),z.unknown()).optional(),asset:z.record(z.string(),z.unknown()).optional(),tutor:z.record(z.string(),z.unknown()).optional(),visual:z.record(z.string(),z.unknown()).optional(),versions:z.array(z.record(z.string(),z.unknown())).optional(),state:z.record(z.string(),z.unknown()).optional(),courses:z.array(z.object({id:z.string(),name:z.string(),revision:z.number(),updated_at:z.number()})).optional(),message:z.string().optional(),source:z.record(z.string(),z.unknown()).optional(),export:z.record(z.string(),z.unknown()).optional(),sync:z.record(z.string(),z.unknown()).optional(),context:z.record(z.string(),z.unknown()).optional()};
+outputShape.banks=z.array(z.record(z.string(),z.unknown())).optional();
+outputShape.bank=z.record(z.string(),z.unknown()).optional();
 outputShape.presentationCapabilities=z.record(z.string(),z.unknown()).optional();
 function same(a,b){if(Array.isArray(a)&&Array.isArray(b))return JSON.stringify([...a].sort())===JSON.stringify([...b].sort());return JSON.stringify(Object.entries(a||{}).sort())===JSON.stringify(Object.entries(b||{}).sort());}
 function requireChoiceExplanations(q){if(!Array.isArray(q.optionNotes)||q.optionNotes.length!==q.options.length||q.optionNotes.some(note=>!note.trim()))throw new Error('Prepare one optionNotes explanation for every answer choice in the same question response.');}
@@ -110,6 +118,7 @@ export async function executeTool(repo,name,raw){
   const result=await saveNewCourse(repo,model);return {...result,message:result.message||`Imported ${args.questions.length} questions.`};
  }
  const saved=await repo.get(args.courseId);if(!saved)throw new Error('Course not found. Import a bank first.');
+ if(['list_practice_banks','read_practice_bank','edit_practice_bank'].includes(name))return executeBanks(repo,saved,name,args,validateQuestion);
  const model=new PluginCourse(saved.data),exam=createExam(model),s=model.session;
  if(['request_bank_explanations','read_bank_explanations','provide_bank_explanations'].includes(name))return executeBankExplanations(repo,model,saved,name,args,view,validateExplanationSources);
  if(['open_test','read_course_state','open_interface'].includes(name))return {state:view(model,saved.revision)};

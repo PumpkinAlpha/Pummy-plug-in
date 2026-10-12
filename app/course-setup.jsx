@@ -46,11 +46,12 @@ export function CourseForm({state,busy,folderScope,onFolderChange,onSave,onCreat
 
 export function NewCourse({busy,onCreate}){const [name,setName]=useState('');return <form className="course-form" onSubmit={e=>{e.preventDefault();onCreate({requestId:crypto.randomUUID(),name});}}><label>Course name<input autoFocus required maxLength={160} value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Thoracic Anatomy"/></label><p className="fine">Add files or connect a local study folder after creating the course.</p><button className="primary" disabled={busy||!name.trim()}>Create course</button></form>;}
 
-export function BuildQuestions({state,busy,connected,onBuild,initialSourceIds,launchAfterBuild=false,examSettings=null}){
+export function BuildQuestions({state,folderScope,busy,connected,onBuild,initialSourceIds,launchAfterBuild=false,examSettings=null}){
  const [mode,setMode]=useState(launchAfterBuild&&examSettings?.examMode==='struggling'?'gaps':launchAfterBuild&&examSettings?.examMode==='custom'?'custom':'coverage');
  const [instructions,setInstructions]=useState('');
  const [count,setCount]=useState(launchAfterBuild?Math.min(generationCapacity(state),Number(examSettings?.size)||10):10);
- const [sourceIds,setSourceIds]=useState(initialSourceIds||state.sources.map(source=>source.id));
+ const scopedSources=folderScope?sourcesInFolder(state,folderScope):state.sources;
+ const [sourceIds,setSourceIds]=useState(initialSourceIds?.filter(id=>scopedSources.some(s=>s.id===id))||scopedSources.map(source=>source.id));
  const [generateExplanations,setGenerateExplanations]=useState(!!examSettings?.generateExplanations);
  const [difficulty,setDifficulty]=useState('exam');
  const [questionModel,setQuestionModel]=useState('current'),[questionEffort,setQuestionEffort]=useState('current');
@@ -58,7 +59,7 @@ export function BuildQuestions({state,busy,connected,onBuild,initialSourceIds,la
  const [explanationModel,setExplanationModel]=useState('current'),[explanationEffort,setExplanationEffort]=useState('current');
  const capacity=generationCapacity(state),customMax=capacity,gaps=gapSignals(state);
  const invalidCount=mode==='custom'&&(!Number.isInteger(count)||count<1||count>customMax);
- const submit=event=>{event.preventDefault();if(!capacity||invalidCount)return;onBuild({mode,instructions:instructions.trim(),count:mode==='custom'?count:null,sourceIds,generateExplanations,difficulty,questionModel,questionEffort,explanationModel,explanationEffort,explanationDepth,launchAfterBuild,examSettings});};
+ const submit=event=>{event.preventDefault();if(!capacity||invalidCount)return;onBuild({folder:folderScope,mode,instructions:instructions.trim(),count:mode==='custom'?count:null,sourceIds,generateExplanations,difficulty,questionModel,questionEffort,explanationModel,explanationEffort,explanationDepth,launchAfterBuild,examSettings});};
  return <form className="course-form build-questions-form" onSubmit={submit}>
   <fieldset className="generation-mode-options"><legend>How should Pummy build this bank?</legend><div className="generation-mode-grid">{Object.entries(BUILD_MODES).map(([id,label])=><button type="button" key={id} className={'generation-mode'+(mode===id?' selected':'')} aria-pressed={mode===id} onClick={()=>setMode(id)}><strong>{label}</strong><span>{id==='coverage'?'Cover the selected sources and objectives.':id==='gaps'?'Focus on material you missed or have not mastered.':'Choose the exact number of questions.'}</span></button>)}</div></fieldset>
   {mode==='custom'&&<label>Number of questions<input type="number" min="1" max={customMax} required value={count} onChange={event=>setCount(Number(event.target.value))}/></label>}
@@ -70,7 +71,7 @@ export function BuildQuestions({state,busy,connected,onBuild,initialSourceIds,la
    <label>Question effort preference<select value={questionEffort} onChange={event=>setQuestionEffort(event.target.value)}>{Object.entries(EFFORT_PREFERENCES).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
   </div></section>
   <label>Topics, objectives, or instructions (optional)<textarea maxLength={4000} value={instructions} onChange={event=>setInstructions(event.target.value)} placeholder="e.g. Emphasize the aortic arch and lecture objectives 1–3."/></label>
-  {state.sources.length>0&&<fieldset><legend>Saved course references</legend>{state.sources.map(source=><label className="toggle" key={source.id}><input type="checkbox" checked={sourceIds.includes(source.id)} onChange={()=>setSourceIds(sourceIds.includes(source.id)?sourceIds.filter(id=>id!==source.id):[...sourceIds,source.id])}/>{source.name}</label>)}</fieldset>}
+  {scopedSources.length>0&&<fieldset><legend>Saved course references</legend>{scopedSources.map(source=><label className="toggle" key={source.id}><input type="checkbox" checked={sourceIds.includes(source.id)} onChange={()=>setSourceIds(sourceIds.includes(source.id)?sourceIds.filter(id=>id!==source.id):[...sourceIds,source.id])}/>{source.name}</label>)}</fieldset>}
   <label className="toggle"><input type="checkbox" checked={generateExplanations} onChange={event=>setGenerateExplanations(event.target.checked)}/>Generate full explanations with these questions</label>
   {generateExplanations&&<section className="generation-settings" aria-label="Explanation generation settings"><h3>Explanation settings</h3><div className="generation-settings-grid"><ExplanationDepth value={explanationDepth} onChange={setExplanationDepth}/>
    <label>Explanation model preference<select value={explanationModel} onChange={event=>setExplanationModel(event.target.value)}>{Object.entries(MODEL_PREFERENCES).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>

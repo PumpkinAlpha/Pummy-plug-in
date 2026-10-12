@@ -1,3 +1,4 @@
+import {bankInsert} from './practice-banks.js';
 import {SLIDE_EXPLAINER_SKILL} from './slide-explainer-skill.js';
 import {z} from 'zod/v4';
 import {TutorRepository} from './tutor-repository.js';
@@ -14,7 +15,7 @@ export function tutorDefinitions(question){return [
  ['begin_presentation_upload','Begin immutable presentation upload',z.object({...course,assetId:uuid,name:z.string().min(1).max(300),kind:z.enum(['pdf','ppt','pptx','docx','txt','md']),bytes:z.number().int().positive(),chunks:z.number().int().positive()}),false,true],
  ['upload_presentation_chunk','Upload presentation file chunk',z.object({...course,assetId:uuid,index:z.number().int().min(0),data:z.string().min(4).max(CHUNK_SIZE).regex(/^[A-Za-z0-9+/]+={0,2}$/)}),false,true],
  ['convert_presentation','Generate and store a slide PDF from an uploaded PowerPoint',z.object({...course,assetId:uuid}),false,true],
- ['import_presentation','Import original PDF, PPT or PPTX for direct viewing; an optional companion PDF can supply exact visuals',z.object({...course,presentationId:uuid,originalAssetId:uuid,pdfAssetId:uuid.optional(),sourceId:id.optional()}),false,true],
+ ['import_presentation','Import original PDF, PPT or PPTX for direct viewing; an optional companion PDF can supply exact visuals',z.object({...course,presentationId:uuid,originalAssetId:uuid,pdfAssetId:uuid.optional(),sourceId:id.optional(),folder:z.object({kind:z.enum(['week','lecture','all','unassigned']),label:z.string().min(1).max(300)}).optional()}),false,true],
  ['import_course_presentation','Open an existing attached course PDF or PowerPoint',z.object({...course,presentationId:uuid,sourceId:id}),false,true],
  ['read_presentation','Read presentation and editable annotations',z.object(presentation),true,true],
  ['read_slide_context','Read professor slide context for answering in the conversation. Set explain=true for the "Explain the slide" trigger to also receive the slide explainer skill and surrounding lecture slides.',z.object({...slide,explain:z.boolean().default(false),query:z.string().max(4000).default(''),region:regionSchema.optional(),annotationIds:z.array(uuid).max(30).default([]),allowGeneral:z.boolean().default(false)}),true,false],
@@ -89,7 +90,7 @@ export async function executeTutor(courseRepo,name,args,append){
    else{if(native.slides.length!==metadata.slides.length)throw new Error('The PDF must contain exactly the same slides in the same order.');metadata.slides=metadata.slides.map((s,i)=>({...s,text:native.slides[i].text||s.text,notes:''}));}
   }else if(original.id!==pdf.id)throw new Error('Use the original PDF as the visual file.');
   if(args.sourceId&&!saved.data.sources.some(s=>s.id===args.sourceId))throw new Error('Selected course source not found.');
-  const data={...metadata,id:args.presentationId,courseId:args.courseId,name:original.name,ownerId:courseRepo.userId,kind:original.kind,sourceId:args.sourceId||null,originalAssetId:original.id,pdfAssetId:pdf?.id||null,renderMode:pdf?'pdf':'powerpoint',assets:{original:{id:original.id,chunks:original.chunks,kind:original.kind},pdf:pdf?{id:pdf.id,chunks:pdf.chunks,kind:'pdf'}:null},createdAt:Date.now()};
+  const data={...metadata,id:args.presentationId,courseId:args.courseId,name:original.name,ownerId:courseRepo.userId,kind:original.kind,sourceId:args.sourceId||null,folder:args.folder||null,originalAssetId:original.id,pdfAssetId:pdf?.id||null,renderMode:pdf?'pdf':'powerpoint',assets:{original:{id:original.id,chunks:original.chunks,kind:original.kind},pdf:pdf?{id:pdf.id,chunks:pdf.chunks,kind:'pdf'}:null},createdAt:Date.now()};
   if(JSON.stringify(data).length>1400000)throw new Error('Slide text is too large. Split this presentation.');
   const result=await repo.create(args.courseId,args.presentationId,data);
   return {presentation:result};
@@ -128,13 +129,14 @@ export async function executeTutor(courseRepo,name,args,append){
   for(const c of args.citations){if(!allowed.some(s=>s.sourceId===c.sourceId&&(c.page===undefined||s.page===c.page)))throw new Error('Citation was not supplied in this tutor context.');}
   if(args.questions.length&&((!r.context.professorSlide.text.trim()&&!r.visual)||!args.citations.some(c=>c.sourceId===sourceId(p,r.page)&&c.page===r.page)))throw new Error('Practice questions require professor slide text or an original visual and a citation to this slide.');
   const questions=args.questions.map(q=>{if(q.page&&q.page!==r.page||q.sourceId&&q.sourceId!==sourceId(p,r.page))throw new Error('Practice question references another slide.');return {...q,sourceId:sourceId(p,r.page),page:r.page,origin:'generated',...(!r.context.professorSlide.text.trim()&&r.visual?{figure:{dataUrl:r.visual,file:p.name,unit:'slide',page:r.page,marks:[]}}:{})};});
-  const updated=await repo.completeRequest(args.courseId,p.id,args.requestId,{...r,status:'complete',answer:args.answer,citations:args.citations,questions,completedAt:Date.now()},r);return {tutor:{request:stripVisual(updated)}};
+  const source=saved.data.sources.find(s=>s.id===p.sourceId),completedAt=Date.now(),bank={id:'batch:'+r.appendId,name:p.name+' · slide '+r.page,createdAt:completedAt,questions:questions.map((q,i)=>({...q,id:r.appendId+':'+i,lecture:source?.lecture||(p.folder?.kind==='lecture'?p.folder.label:''),weekId:source?.weekId||(p.folder?.kind==='week'?p.folder.label:null),sourceName:p.name}))};
+  const updated=await repo.completeRequest(args.courseId,p.id,args.requestId,{...r,status:'complete',answer:args.answer,citations:args.citations,questions,completedAt},r,questions.length?((gate,bindings)=>bankInsert(courseRepo,args.courseId,bank,gate,bindings)):null);return {tutor:{request:stripVisual(updated)}};
  }
  if(name==='save_tutor_questions'){
   const r=await repo.request(args.courseId,p.id,args.requestId);if(r.status!=='complete'||!r.questions?.length)throw new Error('No completed practice questions to save.');
   const current=await courseRepo.get(args.courseId),sid=sourceId(p,r.page),material=slideMaterial(p,r.page),source=current.data.sources.find(s=>s.id===sid),s=assertSlide(p,r.slideId);
   if(source){const text=new Map(current.data.texts).get(sid)||'';if(!text.includes(s.text.trim()))throw new Error('The saved professor source does not include this slide. Sync this slide through Course & sources before saving its questions.');}
-  const result=await append(courseRepo,'add_questions',{courseId:args.courseId,revision:current.revision,requestId:r.appendId,questions:r.questions,sources:source?[]:[{id:sid,name:p.name,rank:1,sourceType:'professor_slides',text:material.text,pages:material.pages}]});
+  const result=await append(courseRepo,'add_questions',{courseId:args.courseId,revision:current.revision,requestId:r.appendId,questions:r.questions.map(q=>({...q,lecture:source?.lecture||(p.folder?.kind==='lecture'?p.folder.label:q.lecture||''),weekId:source?.weekId||(p.folder?.kind==='week'?p.folder.label:q.weekId||null)})),sources:source?[]:[{id:sid,name:p.name,rank:1,sourceType:'professor_slides',...(p.folder?.kind==='lecture'?{lecture:p.folder.label}:p.folder?.kind==='week'?{weekId:p.folder.label}:{}),text:material.text,pages:material.pages}]});
   return {...result,message:'Practice questions appended. Exam progress preserved.'};
  }
  throw new Error('Unknown tutor tool.');

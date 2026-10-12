@@ -12,14 +12,21 @@ import {studyFolders,sourcesInFolder} from './folders.js';
 import {Icon} from './icons.jsx';
 const tools={Draw:['pen','pencil','highlight','eraser','lasso'],Insert:['text','rect','roundRect','ellipse','line','arrow','connector','freeform','callout','sticky','comment','image']};
 const labels={select:'Select',region:'Ask region',pen:'Pen',pencil:'Pencil',highlight:'Highlighter',eraser:'Eraser',lasso:'Lasso',text:'Text box',rect:'Rectangle',roundRect:'Rounded rectangle',ellipse:'Ellipse',line:'Line',arrow:'Arrow',connector:'Connector',freeform:'Freeform',callout:'Callout',sticky:'Sticky note',comment:'Comment',image:'Image'};
-export function InteractiveTutor({state,onSource,onFolderChange,presentationId=null,initialPage=1,onSlide,onPresentation=()=>{},navigationGuard,onBack}){
+export function InteractiveTutor({state,folderScope=null,onSource,onFolderChange,presentationId=null,initialPage=1,onSlide,onPresentation=()=>{},navigationGuard,onBack}){
  const [capabilities,setCapabilities]=useState(null);
- const [list,setList]=useState([]),[p,setP]=useState(null),[original,setOriginal]=useState(null),[pdf,setPdf]=useState(null),[sourcePdf,setSourcePdf]=useState(null),[prepared,setPrepared]=useState(null),[stage,setStage]=useState(''),[source,setSource]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[openPanel,setOpenPanel]=useState('add');const mounted=useRef(true),importAttempt=useRef(null);
- useEffect(()=>{onFolderChange?.(p?studyFolders(state).find(f=>sourcesInFolder(state,f).some(s=>s.id===p.sourceId))||null:null);},[p?.id,p?.sourceId,state.revision]);
+ const [list,setList]=useState([]),[p,setP]=useState(null),[original,setOriginal]=useState(null),[pdf,setPdf]=useState(null),[sourcePdf,setSourcePdf]=useState(null),[prepared,setPrepared]=useState(null),[stage,setStage]=useState(''),[source,setSource]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[openPanel,setOpenPanel]=useState('sources');const mounted=useRef(true),importAttempt=useRef(null);
+ const scopedSources=folderScope?sourcesInFolder(state,folderScope):state.sources;
+ const folderFields=folderScope?{folder:{kind:folderScope.kind,label:folderScope.label}}:{};
+ useEffect(()=>{setSource('');setSourcePdf(null);importAttempt.current=null;},[folderScope?.kind,folderScope?.label]);
+ function selectPresentation(presentation){
+  const folder=presentation.sourceId?studyFolders(state).find(f=>sourcesInFolder(state,f).some(s=>s.id===presentation.sourceId)):presentation.folder;
+  if(folder)onFolderChange?.(folder);setP(presentation);onPresentation(presentation.id);
+ }
+ const visiblePresentations=list.filter(item=>!folderScope||(item.sourceId?scopedSources.some(s=>s.id===item.sourceId):item.folder?.kind===folderScope.kind&&item.folder?.label===folderScope.label));
  const refresh=async()=>{const r=await call('list_presentations',{courseId:state.courseId});if(mounted.current){setList(r.presentations);setCapabilities(r.presentationCapabilities||null);}return r;};
  useEffect(()=>{mounted.current=true;refresh().catch(e=>setError(e.message));return()=>{mounted.current=false;};},[state.courseId]);
  async function run(fn){if(busy)return;setBusy(true);setError('');try{await fn();}catch(e){setError(e.message);}finally{if(mounted.current)setBusy(false);}}
- async function open(id,{navigate=true}={}){const r=await call('read_presentation',{courseId:state.courseId,presentationId:id});setP({...r.presentation,messages:r.tutor.messages});if(navigate)onPresentation(id);}
+ async function open(id,{navigate=true}={}){const r=await call('read_presentation',{courseId:state.courseId,presentationId:id});const presentation={...r.presentation,messages:r.tutor.messages};if(navigate)selectPresentation(presentation);else setP(presentation);}
  useEffect(()=>{if(!presentationId){setP(null);refresh().catch(e=>setError(e.message));}else if(p?.id!==presentationId)run(()=>open(presentationId,{navigate:false}));},[presentationId]);
  useEffect(()=>{if(p||!navigationGuard)return;const guard=async()=>{if(busy)throw new Error('Wait for the presentation import to finish before going back.');};navigationGuard.current=guard;return()=>{if(navigationGuard.current===guard)navigationGuard.current=null;};},[p,busy]);
  async function prepareFile(file){
@@ -29,22 +36,24 @@ export function InteractiveTutor({state,onSource,onFolderChange,presentationId=n
  }
  async function importFile(){
   if(!importAttempt.current||importAttempt.current.original!==original||importAttempt.current.pdf!==pdf||importAttempt.current.source!==source)importAttempt.current={original,pdf,source,presentationId:crypto.randomUUID()};
+  if(source&&!scopedSources.some(s=>s.id===source))throw new Error('Choose a source in the current folder.');
   if(!original)throw new Error('Choose an original presentation.');let files;
   if(pdf){setStage('Uploading presentation…');files={originalAssetId:await uploadPresentationFile(call,state.courseId,original),pdfAssetId:await uploadPresentationFile(call,state.courseId,pdf)};}
   else files=prepared?.file===original?prepared:await prepareFile(original);
   if(!files)throw new Error('Choose a companion PDF exported from the same PowerPoint, including every slide.');
-  setStage('Opening presentation…');const r=await call('import_presentation',{courseId:state.courseId,presentationId:importAttempt.current.presentationId,originalAssetId:files.originalAssetId,pdfAssetId:files.pdfAssetId,...(source?{sourceId:source}:{})});setP(r.presentation);onPresentation(r.presentation.id);await refresh();
+  setStage('Opening presentation…');const r=await call('import_presentation',{courseId:state.courseId,presentationId:importAttempt.current.presentationId,originalAssetId:files.originalAssetId,pdfAssetId:files.pdfAssetId,...folderFields,...(source?{sourceId:source}:{})});selectPresentation(r.presentation);await refresh();
  }
- async function importProject(file){const data=JSON.parse(await file.text());if(data.format!=='pummy-tutor-project'||data.version!==1||!Array.isArray(data.presentation?.slides)||!data.presentation.slides.length||data.presentation.slides.length>300)throw new Error('Choose a Pummy tutor project.');for(const s of data.presentation.slides)annotationList.parse(data.annotations?.[s.id]||[]);const originalBytes=decode64(data.original),pdfBytes=data.pdf?decode64(data.pdf):originalBytes,kind=data.presentation?.kind;if(!['pdf','ppt','pptx'].includes(kind))throw new Error('Invalid project source type.');const originalAssetId=await uploadPresentationFile(call,state.courseId,new File([originalBytes],String(data.presentation.name||`Imported.${kind}`).slice(0,200).replace(/[\/\\]/g,'-'))),pdfAssetId=kind==='pdf'?originalAssetId:data.pdf?await uploadPresentationFile(call,state.courseId,new File([pdfBytes],'Imported.pdf')):undefined;let r=await call('import_presentation',{courseId:state.courseId,presentationId:crypto.randomUUID(),originalAssetId,pdfAssetId});const imported=r.presentation;
+ async function importProject(file){const data=JSON.parse(await file.text());if(data.format!=='pummy-tutor-project'||data.version!==1||!Array.isArray(data.presentation?.slides)||!data.presentation.slides.length||data.presentation.slides.length>300)throw new Error('Choose a Pummy tutor project.');for(const s of data.presentation.slides)annotationList.parse(data.annotations?.[s.id]||[]);const originalBytes=decode64(data.original),pdfBytes=data.pdf?decode64(data.pdf):originalBytes,kind=data.presentation?.kind;if(!['pdf','ppt','pptx'].includes(kind))throw new Error('Invalid project source type.');const originalAssetId=await uploadPresentationFile(call,state.courseId,new File([originalBytes],String(data.presentation.name||`Imported.${kind}`).slice(0,200).replace(/[\/\\]/g,'-'))),pdfAssetId=kind==='pdf'?originalAssetId:data.pdf?await uploadPresentationFile(call,state.courseId,new File([pdfBytes],'Imported.pdf')):undefined;let r=await call('import_presentation',{courseId:state.courseId,presentationId:crypto.randomUUID(),originalAssetId,pdfAssetId,...folderFields});const imported=r.presentation;
   for(let i=0;i<imported.slides.length;i++){const oldId=data.presentation.slides[i]?.id;const annotations=annotationList.parse((data.annotations?.[oldId]||[]).map(a=>({...a,id:crypto.randomUUID(),courseId:state.courseId,presentationId:imported.id,slideId:imported.slides[i].id})));if(annotations.length){r=await call('save_slide_annotations',{courseId:state.courseId,presentationId:imported.id,slideId:imported.slides[i].id,revision:imported.revision,requestId:crypto.randomUUID(),annotations});imported.revision=r.presentation.revision;}}
   await open(imported.id);await refresh();
  }
- const selectedSource=state.sources.find(item=>item.id===source);
+ const selectedSource=scopedSources.find(item=>item.id===source);
  async function openCourseSource(){
+  if(!selectedSource)throw new Error('Choose a source in the current folder.');
   const presentationId=crypto.randomUUID();let r;
   if(sourcePdf&&['ppt','pptx'].includes(selectedSource?.originalFile?.kind)){const pdfAssetId=await uploadPresentationFile(call,state.courseId,sourcePdf);r=await call('import_presentation',{courseId:state.courseId,presentationId,sourceId:source,originalAssetId:selectedSource.originalFile.id,pdfAssetId});}
   else r=await call('import_course_presentation',{courseId:state.courseId,presentationId,sourceId:source});
-  setP(r.presentation);onPresentation(r.presentation.id);await refresh();
+  selectPresentation(r.presentation);await refresh();
  }
  if(p)return <TutorEditor key={p.id+':'+p.revision} p={p} state={state} onSource={onSource} navigationGuard={navigationGuard} onBack={onBack} onClose={()=>{setP(null);onPresentation(null);refresh().catch(e=>setError(e.message));}} initialPage={initialPage} onSlide={onSlide} onReload={()=>run(()=>open(p.id,{navigate:false}))}/>;
  return <div className="tutor-library">
@@ -52,29 +61,29 @@ export function InteractiveTutor({state,onSource,onFolderChange,presentationId=n
   <p>Open lecture slides, add editable annotations, and ask questions in the conversation beside Pummy.</p>
   {error&&<p className="notice error" role="alert">{error}</p>}
   <section className="tutor-import-section">
-   <h2><button className="tutor-import-toggle" type="button" aria-expanded={openPanel==='add'} aria-controls="tutor-add-panel" onClick={()=>setOpenPanel(openPanel==='add'?null:'add')}><span>Add a presentation</span><Icon name={openPanel==='add'?'chevronUp':'chevronDown'} size={20}/></button></h2>
-   {openPanel==='add'&&<div className="tutor-import" id="tutor-add-panel">
-    <div className="presentation-upload"><span>Original PDF, PPT or PPTX</span><label className={'file-button'+(busy?' disabled':'')}><input className="visually-hidden" aria-label="Choose presentation or Pummy project" type="file" accept=".pdf,.ppt,.pptx,.pummy,.json" disabled={busy} onChange={e=>{const f=e.target.files[0];e.target.value='';if(!f)return;if(/\.(pummy|json)$/i.test(f.name)){run(()=>importProject(f));return;}setOriginal(f);setPdf(null);setPrepared(null);setStage('');run(()=>prepareFile(f));}}/>Choose presentation or Pummy project</label><span className="fine presentation-filename">{original?.name||'PDF, PowerPoint, or an exported Pummy project'}</span></div>
-    <p className="fine">Open PDF, PPT and PPTX directly. Your original PowerPoint, speaker notes and embedded media are preserved. A companion PDF is optional for exact PowerPoint visuals.</p>
-    {stage&&!error&&<p className="fine" role="status">{stage}</p>}
-    {original&&/\.pptx?$/i.test(original.name)&&<details ><summary>Optional: use an exported slide PDF</summary><p className="fine">In PowerPoint, choose File → Export → PDF. Include every slide, including hidden slides, in its original order.</p><label className="file-button">Choose companion PDF<input className="visually-hidden" aria-label="Choose companion PDF" type="file" accept=".pdf" disabled={busy} onChange={e=>{setPdf(e.target.files[0]);setError('');}}/></label>{pdf&&<p className="fine" role="status">{pdf.name} ready to pair.</p>}</details>}
-    <label>Link to an existing professor source (optional)<select value={source} onChange={e=>setSource(e.target.value)}><option value="">Use this presentation as its own source</option>{state.sources.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-    <button className="primary" disabled={busy||!original} onClick={()=>run(importFile)}>{busy?stage||'Importing…':'Open Interactive Tutor'}</button>
-   </div>}
-  </section>
-  <section className="tutor-import-section">
    <h2><button className="tutor-import-toggle" type="button" aria-expanded={openPanel==='sources'} aria-controls="tutor-sources-panel" onClick={()=>setOpenPanel(openPanel==='sources'?null:'sources')}><span>Existing course sources</span><Icon name={openPanel==='sources'?'chevronUp':'chevronDown'} size={20}/></button></h2>
    {openPanel==='sources'&&<div className="tutor-import" id="tutor-sources-panel">
-    <label>Open an attached professor PDF or PowerPoint<select value={source} onChange={e=>{setSource(e.target.value);setSourcePdf(null);}}><option value="">Choose a course source</option>{state.sources.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+    <label>Open an attached professor PDF or PowerPoint<select value={source} onChange={e=>{setSource(e.target.value);setSourcePdf(null);}}><option value="">Choose a course source</option>{scopedSources.filter(s=>['pdf','ppt','pptx'].includes(s.originalFile?.kind)||s.hasPresentation).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
     {['ppt','pptx'].includes(selectedSource?.originalFile?.kind)&&<label className="file-button">Optional: use an exported slide PDF<input className="visually-hidden" aria-label="Choose exported PDF for attached PowerPoint" type="file" accept=".pdf,application/pdf" disabled={busy} onChange={e=>setSourcePdf(e.target.files[0])}/></label>}
     {sourcePdf&&<p className="fine">{sourcePdf.name} ready to pair with the original PowerPoint.</p>}
     <button className="secondary" disabled={!source||busy} onClick={()=>run(openCourseSource)}>Open existing presentation</button>
     <p className="fine">Attached PDF, PPT and PPTX files open directly. Add an exported PDF only if you need PowerPoint’s exact slide rendering.</p>
    </div>}
   </section>
+  <section className="tutor-import-section">
+   <h2><button className="tutor-import-toggle" type="button" aria-expanded={openPanel==='add'} aria-controls="tutor-add-panel" onClick={()=>setOpenPanel(openPanel==='add'?null:'add')}><span>Add a presentation</span><Icon name={openPanel==='add'?'chevronUp':'chevronDown'} size={20}/></button></h2>
+   {openPanel==='add'&&<div className="tutor-import" id="tutor-add-panel">
+    <div className="presentation-upload"><span>Original PDF, PPT or PPTX</span><label className={'file-button'+(busy?' disabled':'')}><input className="visually-hidden" aria-label="Choose presentation or Pummy project" type="file" accept=".pdf,.ppt,.pptx,.pummy,.json" disabled={busy} onChange={e=>{const f=e.target.files[0];e.target.value='';if(!f)return;if(/\.(pummy|json)$/i.test(f.name)){run(()=>importProject(f));return;}setOriginal(f);setPdf(null);setPrepared(null);setStage('');run(()=>prepareFile(f));}}/>Choose presentation or Pummy project</label><span className="fine presentation-filename">{original?.name||'PDF, PowerPoint, or an exported Pummy project'}</span></div>
+    <p className="fine">Open PDF, PPT and PPTX directly. Your original PowerPoint, speaker notes and embedded media are preserved. A companion PDF is optional for exact PowerPoint visuals.</p>
+    {stage&&!error&&<p className="fine" role="status">{stage}</p>}
+    {original&&/\.pptx?$/i.test(original.name)&&<details ><summary>Optional: use an exported slide PDF</summary><p className="fine">In PowerPoint, choose File → Export → PDF. Include every slide, including hidden slides, in its original order.</p><label className="file-button">Choose companion PDF<input className="visually-hidden" aria-label="Choose companion PDF" type="file" accept=".pdf" disabled={busy} onChange={e=>{setPdf(e.target.files[0]);setError('');}}/></label>{pdf&&<p className="fine" role="status">{pdf.name} ready to pair.</p>}</details>}
+    <label>Link to an existing professor source (optional)<select value={source} onChange={e=>setSource(e.target.value)}><option value="">Use this presentation as its own source</option>{scopedSources.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+    <button className="primary" disabled={busy||!original} onClick={()=>run(importFile)}>{busy?stage||'Importing…':'Open Interactive Tutor'}</button>
+   </div>}
+  </section>
   <h2>Saved presentations</h2>
-  {list.map(p=><button className="tutor-presentation" key={p.id} disabled={busy} onClick={()=>run(()=>open(p.id))}><b>{p.name}</b><span>{p.slideCount} slides · {p.kind.toUpperCase()} · version {p.revision}</span></button>)}
-  {!list.length&&<p className="fine">Your original course sources and exam progress remain available in Course & sources.</p>}
+  {visiblePresentations.map(p=><button className="tutor-presentation" key={p.id} disabled={busy} onClick={()=>run(()=>open(p.id))}><b>{p.name}</b><span>{p.slideCount} slides · {p.kind.toUpperCase()} · version {p.revision}</span></button>)}
+  {!visiblePresentations.length&&<p className="fine">Your original course sources and exam progress remain available in Course & sources.</p>}
  </div>;
 }
 function Thumbnail({p,s,active,onClick}){const ref=useRef(null),[image,setImage]=useState('');useEffect(()=>{let alive=true;const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){observer.disconnect();renderSlide(call,p,s.page,220).then(image=>{if(alive)setImage(image);}).catch(()=>{});}});observer.observe(ref.current);return()=>{alive=false;observer.disconnect();};},[p.id,s.id]);return <button ref={ref} className={'tutor-thumbnail'+(active?' active':'')} onClick={onClick} aria-label={`Slide ${s.page}`} aria-current={active?'page':undefined}>{image?<img loading="lazy" src={image} alt={`Original slide ${s.page}`} style={{aspectRatio:`${s.width} / ${s.height}`}}/>:<div className="thumb-placeholder" style={{aspectRatio:`${s.width} / ${s.height}`}}/>}<span>{s.page}</span></button>;}

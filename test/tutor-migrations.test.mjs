@@ -10,13 +10,14 @@ import {LocalD1} from '../scripts/local-db.mjs';
 
 test('Drizzle discovers the additive tutor migration with the durable request uniqueness constraint',()=>{
  const migrations=readMigrationFiles({migrationsFolder:fileURLToPath(new URL('../drizzle',import.meta.url))});
- assert.equal(migrations.length,6);
+ assert.equal(migrations.length,7);
  const sql=migrations[1].sql.join('\n');
  assert.equal((sql.match(/CREATE TABLE IF NOT EXISTS/g)||[]).length,6);
  assert.match(migrations[2].sql.join('\n'),/CREATE TABLE `tutor_conversions`/);
  assert.match(migrations[3].sql.join('\n'),/ALTER TABLE `tutor_assets` ADD `storage` text DEFAULT 'd1' NOT NULL/);
  assert.match(migrations[4].sql.join('\n'),/CREATE TABLE `course_deletions`/);
  assert.match(migrations[5].sql.join('\n'),/CREATE TABLE `course_source_content`/);
+ assert.match(migrations[6].sql.join('\n'),/CREATE TABLE `practice_banks`/);
  assert.match(sql,/CREATE UNIQUE INDEX IF NOT EXISTS `tutor_revisions_request_unique`/);
  assert.doesNotMatch(sql,/DROP|DELETE|ALTER TABLE `courses`/i);
 });
@@ -32,5 +33,5 @@ test('upgrading and reopening an existing local database preserves course snapsh
  await assert.rejects(db.prepare('INSERT INTO tutor_revisions(user_id,course_id,presentation_id,revision,request_id,patch,created_at) VALUES(?,?,?,?,?,?,?)').bind('student','course','presentation',3,'receipt','{}',457).run(),/UNIQUE/);db.close();
  reopened=new LocalD1(path);assert.deepEqual(await reopened.prepare('SELECT * FROM courses').first(),before);
  assert.equal((await reopened.prepare('SELECT count(*) AS count FROM tutor_revisions').first()).count,1);
- assert.equal((await reopened.prepare('SELECT count(*) AS count FROM pummy_migrations').first()).count,6);
+ assert.equal((await reopened.prepare('SELECT count(*) AS count FROM pummy_migrations').first()).count,7);
 });

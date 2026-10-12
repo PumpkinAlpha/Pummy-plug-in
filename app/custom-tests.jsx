@@ -1,11 +1,12 @@
+import {questionsInFolder} from './folders.js';
 import React,{useState} from 'react';
 import {navigateTabs} from './tabs.js';
 import {blankQuestion,parseCustomTestText,validateCustomQuestion} from './custom-test-parser.js';
 import {CUSTOM_SELECTION_LIMIT,customSelectionSettings} from './exam-settings.js';
 
-export function CustomTests({state,busy,resume,onStart,onSaveDrafts,onSaveExisting}){
+export function CustomTests({state,folderScope,busy,resume,onStart,onSaveDrafts,onSaveExisting}){
  const [mode,setMode]=useState('write'),[name,setName]=useState(''),[drafts,setDrafts]=useState([blankQuestion()]),[paste,setPaste]=useState(''),[selected,setSelected]=useState([]),[editingId,setEditingId]=useState(null),[error,setError]=useState(''),[notice,setNotice]=useState(''),[importing,setImporting]=useState(false),[search,setSearch]=useState('');
- const bank=state.questionIndex||[];
+ const bank=folderScope?questionsInFolder(state,folderScope):state.questionIndex||[];
  const selectionLimit=Math.min(CUSTOM_SELECTION_LIMIT,bank.length),examSize=customSelectionSettings(state,editingId,selected).size;
  const update=(id,change)=>setDrafts(current=>current.map(question=>question.id===id?{...question,...change}:question));
  const addImported=text=>{try{const questions=parseCustomTestText(text),existing=drafts.filter(q=>q.stem.trim()||q.options.some(option=>option.trim())||q.explanation.trim());if(existing.length+questions.length>100)throw new Error('A custom test can contain up to 100 authored questions. Remove a question before importing more.');setDrafts([...existing,...questions]);setMode('write');setError('');setNotice(`${questions.length} question${questions.length===1?'':'s'} loaded. Review the choices and answers, then save.`);return true;}catch(e){setError(e.message);return false;}};

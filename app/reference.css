@@ -620,3 +620,15 @@ html[data-theme=light] .choice.correct,.choice.correct{background:color-mix(in s
 .local-folder-sync{padding:20px;margin:18px 0;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
 .local-folder-sync .source-upload-queue label{display:flex;gap:10px;align-items:center;overflow-wrap:anywhere}
 .local-folder-sync .source-upload-queue{max-height:360px;overflow:auto}
+
+/* Folder workspaces and archived practice sets share the active theme. */
+.folder-widgets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:28px}
+.folder-widget{display:grid;grid-template-columns:1fr auto;gap:12px;padding:22px;text-align:left;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:14px;min-height:150px}
+.folder-widget>svg:first-child{color:var(--accent)}.folder-widget strong{grid-column:1;font-size:1.05rem}.folder-widget span{grid-column:1;color:var(--muted);font-size:.9rem;line-height:1.5}.folder-widget>svg:last-child{grid-column:2;grid-row:2}
+.folder-widget:hover{border-color:var(--accent);background:var(--raised)}.folder-widget:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.context-pop{max-height:min(70dvh,600px);overflow-y:auto}.context-pop button[aria-current=page]{background:var(--raised);color:var(--accent)}
+.practice-bank-list{display:grid;gap:12px}.practice-bank-entry{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:18px;display:flex;justify-content:space-between;align-items:center;gap:18px}.practice-bank-entry h3{margin:0;overflow-wrap:anywhere}.practice-bank-entry .actions{flex-wrap:wrap}.practice-bank-editor{margin:24px 0;padding:20px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}.bank-question-fields{border:0;padding:0;min-width:0;display:grid;gap:16px}.bank-question-fields>label{display:grid;gap:7px}.bank-question-fields fieldset{border:1px solid var(--line);border-radius:10px;min-width:0;display:grid;gap:10px;padding:16px}.bank-question-fields fieldset label{display:grid;gap:6px}.bank-pair{display:grid;grid-template-columns:1fr 1fr;gap:14px}.bank-diagram{max-width:100%;max-height:400px;object-fit:contain}.bank-question-list{display:grid;gap:8px}.exam-history>h2{margin-top:30px}.practice-bank-editor>.actions{justify-content:space-between}.tutor-library .tutor-presentation{background:var(--panel);color:var(--ink);border:1px solid var(--line);text-align:left}.tutor-library .tutor-presentation:hover{background:var(--raised);border-color:var(--accent)}
+@media(max-width:1000px){.folder-widgets{grid-template-columns:repeat(2,minmax(0,1fr))}.practice-bank-entry{align-items:stretch;flex-direction:column}}
+@media(max-width:560px){.folder-widgets{grid-template-columns:1fr;gap:10px}.folder-widget{min-height:110px;padding:18px}.bank-pair{grid-template-columns:1fr}.practice-bank-editor{padding:12px}.bank-question-fields .custom-choice{grid-template-columns:24px minmax(0,1fr)}}
+
+.practice-bank-editor>.actions{flex-wrap:wrap}.practice-bank-editor h2{min-width:0;flex:1;overflow-wrap:anywhere;font-size:1.3rem}.practice-bank-entry>div{min-width:0}
