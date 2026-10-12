@@ -616,3 +616,7 @@ html[data-theme=light] .choice.correct,.choice.correct{background:color-mix(in s
 .tutor-import details .file-button{display:inline-flex}
 .context-pop,.course-options-menu{max-height:min(70dvh,480px);overflow:auto}
 @media(max-width:650px){.library-home .course-facts{gap:6px;font-size:13px}.course-crumb{min-width:0}.topbar-left{flex:1}.topbar-left .brand span{display:none}.topbar-left .brand{flex:none}.topbar-content{gap:4px}}
+
+.local-folder-sync{padding:20px;margin:18px 0;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.local-folder-sync .source-upload-queue label{display:flex;gap:10px;align-items:center;overflow-wrap:anywhere}
+.local-folder-sync .source-upload-queue{max-height:360px;overflow:auto}

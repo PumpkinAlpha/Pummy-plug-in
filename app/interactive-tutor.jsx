@@ -23,7 +23,7 @@ export function InteractiveTutor({state,onSource,onFolderChange,presentationId=n
  useEffect(()=>{if(!presentationId){setP(null);refresh().catch(e=>setError(e.message));}else if(p?.id!==presentationId)run(()=>open(presentationId,{navigate:false}));},[presentationId]);
  useEffect(()=>{if(p||!navigationGuard)return;const guard=async()=>{if(busy)throw new Error('Wait for the presentation import to finish before going back.');};navigationGuard.current=guard;return()=>{if(navigationGuard.current===guard)navigationGuard.current=null;};},[p,busy]);
  async function prepareFile(file){
-  setStage('Uploading presentation…');const originalAssetId=await uploadPresentationFile(call,state.courseId,file);
+  setStage('Uploading presentation…');const originalAssetId=await uploadPresentationFile(call,state.courseId,file,{onProgress:({completed,total})=>{if(mounted.current)setStage('Uploading presentation… '+Math.round(completed/total*100)+'% ('+completed+'/'+total+')');}});
   const pdfAssetId=file.name.toLowerCase().endsWith('.pdf')?originalAssetId:undefined;
   const result={file,originalAssetId,pdfAssetId};if(mounted.current){setPrepared(result);setStage(file.name.toLowerCase().endsWith('.pdf')?'PDF ready to open.':'PowerPoint ready to open directly.');}return result;
  }

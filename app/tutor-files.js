@@ -5,17 +5,23 @@ import {CHUNK_SIZE,encode64,decode64,pptxMetadata} from '../lib/tutor/presentati
 import {annotationSVG} from '../lib/tutor/annotations.js';
 import {isNativePowerPoint,nativeSlideImage,nativeTextAt} from './powerpoint.js';
 const assets=new Map(),uploads=new WeakMap();let documentCache=null;
-export async function uploadPresentationFile(call,courseId,file,{source=false}={}){
+export async function uploadPresentationFile(call,courseId,file,{source=false,onProgress=()=>{}}={}){
  if(!file||!file.size)throw new Error('Choose a nonempty file.');
  const extension=file.name.toLowerCase().split('.').at(-1),kind=(source?['pdf','ppt','pptx','docx','txt','md']:['pdf','ppt','pptx']).includes(extension)?extension:null;
  if(!kind)throw new Error(source?'Choose a PDF, PowerPoint, Word, TXT or Markdown file.':'Choose a PDF, PPT or PPTX file.');
  let transfer=uploads.get(file)?.get(courseId);
- if(!transfer){transfer={assetId:crypto.randomUUID(),chunks:Math.ceil(file.size/(CHUNK_SIZE/4*3)),next:0};if(!uploads.has(file))uploads.set(file,new Map());uploads.get(file).set(courseId,transfer);}
+ if(!transfer){transfer={assetId:crypto.randomUUID(),chunks:Math.ceil(file.size/(CHUNK_SIZE/4*3)),done:new Set()};if(!uploads.has(file))uploads.set(file,new Map());uploads.get(file).set(courseId,transfer);}
  await call('begin_presentation_upload',{courseId,assetId:transfer.assetId,name:file.name,kind,bytes:file.size,chunks:transfer.chunks});
- for(let index=transfer.next;index<transfer.chunks;index++){await call('upload_presentation_chunk',{courseId,assetId:transfer.assetId,index,data:encode64(new Uint8Array(await (file.slice?file.slice(index*CHUNK_SIZE/4*3,(index+1)*CHUNK_SIZE/4*3).arrayBuffer():file.arrayBuffer().then(buffer=>buffer.slice(index*CHUNK_SIZE/4*3,(index+1)*CHUNK_SIZE/4*3)))))});transfer.next=index+1;}
+ const remaining=Array.from({length:transfer.chunks},(_,i)=>i).filter(i=>!transfer.done.has(i));let cursor=0,failure;
+ const progress=()=>onProgress({completed:transfer.done.size,total:transfer.chunks,bytes:Math.min(file.size,transfer.done.size*CHUNK_SIZE/4*3),totalBytes:file.size});progress();
+ await Promise.all(Array.from({length:Math.min(3,remaining.length)},async()=>{while(!failure&&cursor<remaining.length){const index=remaining[cursor++];try{const start=index*CHUNK_SIZE/4*3,end=(index+1)*CHUNK_SIZE/4*3,buffer=file.slice?await file.slice(start,end).arrayBuffer():(await file.arrayBuffer()).slice(start,end);const args={courseId,assetId:transfer.assetId,index,data:encode64(new Uint8Array(buffer))};
+  for(let retry=0;;retry++){try{await call('upload_presentation_chunk',args);break;}catch(e){if(retry>=2||!/timeout|timed out|network|fetch|temporar|storage|interrupted|unavailable|502|503|504|10001/i.test(e.message))throw e;await new Promise(r=>setTimeout(r,250*(retry+1)));}}
+  transfer.done.add(index);progress();}catch(e){failure=e;}}}));if(failure)throw failure;
+
  return transfer.assetId;
 }
-export async function loadAsset(call,courseId,asset){const key=courseId+':'+asset.id;if(assets.has(key))return assets.get(key);const parts=[];for(let index=0;index<asset.chunks;index++)parts.push(decode64((await call('read_presentation_chunk',{courseId,assetId:asset.id,index})).asset.data));const bytes=new Uint8Array(parts.reduce((n,c)=>n+c.length,0));let offset=0;for(const part of parts){bytes.set(part,offset);offset+=part.length;}if(assets.size>=3)assets.delete(assets.keys().next().value);assets.set(key,bytes);return bytes;}
+export async function loadAsset(call,courseId,asset){const key=courseId+':'+asset.id;if(assets.has(key))return assets.get(key);const pending=(async()=>{const parts=new Array(asset.chunks);let cursor=0;await Promise.all(Array.from({length:Math.min(3,asset.chunks)},async()=>{while(cursor<asset.chunks){const index=cursor++;parts[index]=decode64((await call('read_presentation_chunk',{courseId,assetId:asset.id,index})).asset.data);}}));const bytes=new Uint8Array(parts.reduce((n,c)=>n+c.length,0));let offset=0;for(const part of parts){bytes.set(part,offset);offset+=part.length;}return bytes;})();if(assets.size>=3)assets.delete(assets.keys().next().value);assets.set(key,pending);try{return await pending;}catch(e){if(assets.get(key)===pending)assets.delete(key);throw e;}}
+
 export async function renderSlide(call,presentation,page,width=1500){
  if(isNativePowerPoint(presentation))return nativeSlideImage(call,presentation,page,width,loadAsset);
  const key=presentation.courseId+':'+presentation.pdfAssetId;

@@ -37,7 +37,7 @@ export function SourceFileForm({state,folder,busy,call,run,onSaved,existingSourc
  {extracting&&<p role="status">Reading source text…</p>}{error&&<p role="alert">{error}</p>}
  {entries.length>0&&<ul className="source-upload-queue" aria-label="Selected files">{entries.map(entry=><li key={entry.id}>
  <button type="button" className="quiet" aria-pressed={selected===entry.id} onClick={()=>setSelected(entry.id)}>{entry.raw.name}</button>
- <span role="status">{({reading:'Reading…',ready:'Ready to import',saving:'Uploading…',saved:'Imported',failed:'Upload failed',unreadable:'Could not read'})[entry.status]}</span>
+ <span role="status">{({reading:'Reading…',ready:'Ready to import',saving:entry.progress===100?'Validating original…':'Uploading… '+(entry.progress||0)+'%',saved:'Imported',failed:'Upload failed',unreadable:'Could not read'})[entry.status]}</span>
  {entry.error&&<p role="alert">{entry.error}</p>}{!busy&&!extracting&&entry.status!=='saved'&&<button type="button" className="quiet" aria-label={'Remove '+entry.raw.name} onClick={()=>remove(entry.id)}>Remove</button>}
  </li>)}</ul>}
  {file&&<><label>Source title<input value={file.name} maxLength={300} disabled={editingDisabled} onChange={e=>update({name:e.target.value})}/></label>

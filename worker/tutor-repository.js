@@ -1,4 +1,4 @@
-import {decode64} from '../lib/tutor/presentations.js';
+import {CHUNK_SIZE,decode64} from '../lib/tutor/presentations.js';
 import {retryStorage} from './storage-retry.js';
 const conflict=()=>Object.assign(new Error('Annotations changed in another window. Your local changes are kept. Reload before saving.'),{code:'conflict'});
 export class TutorRepository {
@@ -49,6 +49,7 @@ export class TutorRepository {
   if(!object)throw new Error('Upload is incomplete. Retry the file upload.');
   return object.text();
  }
+ async assetBytes(courseId,id){const a=await this.asset(courseId,id),bytes=new Uint8Array(a.bytes);let cursor=0;await Promise.all(Array.from({length:Math.min(3,a.chunks)},async()=>{while(cursor<a.chunks){const index=cursor++,part=decode64(await this.chunkData(courseId,a,index)),offset=index*CHUNK_SIZE/4*3;if(part.length!==Math.min(CHUNK_SIZE/4*3,a.bytes-offset))throw new Error('Original source upload has a size mismatch.');bytes.set(part,offset);}}));return bytes;}
  async assetData(courseId,id){const a=await this.asset(courseId,id),parts=[];for(let index=0;index<a.chunks;index++)parts.push(await this.chunkData(courseId,a,index));return parts.join('');}
  async validateAsset(courseId,id){
   const a=await this.asset(courseId,id);let decoded=0;

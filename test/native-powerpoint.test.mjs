@@ -9,6 +9,7 @@ import {legacyPptSlides} from '../lib/tutor/legacy-ppt.js';
 import {nativeDeck,checkPowerPointExpansion} from '../app/powerpoint.js';
 import {fixtureLegacyPPT} from './source-fixtures.mjs';
 import {nativePPTX} from './native-fixtures.mjs';
+import {extractSourceFile} from '../app/source-files.js';
 import {zipSync,unzipSync,strFromU8} from 'fflate';
 for(const kind of ['ppt','pptx'])test(`original ${kind} opens without a PDF or converter and survives export/reimport`,async t=>{
  const db=new LocalD1();t.after(()=>db.close());let conversionCalls=0;const repo=new CourseRepository(db,'native-'+kind,{fetch(){conversionCalls++;throw Error('Must not convert');}}),call=(n,a)=>executeTool(repo,n,a),{state}=await call('create_course',{requestId:crypto.randomUUID(),name:'Native deck'}),before=await repo.get(state.courseId),bytes=kind==='ppt'?fixtureLegacyPPT():nativePPTX(),assetId=await uploadPresentationFile(call,state.courseId,new File([bytes],'Lecture.'+kind)),args={courseId:state.courseId,presentationId:crypto.randomUUID(),originalAssetId:assetId};
@@ -26,3 +27,5 @@ test('legacy renderer follows the current revision for regular FAT storage witho
  const bytes=fixtureLegacyPPT({large:true}),before=bytes.slice(),view=legacyPptSlides(bytes,{rendererView:true}),deck=await parse(view);
  assert.deepEqual(bytes,before);assert.equal(deck.slides.length,2);assert.match(slideText(deck.slides[0]),/Second slide/);assert.match(slideText(deck.slides[1]),/Latest professor text/);assert.ok(!deck.slides.map(slideText).join(' ').includes('Stale'));deck.dispose?.();
 });
+
+test('visual-only PowerPoint imports retain originals and clearly mark missing searchable text',async()=>{const files=unzipSync(nativePPTX());for(const path of Object.keys(files))if(/^ppt\/slides\/slide.*\.xml$/.test(path))files[path]=new TextEncoder().encode(strFromU8(files[path]).replace(/<a:t>[^<]*<\/a:t>/g,'<a:t></a:t>'));const bytes=zipSync(files),file=new File([bytes],'Visual.pptx'),parsed=await extractSourceFile(file);assert.equal(parsed.originalFile,file);assert.equal(parsed.pages.length,2);assert.match(parsed.text,/Visual-only slide/);assert.ok(parsed.warnings.some(w=>w.includes('Image-only')));});

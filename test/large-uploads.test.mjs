@@ -30,7 +30,7 @@ test('32 MB source uploads stream small slices into object storage and preserve 
 test('object upload failures retry with the same ID and conflicting retries never overwrite originals',async t=>{
  const db=new LocalD1(),bucket=new Bucket();t.after(()=>db.close());const repo=new CourseRepository(db,'retry-owner',null,bucket),call=(n,a)=>executeTool(repo,n,a),{state}=await call('create_course',{requestId:crypto.randomUUID(),name:'Retries'}),file=new File(['Original text'],'original.txt');
  const put=bucket.put.bind(bucket);let fail=true;bucket.put=async(...args)=>{if(fail){fail=false;throw new Error('Storage interrupted');}return put(...args);};
- await assert.rejects(uploadPresentationFile(call,state.courseId,file,{source:true}),/interrupted/);const assetId=await uploadPresentationFile(call,state.courseId,file,{source:true});
+ const assetId=await uploadPresentationFile(call,state.courseId,file,{source:true});assert.equal(fail,false);
  const args={courseId:state.courseId,assetId,index:0,data:encode64(new TextEncoder().encode('Original text'))};bucket.objects.clear();await call('upload_presentation_chunk',args);assert.equal(bucket.objects.size,1);
  await assert.rejects(call('upload_presentation_chunk',{...args,data:encode64(new TextEncoder().encode('Replaced text'))}),/cannot be overwritten/);
  const fresh=(await call('read_course_state',{courseId:state.courseId})).state;await call('attach_source_original',{courseId:state.courseId,revision:fresh.revision,sourceId:'missing',assetId}).then(()=>assert.fail('Missing sources must fail'),e=>assert.match(e.message,/not found/));

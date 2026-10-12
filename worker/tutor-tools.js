@@ -55,7 +55,7 @@ export async function executeTutor(courseRepo,name,args,append){
   const receipt=()=>repo.query('SELECT pdf_asset_id FROM tutor_conversions WHERE user_id=? AND course_id=? AND original_asset_id=?',args.courseId,original.id).first();
   const existing=await receipt();if(existing)return {asset:await repo.asset(args.courseId,existing.pdf_asset_id)};
   if(original.bytes>MAX_CONVERSION_BYTES)throw new Error('Automatic conversion supports PowerPoint files up to 16 MB. Use a companion PDF for this presentation.');
-  const bytes=decode64(await repo.assetData(args.courseId,original.id));if(bytes.length!==original.bytes)throw new Error('PowerPoint upload size mismatch.');
+  const bytes=await repo.assetBytes(args.courseId,original.id);if(bytes.length!==original.bytes)throw new Error('PowerPoint upload size mismatch.');
   const meta=original.kind==='pptx'?pptxMetadata(bytes):legacyPptSlides(bytes);
   const pdf=await convertBytes(courseRepo.converter,original.kind,bytes),rendered=await pdfMetadata(pdf);
   if(original.kind==='pptx')pairedMetadata(meta,rendered);else if(meta.length!==rendered.slides.length)throw new Error('The generated PDF does not contain every slide.');
@@ -79,10 +79,10 @@ export async function executeTutor(courseRepo,name,args,append){
   let metadata;
   if(pdf){
    if(pdf.kind!=='pdf')throw new Error('The companion visual file must be a PDF.');
-   const pdfBytes=decode64(await repo.assetData(args.courseId,pdf.id));if(pdfBytes.length!==pdf.bytes)throw new Error('PDF upload size mismatch.');metadata=await pdfMetadata(pdfBytes);
+   const pdfBytes=await repo.assetBytes(args.courseId,pdf.id);if(pdfBytes.length!==pdf.bytes)throw new Error('PDF upload size mismatch.');metadata=await pdfMetadata(pdfBytes);
   }
   if(['ppt','pptx'].includes(original.kind)){
-   const bytes=decode64(await repo.assetData(args.courseId,original.id));if(bytes.length!==original.bytes)throw new Error('PowerPoint upload size mismatch.');
+   const bytes=await repo.assetBytes(args.courseId,original.id);if(bytes.length!==original.bytes)throw new Error('PowerPoint upload size mismatch.');
    const native=original.kind==='pptx'?pptxMetadata(bytes):legacyPptSlides(bytes,{metadata:true});
    if(!pdf)metadata=native;
    else if(original.kind==='pptx')metadata=pairedMetadata(native,metadata);
