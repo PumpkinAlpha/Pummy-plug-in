@@ -3,6 +3,7 @@ import {PDFDocument} from 'pdf-lib';
 import {zipSync,unzipSync,strToU8,strFromU8} from 'fflate';
 import {CHUNK_SIZE,encode64,decode64,pptxMetadata} from '../lib/tutor/presentations.js';
 import {annotationSVG} from '../lib/tutor/annotations.js';
+import {isNativePowerPoint,nativeSlideImage,nativeTextAt} from './powerpoint.js';
 const assets=new Map(),uploads=new WeakMap();let documentCache=null;
 export async function uploadPresentationFile(call,courseId,file,{source=false}={}){
  if(!file||!file.size)throw new Error('Choose a nonempty file.');
@@ -16,6 +17,7 @@ export async function uploadPresentationFile(call,courseId,file,{source=false}={
 }
 export async function loadAsset(call,courseId,asset){const key=courseId+':'+asset.id;if(assets.has(key))return assets.get(key);const parts=[];for(let index=0;index<asset.chunks;index++)parts.push(decode64((await call('read_presentation_chunk',{courseId,assetId:asset.id,index})).asset.data));const bytes=new Uint8Array(parts.reduce((n,c)=>n+c.length,0));let offset=0;for(const part of parts){bytes.set(part,offset);offset+=part.length;}if(assets.size>=3)assets.delete(assets.keys().next().value);assets.set(key,bytes);return bytes;}
 export async function renderSlide(call,presentation,page,width=1500){
+ if(isNativePowerPoint(presentation))return nativeSlideImage(call,presentation,page,width,loadAsset);
  const key=presentation.courseId+':'+presentation.pdfAssetId;
  if(documentCache?.key!==key){
   const old=documentCache,entry={key,promise:null};
@@ -31,6 +33,7 @@ export async function renderSlide(call,presentation,page,width=1500){
 // Finds the original slide text block (line or paragraph) at a normalized point, read from the
 // rendered PDF so it works for PDF and converted PowerPoint slides. The source file is never changed.
 export async function slideTextAt(call,presentation,page,px,py){
+ if(isNativePowerPoint(presentation))return nativeTextAt(call,presentation,page,px,py,loadAsset);
  await renderSlide(call,presentation,page,200);
  const doc=await documentCache.promise,pg=await doc.getPage(page),v=pg.getViewport({scale:1}),{items}=await pg.getTextContent();
  const runs=items.filter(t=>t.str&&t.str.trim()).map(t=>{const size=Math.hypot(t.transform[2],t.transform[3])||t.height||10,[x,base]=v.convertToViewportPoint(t.transform[4],t.transform[5]);return {str:t.str,x:x/v.width,y:(base-size*.9)/v.height,w:Math.max(t.width,1)/v.width,h:size*1.15/v.height,size:size/v.width,base:base/v.height};});
@@ -101,4 +104,4 @@ export async function exportEditablePPTX(call,p,annotations){if(p.kind!=='pptx')
  for(let i=0;i<ids.length;i++){const name='ppt/'+relMap.get(ids[i]).replace(/^\.\//,''),s=p.slides[i],objects=[...(annotations[s.id]||[])].sort((a,b)=>a.layer-b.layer);if(objects.some(a=>a.type==='image'))throw new Error('Image annotations currently require flattened PPTX export.');let source=strFromU8(files[name]);const last=Math.max(1,...[...source.matchAll(/<p:cNvPr\b[^>]*\bid="(\d+)"/g)].map(m=>Number(m[1])));const additions=objects.map((a,j)=>editableShape(a,last+j+1,Math.round(meta.width*12700),Math.round(meta.height*12700))).join('');if(!source.includes('</p:spTree>'))throw new Error('Unsupported PPTX namespace. Use flattened export.');files[name]=strToU8(source.replace('</p:spTree>',additions+'</p:spTree>'));}
  return zipSync(files);
 }
-export async function exportProject(call,p,annotations){const original=await loadAsset(call,p.courseId,p.assets.original),pdf=await loadAsset(call,p.courseId,p.assets.pdf);return JSON.stringify({format:'pummy-tutor-project',version:1,presentation:p,annotations,original:encode64(original),pdf:p.kind==='pdf'?null:encode64(pdf)});}
+export async function exportProject(call,p,annotations){const original=await loadAsset(call,p.courseId,p.assets.original),pdf=p.assets.pdf?await loadAsset(call,p.courseId,p.assets.pdf):null;return JSON.stringify({format:'pummy-tutor-project',version:1,presentation:p,annotations,original:encode64(original),pdf:p.kind==='pdf'||!pdf?null:encode64(pdf)});}

@@ -9,11 +9,11 @@ function packCourse(data){
   const content=sourceEntries(data),sources=(data.sources||[]).map(source=>{const {visualPdf,...metadata}=source;if(Array.isArray(metadata.pages))delete metadata.pages;return metadata;});
   const writeId=crypto.randomUUID(),json=JSON.stringify({...data,sources,texts:[],_sourceStorage:{version:1,writeId}});
   if(new TextEncoder().encode(json).length>900000)throw new Error('The saved questions and exam history exceed course capacity. Export progress and split the question bank into smaller courses. Source files are stored separately.');
-  return {json,writeId,content:[...content.values()]};
+    return {json,writeId,content:[...content.values()],assetIds:[...new Set((data.sources||[]).map(s=>s.originalFile?.id).filter(Boolean))]};
 }
 export class CourseRepository {
   constructor(db,userId,converter=null,assetStore=null,profile=null){this.db=db;this.userId=userId;this.converter=converter;this.assetStore=assetStore;this.profile=profile;}
-  async list(){const {results}=await this.db.prepare("SELECT id, name, revision, updated_at, data FROM courses WHERE user_id=? UNION ALL SELECT course_id AS id, name, revision, updated_at, '{}' AS data FROM course_deletions WHERE user_id=? ORDER BY updated_at DESC").bind(this.userId,this.userId).all();return results.map(({data,...row})=>{const saved=JSON.parse(data),concepts=saved.concepts||[],questions=saved.questions||[],sources=saved.sources||[];const weeks=new Set([...sources.map(s=>s.weekId),...questions.map(q=>q.weekId)].filter(Boolean));const lectures=new Set(sources.map(s=>s.lecture).filter(Boolean));const unassigned=lectures.size&&(sources.some(s=>!s.lecture)||questions.some(q=>!sources.some(s=>s.id===q.sourceId&&s.lecture)));return {...row,questionCount:questions.filter(q=>q.keyed&&!['followup','variant'].includes(q.origin)).length,sourceCount:sources.length,weekCount:weeks.size||(lectures.size+Number(!!unassigned))||(sources.length||questions.length?1:0),due:concepts.filter(isDue).length,learning:concepts.filter(c=>bucket(c)==='learning').length,retained:concepts.filter(c=>bucket(c)==='retained').length,professorCount:questions.filter(q=>q.keyed&&q.origin==='practice').length};});}
+  async list(){const {results}=await this.db.prepare("SELECT id, name, revision, updated_at, data FROM courses WHERE user_id=? UNION ALL SELECT course_id AS id, name, revision, updated_at, '{}' AS data FROM course_deletions WHERE user_id=? ORDER BY updated_at DESC").bind(this.userId,this.userId).all();return results.map(({data,...row})=>{const saved=JSON.parse(data),concepts=saved.concepts||[],questions=saved.questions||[],sources=(saved.sources||[]).filter(s=>!s.deletedAt);const weeks=new Set([...sources.map(s=>s.weekId),...questions.map(q=>q.weekId)].filter(Boolean));const lectures=new Set(sources.map(s=>s.lecture).filter(Boolean));const unassigned=lectures.size&&(sources.some(s=>!s.lecture)||questions.some(q=>!sources.some(s=>s.id===q.sourceId&&s.lecture)));return {...row,questionCount:questions.filter(q=>q.keyed&&!['followup','variant'].includes(q.origin)).length,sourceCount:sources.length,weekCount:weeks.size||(lectures.size+Number(!!unassigned))||(sources.length||questions.length?1:0),due:concepts.filter(isDue).length,learning:concepts.filter(c=>bucket(c)==='learning').length,retained:concepts.filter(c=>bucket(c)==='retained').length,professorCount:questions.filter(q=>q.keyed&&q.origin==='practice').length};});}
   async get(id){
     // Read the snapshot and its source rows together so a concurrent sync cannot
     // pair an older exam revision with newer source text.
@@ -70,7 +70,7 @@ export class CourseRepository {
     if(result.meta.changes!==1)throw Object.assign(new Error('Your course changed. Refresh and retry.'),{code:'conflict'});
     return revision;
   }
-  contentWrites(id,{writeId,content},expectedData){
+  contentWrites(id,{writeId,content,assetIds},expectedData){
     // Only the winning snapshot write may replace its source rows. The unique
     // token also protects receipt writes that intentionally retain the revision.
     const current="EXISTS(SELECT 1 FROM courses WHERE user_id=? AND id=? AND json_extract(data,'$._sourceStorage.writeId')=?)";
@@ -78,6 +78,8 @@ export class CourseRepository {
     if(!hasPrevious)statements.push(this.db.prepare(`DELETE FROM course_source_content WHERE user_id=? AND course_id=? AND ${current}`).bind(this.userId,id,this.userId,id,writeId));
     for(const sourceId of previous.keys())if(!nextIds.has(sourceId))statements.push(this.db.prepare(`DELETE FROM course_source_content WHERE user_id=? AND course_id=? AND source_id=? AND ${current}`).bind(this.userId,id,sourceId,this.userId,id,writeId));
     for(const entry of content){const old=previous.get(entry.id);if(old&&old.text===entry.text&&old.pages===entry.pages&&old.visualPdf===entry.visualPdf&&old.position===entry.position)continue;statements.push(this.db.prepare(`INSERT INTO course_source_content(user_id,course_id,source_id,text,pages,visual_pdf,position) SELECT ?,?,?,?,?,?,? WHERE ${current} ON CONFLICT(user_id,course_id,source_id) DO UPDATE SET text=excluded.text,pages=excluded.pages,visual_pdf=excluded.visual_pdf,position=excluded.position`).bind(this.userId,id,entry.id,entry.text,entry.pages,entry.visualPdf??null,entry.position,this.userId,id,writeId));}
+    // Original files become readable only when the matching course write wins.
+    for(const assetId of assetIds)statements.push(this.db.prepare(`UPDATE tutor_assets SET ready=1 WHERE user_id=? AND course_id=? AND id=? AND ready=0 AND ${current}`).bind(this.userId,id,assetId,this.userId,id,writeId));
     return statements;
   }
 }

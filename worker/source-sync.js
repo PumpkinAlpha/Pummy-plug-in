@@ -33,7 +33,7 @@ export async function syncSources(repo,saved,model,args,view,refresh){
   const rank=src.rank??old?.rank??DEFAULT_RANKS[src.sourceType||'other'];
   const {text,metadata:meta,originalAssetId,...info}=src;
   let originalFile=old?.originalFile;
-  if(originalAssetId){const files=new TutorRepository(repo),a=await files.validateAsset(model.id,originalAssetId);originalFile={id:a.id,name:a.name,kind:a.kind,chunks:a.chunks,bytes:a.bytes};await files.query('UPDATE tutor_assets SET ready=1 WHERE user_id=? AND course_id=? AND id=?',model.id,a.id).run();}
+  if(originalAssetId){const files=new TutorRepository(repo),a=await files.validateAsset(model.id,originalAssetId);originalFile={id:a.id,name:a.name,kind:a.kind,chunks:a.chunks,bytes:a.bytes};}
   const next={...old,...info,...(originalFile?{originalFile}:{}),id:src.id,name:src.name,rank,sourceType:src.sourceType||old?.sourceType||'other',kind:'material',contentHash,metadata:{...semanticMetadata(old?.metadata),...semanticMetadata(meta)}};
   // Omitted metadata/pages retain the stored value; clients explicitly resend changed pages.
   if(src.pages===undefined&&old?.pages){if(oldText===text)next.pages=old.pages;else delete next.pages;}

@@ -17,6 +17,7 @@ const sections=[
   ['Add and organize sources','Course & sources shows one subfolder at a time. Add a source excerpt, import a question file into that subfolder, and edit each source’s type, priority, or folder. Professor slides, objectives, quizzes, and other materials can have different priorities.'],
   ['ChatGPT Project files','Linking a Project records its name and URL. To sync its files, open Pummy inside a chat in that Project and choose Sync Project Sources. A saved Project link by itself does not give Pummy access to those files.'],
   ['Create questions','Full coverage asks for questions across selected material; Based on your gaps uses missed or unmastered concepts; Custom uses your exact count. Difficulty changes the style of the request. Model and effort dropdowns are preferences sent to ChatGPT; set the actual model and effort in ChatGPT before generating.'],
+  ['Interactive Tutor','Open original PDF, PPT or PPTX slides directly. Add editable annotations, export a project, or download the unchanged original. PowerPoint study views are static; an optional PDF exported by PowerPoint supplies exact visuals.'],
   ['Import a bank','You can import a Pummy JSON backup, TXT, Word (.docx), or text PDF question file. Review extracted questions before saving. Scanned PDFs need readable text or a separate text version.']
  ]},
  {id:'exams',title:'Exams and custom tests',items:[

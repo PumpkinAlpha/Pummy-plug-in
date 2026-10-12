@@ -1,6 +1,8 @@
 import {createServer} from 'node:http';
 import {Readable} from 'node:stream';
 import {timingSafeEqual} from 'node:crypto';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 import {createPresentationConverter} from './presentation-converter.mjs';
 const token=process.env.PRESENTATION_CONVERTER_TOKEN;
 if(!token||token.length<32)throw new Error('Set PRESENTATION_CONVERTER_TOKEN to a secret of at least 32 characters.');
@@ -10,9 +12,14 @@ if(!Number.isInteger(port)||port<1||port>65535)throw new Error('Invalid converte
 const server=createServer(async(req,res)=>{
  const received=Buffer.from(req.headers.authorization||'');
  if(received.length!==expected.length||!timingSafeEqual(received,expected)){res.writeHead(401);res.end('Authentication required.');return;}
+ if(req.url==='/health'&&req.method==='GET'){
+  try{await promisify(execFile)(process.env.PUMMY_SOFFICE||'soffice',['--version'],{timeout:5000,maxBuffer:10000});res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end('{"ok":true}');}
+  catch{res.writeHead(503);res.end('LibreOffice is unavailable.');}return;
+ }
  if(req.url!=='/convert'){res.writeHead(404);res.end('Not found');return;}
  try{const request=new Request('https://presentation-converter/convert',{method:req.method,headers:req.headers,...(req.method==='POST'?{body:Readable.toWeb(req),duplex:'half'}:{})});const response=await converter.fetch(request);res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));}
  catch{res.writeHead(500);res.end('Slide conversion failed.');}
 });
+server.requestTimeout=120000;server.headersTimeout=15000;
 server.listen(port,process.env.PUMMY_CONVERTER_HOST||'127.0.0.1',()=>console.log(`Pummy slide converter listening on port ${port}`));
 process.on('SIGTERM',()=>server.close(()=>process.exit(0)));

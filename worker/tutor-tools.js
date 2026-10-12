@@ -4,7 +4,7 @@ import {TutorRepository} from './tutor-repository.js';
 import {annotationList,regionSchema} from '../lib/tutor/annotations.js';
 import {CHUNK_SIZE,decode64,encode64,pdfMetadata,pptxMetadata,pairedMetadata} from '../lib/tutor/presentations.js';
 import {legacyPptSlides} from '../lib/tutor/legacy-ppt.js';
-import {convertBytes} from './presentation-converter.js';
+import {convertBytes,MAX_CONVERSION_BYTES} from './presentation-converter.js';
 import {PluginCourse} from './course.js';
 import {grounding,relevantObjectives} from './grounding.js';
 const id=z.string().min(1).max(180),uuid=z.string().uuid(),course={courseId:id},presentation={...course,presentationId:uuid},slide={...presentation,slideId:id};
@@ -14,7 +14,7 @@ export function tutorDefinitions(question){return [
  ['begin_presentation_upload','Begin immutable presentation upload',z.object({...course,assetId:uuid,name:z.string().min(1).max(300),kind:z.enum(['pdf','ppt','pptx','docx','txt','md']),bytes:z.number().int().positive(),chunks:z.number().int().positive()}),false,true],
  ['upload_presentation_chunk','Upload presentation file chunk',z.object({...course,assetId:uuid,index:z.number().int().min(0),data:z.string().min(4).max(CHUNK_SIZE).regex(/^[A-Za-z0-9+/]+={0,2}$/)}),false,true],
  ['convert_presentation','Generate and store a slide PDF from an uploaded PowerPoint',z.object({...course,assetId:uuid}),false,true],
- ['import_presentation','Import course presentation',z.object({...course,presentationId:uuid,originalAssetId:uuid,pdfAssetId:uuid,sourceId:id.optional()}),false,true],
+ ['import_presentation','Import original PDF, PPT or PPTX for direct viewing; an optional companion PDF can supply exact visuals',z.object({...course,presentationId:uuid,originalAssetId:uuid,pdfAssetId:uuid.optional(),sourceId:id.optional()}),false,true],
  ['import_course_presentation','Open an existing attached course PDF or PowerPoint',z.object({...course,presentationId:uuid,sourceId:id}),false,true],
  ['read_presentation','Read presentation and editable annotations',z.object(presentation),true,true],
  ['read_slide_context','Read professor slide context for answering in the conversation. Set explain=true for the "Explain the slide" trigger to also receive the slide explainer skill and surrounding lecture slides.',z.object({...slide,explain:z.boolean().default(false),query:z.string().max(4000).default(''),region:regionSchema.optional(),annotationIds:z.array(uuid).max(30).default([]),allowGeneral:z.boolean().default(false)}),true,false],
@@ -33,7 +33,7 @@ const sourceId=(p,page)=>slideMaterial(p,page).id;
 function stripVisual(r){const {visual,...rest}=r;return rest;}
 export async function executeTutor(courseRepo,name,args,append){
  const repo=new TutorRepository(courseRepo),saved=await repo.authorize(args.courseId);
- if(name==='list_presentations')return {presentations:await repo.list(args.courseId)};
+ if(name==='list_presentations')return {presentations:await repo.list(args.courseId),presentationCapabilities:{nativePowerPoint:true,automaticConversion:!!courseRepo.converter,maxConversionBytes:MAX_CONVERSION_BYTES}};
  if(name==='begin_presentation_upload'){
   if(args.chunks!==Math.ceil(Math.ceil(args.bytes/3)*4/CHUNK_SIZE))throw new Error('Invalid upload chunk count.');
   const {results}=await repo.query('SELECT id FROM tutor_assets WHERE user_id=? AND course_id=?',args.courseId).all();if(results.length>=100&&!results.some(a=>a.id===args.assetId))throw new Error('Use up to 100 presentation files per course.');
@@ -54,6 +54,7 @@ export async function executeTutor(courseRepo,name,args,append){
   const original=await repo.asset(args.courseId,args.assetId);if(!['ppt','pptx'].includes(original.kind))throw new Error('Choose a PPT or PPTX file to convert.');
   const receipt=()=>repo.query('SELECT pdf_asset_id FROM tutor_conversions WHERE user_id=? AND course_id=? AND original_asset_id=?',args.courseId,original.id).first();
   const existing=await receipt();if(existing)return {asset:await repo.asset(args.courseId,existing.pdf_asset_id)};
+  if(original.bytes>MAX_CONVERSION_BYTES)throw new Error('Automatic conversion supports PowerPoint files up to 16 MB. Use a companion PDF for this presentation.');
   const bytes=decode64(await repo.assetData(args.courseId,original.id));if(bytes.length!==original.bytes)throw new Error('PowerPoint upload size mismatch.');
   const meta=original.kind==='pptx'?pptxMetadata(bytes):legacyPptSlides(bytes);
   const pdf=await convertBytes(courseRepo.converter,original.kind,bytes),rendered=await pdfMetadata(pdf);
@@ -68,17 +69,27 @@ export async function executeTutor(courseRepo,name,args,append){
  if(name==='import_course_presentation'){
   const source=saved.data.sources.find(s=>s.id===args.sourceId),original=source?.originalFile;
   if(original?.kind==='pdf')return executeTutor(courseRepo,'import_presentation',{...args,originalAssetId:original.id,pdfAssetId:original.id},append);
-  if(['ppt','pptx'].includes(original?.kind)){const converted=await executeTutor(courseRepo,'convert_presentation',{courseId:args.courseId,assetId:original.id},append);return executeTutor(courseRepo,'import_presentation',{...args,originalAssetId:original.id,pdfAssetId:converted.asset.id},append);}
+  if(['ppt','pptx'].includes(original?.kind))return executeTutor(courseRepo,'import_presentation',{...args,originalAssetId:original.id},append);
   if(!source?.visualPdf)throw new Error('Attach the original PDF or PowerPoint to this course source first, or import a presentation file.');const data=source.visualPdf.split(',')[1],bytes=decode64(data),assetId=args.presentationId;await executeTutor(courseRepo,'begin_presentation_upload',{courseId:args.courseId,assetId,name:source.name.replace(/\.pdf$/i,'')+'.pdf',kind:'pdf',bytes:bytes.length,chunks:Math.ceil(data.length/CHUNK_SIZE)},append);for(let index=0;index<Math.ceil(data.length/CHUNK_SIZE);index++)await executeTutor(courseRepo,'upload_presentation_chunk',{courseId:args.courseId,assetId,index,data:data.slice(index*CHUNK_SIZE,(index+1)*CHUNK_SIZE)},append);return executeTutor(courseRepo,'import_presentation',{...args,originalAssetId:assetId,pdfAssetId:assetId},append);
  }
  if(name==='import_presentation'){
-  const existing=(await repo.list(args.courseId)).find(p=>p.id===args.presentationId);if(existing){const current=await repo.get(args.courseId,args.presentationId);if(current.originalAssetId!==args.originalAssetId||current.pdfAssetId!==args.pdfAssetId||(current.sourceId||null)!==(args.sourceId||null))throw new Error('Presentation ID is already in use.');return {presentation:await repo.create(args.courseId,args.presentationId,current)};}
-  const original=await repo.asset(args.courseId,args.originalAssetId),pdf=await repo.asset(args.courseId,args.pdfAssetId);
-  if(pdf.kind!=='pdf')throw new Error('A visual PDF is required. Generate the slide PDF before importing.');
-  const pdfBytes=decode64(await repo.assetData(args.courseId,pdf.id));if(pdfBytes.length!==pdf.bytes)throw new Error('PDF upload size mismatch.');let metadata=await pdfMetadata(pdfBytes);
-  if(['ppt','pptx'].includes(original.kind)){const bytes=decode64(await repo.assetData(args.courseId,original.id));if(bytes.length!==original.bytes)throw new Error('PowerPoint upload size mismatch.');if(original.kind==='pptx')metadata=pairedMetadata(pptxMetadata(bytes),metadata);else{const slides=legacyPptSlides(bytes);if(slides.length!==metadata.slides.length)throw new Error('The PDF must contain exactly the same slides in the same order.');metadata.slides=metadata.slides.map((s,i)=>({...s,text:slides[i].text||s.text,notes:''}));}}else if(original.kind!=='pdf'||original.id!==pdf.id)throw new Error('Use the original PDF as the visual file.');
+  const existing=(await repo.list(args.courseId)).find(p=>p.id===args.presentationId);if(existing){const current=await repo.get(args.courseId,args.presentationId);if(current.originalAssetId!==args.originalAssetId||current.pdfAssetId!==(args.pdfAssetId||(current.kind==='pdf'?args.originalAssetId:null))||(current.sourceId||null)!==(args.sourceId||null))throw new Error('Presentation ID is already in use.');return {presentation:await repo.create(args.courseId,args.presentationId,current)};}
+  const original=await repo.asset(args.courseId,args.originalAssetId),pdfId=args.pdfAssetId||(original.kind==='pdf'?original.id:null),pdf=pdfId?await repo.asset(args.courseId,pdfId):null;
+  if(!['pdf','ppt','pptx'].includes(original.kind))throw new Error('Choose an original PDF, PPT or PPTX.');
+  let metadata;
+  if(pdf){
+   if(pdf.kind!=='pdf')throw new Error('The companion visual file must be a PDF.');
+   const pdfBytes=decode64(await repo.assetData(args.courseId,pdf.id));if(pdfBytes.length!==pdf.bytes)throw new Error('PDF upload size mismatch.');metadata=await pdfMetadata(pdfBytes);
+  }
+  if(['ppt','pptx'].includes(original.kind)){
+   const bytes=decode64(await repo.assetData(args.courseId,original.id));if(bytes.length!==original.bytes)throw new Error('PowerPoint upload size mismatch.');
+   const native=original.kind==='pptx'?pptxMetadata(bytes):legacyPptSlides(bytes,{metadata:true});
+   if(!pdf)metadata=native;
+   else if(original.kind==='pptx')metadata=pairedMetadata(native,metadata);
+   else{if(native.slides.length!==metadata.slides.length)throw new Error('The PDF must contain exactly the same slides in the same order.');metadata.slides=metadata.slides.map((s,i)=>({...s,text:native.slides[i].text||s.text,notes:''}));}
+  }else if(original.id!==pdf.id)throw new Error('Use the original PDF as the visual file.');
   if(args.sourceId&&!saved.data.sources.some(s=>s.id===args.sourceId))throw new Error('Selected course source not found.');
-  const data={...metadata,id:args.presentationId,courseId:args.courseId,name:original.name,ownerId:courseRepo.userId,kind:original.kind,sourceId:args.sourceId||null,originalAssetId:original.id,pdfAssetId:pdf.id,assets:{original:{id:original.id,chunks:original.chunks,kind:original.kind},pdf:{id:pdf.id,chunks:pdf.chunks,kind:'pdf'}},createdAt:Date.now()};
+  const data={...metadata,id:args.presentationId,courseId:args.courseId,name:original.name,ownerId:courseRepo.userId,kind:original.kind,sourceId:args.sourceId||null,originalAssetId:original.id,pdfAssetId:pdf?.id||null,renderMode:pdf?'pdf':'powerpoint',assets:{original:{id:original.id,chunks:original.chunks,kind:original.kind},pdf:pdf?{id:pdf.id,chunks:pdf.chunks,kind:'pdf'}:null},createdAt:Date.now()};
   if(JSON.stringify(data).length>1400000)throw new Error('Slide text is too large. Split this presentation.');
   const result=await repo.create(args.courseId,args.presentationId,data);
   return {presentation:result};

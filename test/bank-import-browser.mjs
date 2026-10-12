@@ -22,7 +22,7 @@ try{
  const file={name:'Large backup.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({name:'Large backup',questions:Array.from({length:204},(_,i)=>({term:`Topic ${i}`,stem:`Question ${i}?`,options:['Yes','No'],answer:[0],page:null}))}))};
  const picker=page.locator('input[aria-label="Import question bank"]');await picker.setInputFiles(file);
  await page.getByText(/Lost import response.*Select the same JSON file again/).waitFor();assert.equal((await repo.list()).length,1);assert.equal((await repo.list())[0].questionCount,204);
- await picker.setInputFiles(file);await page.getByText('Imported 204 questions, sources and spaced-review progress.',{exact:false}).waitFor();assert.equal((await repo.list()).length,1);assert.equal((await repo.list())[0].questionCount,204);
+ await page.reload();await page.locator('input[aria-label="Import question bank"]').setInputFiles(file);await page.getByText('Imported 204 questions, sources and spaced-review progress.',{exact:false}).waitFor();assert.equal((await repo.list()).length,1);assert.equal((await repo.list())[0].questionCount,204);
  await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);
  await page.screenshot({path:fileURLToPath(new URL('restored-bank-mobile.png',directory)),fullPage:true});
  console.log('Bank browser checks passed: a 204-question JSON export with null page numbers imports, a lost second-batch response resumes without duplicate courses/questions, and the restored course fits a phone.');

@@ -52,8 +52,8 @@ try{
  await app.locator('.tutor-heading').hover();await app.getByRole('button',{name:'Back to previous page',exact:true}).click();
  // The library navigation stays accessible while the editor uses its own title bar.
  await page.mouse.move(1000,850);await app.locator('.tutor-library').evaluate(el=>{el.tabIndex=-1;el.focus();});
- await app.locator('.app-topbar').evaluate(async el=>{while(el.getBoundingClientRect().height!==10)await new Promise(r=>requestAnimationFrame(r));});
- await app.locator('.header-peek').hover();await app.getByRole('button',{name:'Display settings',exact:true}).waitFor();
+ assert.equal(await app.locator('.app-topbar').evaluate(el=>el.getBoundingClientRect().height),62);
+ await app.getByRole('button',{name:'Display settings',exact:true}).waitFor();
  await app.getByRole('button',{name:'Display settings',exact:true}).focus();assert.equal(await app.getByRole('button',{name:'Display settings',exact:true}).isVisible(),true);
  await app.getByRole('button',{name:'Display settings',exact:true}).click();
  let display=app.getByRole('dialog',{name:'Display & exam controls'});
@@ -68,7 +68,7 @@ try{
   await app.locator('.tutor-library').evaluate(el=>{el.tabIndex=-1;el.focus();});await page.mouse.move(1000,850);
   await page.waitForFunction(()=>{const frame=document.querySelector('iframe').contentDocument,el=frame.querySelector('.nav-item:not(.active)'),root=getComputedStyle(frame.documentElement);return getComputedStyle(el).backgroundColor===root.getPropertyValue('--raised').trim()||el.getAnimations().length===0;});
   await page.screenshot({path:join(directory,`theme-${theme}.png`)});
-  await app.locator('.header-peek').hover();await app.getByRole('button',{name:'Display settings',exact:true}).click();display=app.getByRole('dialog',{name:'Display & exam controls'});
+  await app.getByRole('button',{name:'Display settings',exact:true}).click();display=app.getByRole('dialog',{name:'Display & exam controls'});
  }
  await display.getByRole('combobox',{name:'ChatGPT profile',exact:true}).selectOption('switch');await display.getByText(/Switch accounts in ChatGPT/).waitFor();assert.equal(await display.getByRole('combobox',{name:'ChatGPT profile',exact:true}).locator('option').first().textContent(),'qa@example.test');await page.screenshot({path:join(directory,'connected-profile.png')});
  await display.getByRole('button',{name:'Close',exact:true}).click();await app.getByRole('button',{name:/Chat lecture.pptx/}).click();await app.locator('.tutor-canvas').evaluate(el=>{el.tabIndex=-1;el.focus();});await page.mouse.move(1000,850);
@@ -79,7 +79,7 @@ try{
  await app.getByRole('button',{name:'Home',exact:true}).click();await app.getByRole('button',{name:'Ask region',exact:true}).click();const canvas=await app.locator('.tutor-canvas').boundingBox();await page.mouse.move(canvas.x+canvas.width*.1,canvas.y+canvas.height*.1);await page.mouse.down();await page.mouse.move(canvas.x+canvas.width*.4,canvas.y+canvas.height*.4,{steps:8});await page.mouse.up();
  await page.waitForFunction(()=>contexts.at(-1)?.structuredContent?.interactiveTutor?.region?.w>.29);shared=await page.evaluate(()=>contexts.at(-1));assert.ok(shared.content.some(b=>b.type==='image'));await page.screenshot({path:join(directory,'conversation-slide-context.png'),fullPage:true});
  await app.locator('.explain-slide-fab').hover();await app.getByRole('combobox',{name:'Go to slide'}).selectOption('1');await page.waitForFunction(()=>contexts.at(-1)?.structuredContent?.interactiveTutor?.page===2&&contexts.at(-1)?.content?.some(b=>b.type==='image'));assert.equal((await page.evaluate(()=>contexts.at(-1))).structuredContent.interactiveTutor.region,null);
- await app.locator('.tutor-heading').hover();await app.getByRole('button',{name:'Back to previous page',exact:true}).click();await app.locator('.header-peek').hover();await app.getByRole('button',{name:'Adaptive exam',exact:true}).click();await page.waitForFunction(()=>contexts.some(c=>c.structuredContent?.interactiveTutor===null));
+ await app.locator('.tutor-heading').hover();await app.getByRole('button',{name:'Back to previous page',exact:true}).click();await app.getByRole('button',{name:'Adaptive exam',exact:true}).click();await page.waitForFunction(()=>contexts.some(c=>c.structuredContent?.interactiveTutor===null));
  assert.deepEqual(await page.evaluate(()=>displayRequests),[]);assert.equal(await page.evaluate(()=>handoffs.length),2);assert.equal((await executeTool(repo,'read_slide_tutor',{courseId:course.courseId,presentationId:presentation.id})).tutor.requests.length,0);assert.deepEqual(await repo.get(course.courseId),beforeChat);
 await page.reload();await app.getByRole('button',{name:'Open course',exact:true}).waitFor();assert.equal(await app.locator('html').getAttribute('data-theme'),'custom');assert.equal(await app.locator('html').evaluate(el=>el.style.getPropertyValue('--bg')),'#f5f1ff');assert.deepEqual(errors,[]);assert.deepEqual(await page.evaluate(()=>hostErrors),[]);console.log('Explanation browser checks passed: scoped buttons, depth settings, real MCP bridge handoffs, saved batch polling, button disappearance, hidden explanations until submission, safe any-key/Space/Enter continuation, and conversation slide text/notes/images/regions with no tutor request or exam mutation.');
 }catch(e){if(page){console.error(await page.locator('body').innerText());await page.screenshot({path:join(directory,'failure.png'),fullPage:true});}throw e;}finally{await browser?.close();await new Promise(resolve=>server.close(resolve));db.close();}

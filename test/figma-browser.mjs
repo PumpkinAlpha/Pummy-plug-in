@@ -7,13 +7,14 @@ import {LocalD1} from '../scripts/local-db.mjs';
 import {CourseRepository} from '../worker/repository.js';
 import {executeTool} from '../worker/tools.js';
 import {fixturePDF,fixturePPTX} from './tutor-fixtures.mjs';
+import {nativePPTX} from './native-fixtures.mjs';
 import {encode64,CHUNK_SIZE} from '../lib/tutor/presentations.js';
 import worker from '../dist/server/index.js';
 const directory=new URL('../work/figma-qa/',import.meta.url);await mkdir(directory,{recursive:true});
 const db=new LocalD1(),repo=new CourseRepository(db,'figma-qa',{fetch:async()=>new Response(await fixturePDF())}),call=(name,args)=>executeTool(repo,name,args);
 let {state}=await call('import_questions',{requestId:crypto.randomUUID(),name:'Figma integration preview',questions:[{stem:'Which number is even?',options:['One','Two'],answer:[1]}],sources:[{id:'lecture',name:'Anatomy lecture',text:'The jugular and subclavian veins unite.'}]});
 async function upload(bytes,kind){const data=encode64(bytes),assetId=crypto.randomUUID();await call('begin_presentation_upload',{courseId:state.courseId,assetId,name:'Anatomy lecture.'+kind,kind,bytes:bytes.length,chunks:Math.ceil(data.length/CHUNK_SIZE)});for(let index=0;index<Math.ceil(data.length/CHUNK_SIZE);index++)await call('upload_presentation_chunk',{courseId:state.courseId,assetId,index,data:data.slice(index*CHUNK_SIZE,(index+1)*CHUNK_SIZE)});return assetId;}
-const originalAssetId=await upload(fixturePPTX(),'pptx');state=(await call('attach_source_original',{courseId:state.courseId,revision:state.revision,sourceId:'lecture',assetId:originalAssetId})).state;
+const originalAssetId=await upload(nativePPTX(),'pptx');state=(await call('attach_source_original',{courseId:state.courseId,revision:state.revision,sourceId:'lecture',assetId:originalAssetId})).state;
 const p=(await call('import_course_presentation',{courseId:state.courseId,presentationId:crypto.randomUUID(),sourceId:'lecture'})).presentation,before=await repo.get(state.courseId);
 const host=`<!doctype html><style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style><iframe src="/"></iframe><script>
 window.handoffs=[];window.contexts=[];window.displayRequests=[];addEventListener('message',async e=>{const m=e.data;if(!m||m.jsonrpc!=='2.0'||m.id==null)return;try{let result={};if(m.method==='ui/initialize')result={protocolVersion:'2026-01-26',hostInfo:{name:'QA host',version:'1'},hostCapabilities:{serverTools:{},message:{text:{}},updateModelContext:{structuredContent:{}}},hostContext:{displayMode:'inline',availableDisplayModes:['inline','fullscreen']}};else if(m.method==='tools/call')result=await fetch('/api/tool',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(m.params)}).then(r=>r.json());else if(m.method==='ui/message')handoffs.push(m.params);else if(m.method==='ui/update-model-context')contexts.push(m.params);else if(m.method==='ui/request-display-mode')displayRequests.push(m.params);e.source.postMessage({jsonrpc:'2.0',id:m.id,result},'*');}catch(error){e.source.postMessage({jsonrpc:'2.0',id:m.id,error:{code:-32603,message:error.message}},'*');}});

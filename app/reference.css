@@ -601,28 +601,18 @@ html[data-theme=light] .choice.correct,.choice.correct{background:color-mix(in s
 .tutor-canvas:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media(pointer:coarse){.app-topbar.auto-hidden,.header-peek{height:28px;min-height:28px}.workspace.shell-course.tutor-workspace{grid-template-rows:28px minmax(calc(100dvh - 28px),auto)}.tutor-workspace.shell-course .app-sidebar{top:28px;height:calc(100dvh - 28px)}.tutor-workspace.shell-course .sidebar-scrim{inset:28px 0 0}}
 
-/* Revealed navigation occupies a row, so it cannot cover editor controls. */
-.workspace.shell-course.tutor-workspace{--tutor-header-height:18px;grid-template-rows:var(--tutor-header-height) minmax(calc(100dvh - var(--tutor-header-height)),auto)}
-.workspace.shell-course.tutor-workspace:has(.auto-hidden.is-revealed){--tutor-header-height:62px}
-.app-topbar.auto-hidden.is-revealed{height:62px;min-height:62px}
-.auto-hidden.is-revealed .topbar-content{position:relative}
-.auto-hidden.is-revealed .header-peek{display:none}
-.tutor-workspace.shell-course .app-sidebar{top:var(--tutor-header-height);height:calc(100dvh - var(--tutor-header-height))}
-.tutor-workspace.shell-course .sidebar-scrim{inset:var(--tutor-header-height) 0 0}
-@media(pointer:coarse){.workspace.shell-course.tutor-workspace{--tutor-header-height:28px}}
-.auto-hidden.is-revealed .header-peek{display:grid;position:absolute;top:0;left:calc(50% - 22px);z-index:1;width:44px;height:44px;min-height:44px;border:0;background:transparent}
-
-/* Auto-hide top bar: overlay reveal that never shifts the page */
-.app-topbar.auto-hidden,.app-topbar.auto-hidden.is-revealed{height:10px;min-height:10px;padding:0;position:sticky;top:0;z-index:40}
-.workspace.shell-course.tutor-workspace:has(.auto-hidden.is-revealed){--tutor-header-height:10px}
-.auto-hidden .topbar-content,.auto-hidden.is-revealed .topbar-content{position:absolute;inset:0 0 auto;min-height:62px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:16px;padding:0 16px 0 12px;background:var(--bg);border-bottom:1px solid var(--line)}
-.header-peek,.auto-hidden.is-revealed .header-peek{display:grid;position:absolute;inset:0 0 auto;width:100%;height:28px;min-height:28px;padding:0;border:0;border-radius:0;background:transparent;color:transparent;z-index:1;cursor:pointer}
-.header-peek:focus-visible{color:var(--muted);background:var(--raised);height:18px}
-.auto-hidden.is-revealed .header-peek{pointer-events:none}
-
-/* Global auto-hide sidebar: hidden until the cursor reaches the left edge */
-.sidebar-edge{position:fixed;left:0;top:0;bottom:0;width:28px;z-index:59}
-.workspace.shell-course .app-sidebar.is-auto{position:fixed;left:0;top:0;height:100dvh;z-index:60;transform:translateX(-100%);visibility:hidden;transition:transform 180ms ease,visibility 180ms;box-shadow:8px 0 24px #0003;background:var(--bg)}
-.sidebar-edge:hover+.app-sidebar.is-auto,.app-sidebar.is-auto:hover,.app-sidebar.is-auto:focus-within{transform:none;visibility:visible}
-.workspace.shell-course.sidebar-closed .app-sidebar.is-auto{display:flex}
-@media(prefers-reduced-motion:reduce){.workspace.shell-course .app-sidebar.is-auto{transition:none}}
+/* Navigation remains visible and opens only on explicit action. */
+.workspace.shell-course.tutor-workspace{grid-template-rows:62px minmax(calc(100dvh - 62px),auto)}
+.workspace.shell-course.sidebar-closed .app-sidebar{display:none}
+.tutor-workspace.shell-course .app-sidebar{top:62px;height:calc(100dvh - 62px)}
+.tutor-workspace.shell-course .sidebar-scrim{inset:62px 0 0}
+.app-sidebar .nav-item{min-height:44px;background:transparent;font-weight:500;box-shadow:none}
+.app-sidebar .nav-item.active,.app-sidebar .nav-item[aria-current=page]{background:var(--accent-soft);font-weight:650}
+.library-home .course-facts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.course-tile-heading h2{overflow-wrap:anywhere}
+.home-stats>div,.course-tile{box-shadow:none}
+.tutor-import details{padding:12px;border:1px solid var(--line);border-radius:8px}
+.tutor-import details[open]>summary{margin-bottom:12px}
+.tutor-import details .file-button{display:inline-flex}
+.context-pop,.course-options-menu{max-height:min(70dvh,480px);overflow:auto}
+@media(max-width:650px){.library-home .course-facts{gap:6px;font-size:13px}.course-crumb{min-width:0}.topbar-left{flex:1}.topbar-left .brand span{display:none}.topbar-left .brand{flex:none}.topbar-content{gap:4px}}

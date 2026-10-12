@@ -40,7 +40,7 @@ export default {async fetch(request,env){
   }
   if(url.pathname==='/'){
    if(!user)return new Response(null,{status:302,headers:{Location:'/signin-with-chatgpt?return_to=%2F','Cache-Control':'no-store'}});
-   return new Response(page,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':"default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; media-src blob: data:; connect-src 'self'; object-src 'none'; base-uri 'none'"}});
+   return new Response(page,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':"default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; media-src blob: data:; connect-src 'self' blob:; object-src 'none'; base-uri 'none'"}});
   }
   return new Response('Not found',{status:404});
  }catch(e){console.error('pummy-request-failed',url.pathname,e.message);const status=e.status||(e.code==='conflict'?409:400);return json(url.pathname==='/mcp'&&e.rpcCode?{jsonrpc:'2.0',id:null,error:{code:e.rpcCode,message:e.message}}:{error:e.message||'Could not load your test. Try again.'},status);}

@@ -37,6 +37,6 @@ test('object upload failures retry with the same ID and conflicting retries neve
 });
 test('profiles use only trusted current identity and reject client-selected account IDs',async t=>{
  const profile=connectedProfile(new Request('https://pummy.test/',{headers:{'oai-authenticated-user-full-name':'Daniel%20Dehkordi','oai-authenticated-user-full-name-encoding':'percent-encoded-utf-8','oai-authenticated-user-email':'demo@example.test'}}));assert.equal(profile.name,'Daniel Dehkordi');
- const db=new LocalD1();t.after(()=>db.close());const repo=new CourseRepository(db,'current',null,null,profile);assert.deepEqual((await executeTool(repo,'read_connected_profile',{})).profile,profile);
+ const db=new LocalD1();t.after(()=>db.close());const repo=new CourseRepository(db,'current',null,null,profile);const current=(await executeTool(repo,'read_connected_profile',{})).profile;assert.deepEqual({name:current.name,email:current.email},profile);assert.match(current.recoveryScope,/^[a-f0-9]{64}$/);const other=(await executeTool(new CourseRepository(db,'other'),'read_connected_profile',{})).profile;assert.notEqual(current.recoveryScope,other.recoveryScope);
  await assert.rejects(executeTool(repo,'read_connected_profile',{userId:'other-account'}),/Check/);
 });

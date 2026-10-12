@@ -70,6 +70,7 @@ definitions.push({...definitions.find(t=>t.name==='import_questions'),name:'add_
 const tutorDefs=tutorDefinitions(question),tutorNames=new Set(tutorDefs.map(d=>d.name));
 definitions.push(...tutorDefs);
 export const outputShape={profile:z.record(z.string(),z.unknown()).optional(),request:z.record(z.string(),z.unknown()).optional(),presentations:z.array(z.record(z.string(),z.unknown())).optional(),presentation:z.record(z.string(),z.unknown()).optional(),asset:z.record(z.string(),z.unknown()).optional(),tutor:z.record(z.string(),z.unknown()).optional(),visual:z.record(z.string(),z.unknown()).optional(),versions:z.array(z.record(z.string(),z.unknown())).optional(),state:z.record(z.string(),z.unknown()).optional(),courses:z.array(z.object({id:z.string(),name:z.string(),revision:z.number(),updated_at:z.number()})).optional(),message:z.string().optional(),source:z.record(z.string(),z.unknown()).optional(),export:z.record(z.string(),z.unknown()).optional(),sync:z.record(z.string(),z.unknown()).optional(),context:z.record(z.string(),z.unknown()).optional()};
+outputShape.presentationCapabilities=z.record(z.string(),z.unknown()).optional();
 function same(a,b){if(Array.isArray(a)&&Array.isArray(b))return JSON.stringify([...a].sort())===JSON.stringify([...b].sort());return JSON.stringify(Object.entries(a||{}).sort())===JSON.stringify(Object.entries(b||{}).sort());}
 function requireChoiceExplanations(q){if(!Array.isArray(q.optionNotes)||q.optionNotes.length!==q.options.length||q.optionNotes.some(note=>!note.trim()))throw new Error('Prepare one optionNotes explanation for every answer choice in the same question response.');}
 function checkResponse(q,args){
@@ -88,7 +89,10 @@ async function saveNewCourse(repo,model){
 }
 export async function executeTool(repo,name,raw){
  const def=definitions.find(t=>t.name===name);if(!def)throw new Error('Unknown tool.');const parsed=def.schema.safeParse(raw);if(!parsed.success){const issue=parsed.error.issues[0];throw Object.assign(new Error(`Check ${issue.path.join('.')||'the request'}: ${issue.message}. ${name==='sync_course_sources'?'Sync rejected; no changes were saved.':'For imports, use a supported question format with a complete key.'}`),name==='sync_course_sources'?{sync:{added:[],updated:[],unchanged:[],rejected:parsed.error.issues.map(i=>({path:i.path.join('.'),message:i.message}))}}:{});}let args=parsed.data;
- if(name==='read_connected_profile')return {profile:repo.profile||{name:'Connected ChatGPT account'}};
+ if(name==='read_connected_profile'){
+  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('pummy-recovery:'+repo.userId));
+  return {profile:{...(repo.profile||{name:'Connected ChatGPT account'}),recoveryScope:[...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('')}};
+ }
  if(tutorNames.has(name))return executeTutor(repo,name,args,executeTool);
  if(name==='list_courses'||(['open_test','read_course_state','open_interface'].includes(name)&&!args.courseId))return {courses:await repo.list()};
  if(name==='delete_course'){await repo.delete(args.courseId,args.revision);return {courses:await repo.list()};}
@@ -198,7 +202,6 @@ export async function executeTool(repo,name,raw){
   const source=model.sources.get(args.sourceId);if(!source)throw new Error('Source not found.');
   const files=new TutorRepository(repo),a=await files.validateAsset(args.courseId,args.assetId);
   source.originalFile={id:a.id,name:a.name,kind:a.kind,chunks:a.chunks,bytes:a.bytes};
-  await files.query('UPDATE tutor_assets SET ready=1 WHERE user_id=? AND course_id=? AND id=?',args.courseId,a.id).run();
  }
  else if(name==='attach_source_pdf'){
   const source=model.sources.get(args.sourceId);if(!source)throw new Error('Source not found.');
