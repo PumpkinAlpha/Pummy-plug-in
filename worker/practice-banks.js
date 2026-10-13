@@ -1,3 +1,4 @@
+import {getBankAvailability,unavailableQuestions} from '../lib/bank-availability.js';
 import {verifiedObjectives} from '../lib/source-objectives.js';
 import {bankObjectiveCoverage} from '../lib/bank-coverage.js';
 // Archive copies live outside the course snapshot. Editing them cannot alter
@@ -51,7 +52,7 @@ export async function allBanks(repo,courseId,data){return groupBanks((await bank
 
 // Check every member before writing any of them. The failing SQL expression
 // aborts the entire D1 batch if another editor changed a member in the meantime.
-async function writeBanks(repo,saved,members,next){
+async function writeBanks(repo,saved,members,next,invalidate=false){
  const expected=JSON.stringify(members.map(({id,revision})=>({id,revision})));
  const guard=repo.db.prepare(`SELECT CASE WHEN NOT EXISTS(
   SELECT 1 FROM json_each(?) e LEFT JOIN practice_banks b ON b.user_id=? AND b.course_id=? AND b.id=json_extract(e.value,'$.id')
@@ -66,9 +67,11 @@ async function writeBanks(repo,saved,members,next){
   // Preserve links added atomically by a concurrent course append.
   return repo.db.prepare("UPDATE practice_banks SET name=?,data=json_set(?,'$.linkedQuestionIds',json(COALESCE(json_extract(data,'$.linkedQuestionIds'),json_extract(?,'$.linkedQuestionIds'),'[]'))),revision=revision+1,updated_at=? WHERE user_id=? AND course_id=? AND id=?").bind(data.name,json,json,Date.now(),repo.userId,saved.data.id,data.id);
  });
+ if(invalidate)writes.push(repo.db.prepare('UPDATE courses SET revision=revision+1,updated_at=? WHERE user_id=? AND id=? AND revision=?').bind(Date.now(),repo.userId,saved.data.id,saved.revision));
  try{await repo.db.batch([guard,...writes]);}catch(e){if(/practice-bank-conflict|malformed JSON|invalid JSON/i.test(e.message))throw conflict();throw e;}
 }
-export async function executeBanks(repo,saved,name,args,validateQuestion){
+export async function executeBanks(repo,saved,name,args,validateQuestion,renderState){
+ const changed=async message=>({state:renderState(await repo.get(args.courseId)),courses:await repo.list(),message});
  const entries=await bankEntries(repo,args.courseId,saved.data),banks=groupBanks(entries.filter(b=>!b.deletedAt&&!b.purgedAt));
  const objectives=verifiedObjectives({objectives:saved.data.objectives||[],sources:new Map((saved.data.sources||[]).map(s=>[s.id,s])),texts:new Map(saved.data.texts||[])});
  const summary=bank=>{const {questions,...b}=publicBank(bank);return {...b,count:questions.length,coverage:bankObjectiveCoverage(questions,objectives,saved.data.sources,bank.sourceIds),questionIndex:questions.map(({id,sourceId,objectiveId,objective,lecture,weekId})=>({id,sourceId,objectiveId:objectiveId||objective,lecture,weekId}))};};
@@ -80,7 +83,7 @@ export async function executeBanks(repo,saved,name,args,validateQuestion){
   const members=chosen.flatMap(b=>b._members);await writeBanks(repo,saved,members,members.map(b=>({...b,groupId:'combined:'+args.requestId,groupName:args.name})));
   return {bank:publicBank((await allBanks(repo,args.courseId,saved.data)).find(b=>b.id===id)),message:'Question banks combined. All questions and exam progress preserved.'};
  }
- if(name==='purge_practice_bank'&&entries.some(b=>b.purgedAt&&(b.id===args.bankId||b.purgedBankId===args.bankId)))return {message:'Question bank permanently deleted.'};
+ if(name==='purge_practice_bank'&&entries.some(b=>b.purgedAt&&(b.id===args.bankId||b.purgedBankId===args.bankId)))return changed('Question bank permanently deleted.');
  const pool=['restore_practice_bank','purge_practice_bank'].includes(name)?groupBanks(entries.filter(b=>b.deletedAt&&!b.purgedAt)):banks;
  const bank=pool.find(b=>b.id===args.bankId);if(!bank)throw new Error('Question bank not found.');
  if(name==='read_practice_bank')return {bank:publicBank(bank)};
@@ -88,12 +91,14 @@ export async function executeBanks(repo,saved,name,args,validateQuestion){
  if(name==='purge_practice_bank'){
   // Keep only identifiers that prevent old course/tutor copies being recovered
   // into the archive again. No question text, answer keys or diagrams remain.
-  await writeBanks(repo,saved,bank._members,bank._members.map(b=>({id:b.id,name:'Deleted bank',purgedBankId:bank.id,revision:b.revision,createdAt:b.createdAt,deletedAt:b.deletedAt,purgedAt:Date.now(),questions:[],linkedQuestionIds:[...new Set([...b.questions.map(q=>q.id),...(b.linkedQuestionIds||[])])]})));
-  return {message:'Question bank permanently deleted.'};
+  await writeBanks(repo,saved,bank._members,bank._members.map(b=>({id:b.id,name:'Deleted bank',purgedBankId:bank.id,revision:b.revision,createdAt:b.createdAt,deletedAt:b.deletedAt,purgedAt:Date.now(),questions:[],linkedQuestionIds:[...new Set([...b.questions.map(q=>q.id),...(b.linkedQuestionIds||[])])]})),true);
+  return changed('Question bank permanently deleted.');
  }
  if(name==='delete_practice_bank'||name==='restore_practice_bank'){
-  const remove=name==='delete_practice_bank';await writeBanks(repo,saved,bank._members,bank._members.map(b=>({...b,deletedAt:remove?Date.now():null})));
-  return {message:remove?'Question bank moved to Recently deleted. Course questions and exam progress preserved.':'Question bank restored.'};
+  const remove=name==='delete_practice_bank';
+  if(!remove){const deleted=new Set(getBankAvailability(saved.data));for(const member of bank._members)for(const id of [...member.questions.map(q=>q.id),...(member.linkedQuestionIds||[])])deleted.delete(id);const blocked=unavailableQuestions(saved.data.questions||[],deleted);if((saved.data.questions||[]).filter(q=>!blocked.has(q.id)).length>500)throw new Error('Restoring this bank would exceed 500 active questions. Delete another bank before restoring it.');}
+  await writeBanks(repo,saved,bank._members,bank._members.map(b=>({...b,deletedAt:remove?Date.now():null})),true);
+  return changed(remove?'Question bank moved to Recently deleted. Its questions are excluded from new tests; saved exams and results are kept.':'Question bank restored.');
  }
  const edits=args.questions||[{questionId:args.questionId,question:args.question}],byId=new Map();
  for(const edit of edits){

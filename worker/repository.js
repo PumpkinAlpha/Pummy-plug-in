@@ -1,3 +1,4 @@
+import {bankIndexColumns,deletedBankQuestions,setBankAvailability,unavailableQuestions,availableConcepts} from '../lib/bank-availability.js';
 import {bucket,isDue} from '../lib/pummy-core.mjs';
 import {captureBanks} from './practice-banks.js';
 const storedSnapshots=new WeakMap(),externalSnapshots=new WeakSet();
@@ -14,13 +15,20 @@ function packCourse(data){
 }
 export class CourseRepository {
   constructor(db,userId,converter=null,assetStore=null,profile=null){this.db=db;this.userId=userId;this.converter=converter;this.assetStore=assetStore;this.profile=profile;}
-  async list(){const {results}=await this.db.prepare("SELECT id, name, revision, updated_at, data FROM courses WHERE user_id=? UNION ALL SELECT course_id AS id, name, revision, updated_at, '{}' AS data FROM course_deletions WHERE user_id=? ORDER BY updated_at DESC").bind(this.userId,this.userId).all();return results.map(({data,...row})=>{const saved=JSON.parse(data),concepts=saved.concepts||[],questions=saved.questions||[],sources=(saved.sources||[]).filter(s=>!s.deletedAt);const weeks=new Set([...sources.map(s=>s.weekId),...questions.map(q=>q.weekId)].filter(Boolean));const lectures=new Set(sources.map(s=>s.lecture).filter(Boolean));const unassigned=lectures.size&&(sources.some(s=>!s.lecture)||questions.some(q=>!sources.some(s=>s.id===q.sourceId&&s.lecture)));return {...row,questionCount:questions.filter(q=>q.keyed&&!['followup','variant'].includes(q.origin)).length,sourceCount:sources.length,weekCount:weeks.size||(lectures.size+Number(!!unassigned))||(sources.length||questions.length?1:0),due:concepts.filter(isDue).length,learning:concepts.filter(c=>bucket(c)==='learning').length,retained:concepts.filter(c=>bucket(c)==='retained').length,professorCount:questions.filter(q=>q.keyed&&q.origin==='practice').length};});}
+  async list(){
+    const [library,index]=await this.db.batch([
+      this.db.prepare("SELECT id, name, revision, updated_at, data FROM courses WHERE user_id=? UNION ALL SELECT course_id AS id, name, revision, updated_at, '{}' AS data FROM course_deletions WHERE user_id=? ORDER BY updated_at DESC").bind(this.userId,this.userId),
+      this.db.prepare(`SELECT ${bankIndexColumns} FROM practice_banks WHERE user_id=?`).bind(this.userId)
+    ]);
+    return library.results.map(({data,...row})=>{const saved=JSON.parse(data),all=saved.questions||[],deleted=deletedBankQuestions(index.results.filter(b=>b.course_id===row.id)),blocked=unavailableQuestions(all,deleted),questions=all.filter(q=>!blocked.has(q.id)),concepts=availableConcepts(all,saved.concepts||[],deleted),sources=(saved.sources||[]).filter(s=>!s.deletedAt);const weeks=new Set([...sources.map(s=>s.weekId),...questions.map(q=>q.weekId)].filter(Boolean));const lectures=new Set(sources.map(s=>s.lecture).filter(Boolean));const unassigned=lectures.size&&(sources.some(s=>!s.lecture)||questions.some(q=>!sources.some(s=>s.id===q.sourceId&&s.lecture)));return {...row,questionCount:questions.filter(q=>q.keyed&&!['followup','variant'].includes(q.origin)).length,sourceCount:sources.length,weekCount:weeks.size||(lectures.size+Number(!!unassigned))||(sources.length||questions.length?1:0),due:concepts.filter(isDue).length,learning:concepts.filter(c=>bucket(c)==='learning').length,retained:concepts.filter(c=>bucket(c)==='retained').length,professorCount:questions.filter(q=>q.keyed&&q.origin==='practice').length};});
+  }
   async get(id){
     // Read the snapshot and its source rows together so a concurrent sync cannot
     // pair an older exam revision with newer source text.
-    const [snapshot,sourceRows]=await this.db.batch([
+    const [snapshot,sourceRows,bankRows]=await this.db.batch([
       this.db.prepare('SELECT data, revision FROM courses WHERE user_id=? AND id=?').bind(this.userId,id),
-      this.db.prepare('SELECT source_id AS id,text,pages,visual_pdf AS visualPdf,position FROM course_source_content WHERE user_id=? AND course_id=? ORDER BY position').bind(this.userId,id)
+      this.db.prepare('SELECT source_id AS id,text,pages,visual_pdf AS visualPdf,position FROM course_source_content WHERE user_id=? AND course_id=? ORDER BY position').bind(this.userId,id),
+      this.db.prepare(`SELECT ${bankIndexColumns} FROM practice_banks WHERE user_id=? AND course_id=?`).bind(this.userId,id)
     ]);
     const row=snapshot.results[0];
     if(!row)return null;
@@ -32,7 +40,7 @@ export class CourseRepository {
       data.texts=content.filter(entry=>entry.text!==null).sort((a,b)=>a.position-b.position).map(entry=>[entry.id,entry.text]);
       delete data._sourceStorage;
     }
-    storedSnapshots.set(data,row.data);return {data,revision:row.revision};
+    setBankAvailability(data,deletedBankQuestions(bankRows.results));storedSnapshots.set(data,row.data);return {data,revision:row.revision};
   }
   async delete(id,revision){
     // Preserve a retryable receipt before removing course-owned database records.

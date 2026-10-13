@@ -103,7 +103,7 @@ test('delete and restore apply to whole grouped banks and cannot recover deleted
  await assert.rejects(call('read_practice_bank',{courseId:state.courseId,bankId:group.id}),/not found/);
  const freshRepo=new CourseRepository(repo.db,'student');result=await executeTool(freshRepo,'list_practice_banks',{courseId:state.courseId});assert.equal(result.banks.length,1);assert.equal(result.deletedBanks.length,1);
  await call('restore_practice_bank',{courseId:state.courseId,bankId:group.id,bankRevision:result.deletedBanks[0].revision});
- result=await call('list_practice_banks',{courseId:state.courseId});assert.equal(result.banks.length,2);assert.equal(result.deletedBanks.length,0);assert.deepEqual(await repo.get(state.courseId),before);
+ result=await call('list_practice_banks',{courseId:state.courseId});assert.equal(result.banks.length,2);assert.equal(result.deletedBanks.length,0);assert.deepEqual((await repo.get(state.courseId)).data,before.data);assert.equal((await repo.get(state.courseId)).revision,before.revision+2);
  await assert.rejects(executeTool(new CourseRepository(repo.db,'other'),'delete_practice_bank',{courseId:state.courseId,bankId:group.id,bankRevision:group.revision}),/not found/i);
 });
 test('deleting recovered course and unsaved tutor banks persists without changing their source records',async t=>{
@@ -145,6 +145,6 @@ test('Delete forever erases bank contents, cannot restore, and suppresses legacy
  await assert.rejects(call('purge_practice_bank',ref),/confirmed/);await assert.rejects(call('purge_practice_bank',{...ref,bankRevision:999,confirmed:true}),/changed/);
  await call('purge_practice_bank',{...ref,confirmed:true});assert.deepEqual(await call('list_practice_banks',{courseId:state.courseId}),{banks:[],deletedBanks:[]});
  const row=await db.prepare('SELECT data FROM practice_banks').first();assert.ok(!row.data.includes(question.stem));assert.ok(!row.data.includes(question.definition));assert.deepEqual(JSON.parse(row.data).questions,[]);
- await assert.rejects(call('restore_practice_bank',ref),/not found/);assert.deepEqual(await repo.get(state.courseId),before);
+ await assert.rejects(call('restore_practice_bank',ref),/not found/);assert.deepEqual((await repo.get(state.courseId)).data,before.data);assert.equal((await repo.get(state.courseId)).revision,before.revision+2);
  const reload=new CourseRepository(db,'student');assert.deepEqual(await executeTool(reload,'list_practice_banks',{courseId:state.courseId}),{banks:[],deletedBanks:[]});
 });
