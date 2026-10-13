@@ -13,7 +13,7 @@
 ## Verification
 
 - `npm run build` and `npm run validate` passed for the final bundle.
-- `npm test`: 246 passed, zero failures.
+- `npm test`: 247 passed, zero failures.
 - All fourteen browser suites passed across the regression run and focused final reruns. The deletion fixture was updated to open a collapsed sidebar before navigation; source deletion, restoration and original bytes passed again against the final bundle. The objective suite verifies source wording, real slide references, no generated explanation banner, folder scope, repeated pulls, preserved exams, themes and phone layout.
 - Unit coverage includes actual PPTX/DOCX extraction and uploads, standalone PowerPoint tutor context, rejected fabricated/paraphrased/shortened/uncited/wrong-page writes, legacy backup restoration and bounded complete objective context.
 - Disposable databases/files were used for writes. No production student files, questions or results were deleted or rewritten during verification.
@@ -21,3 +21,5 @@
 ## Extraction limits
 
 Only explicit objectives in searchable text are extracted. Image-only objective slides require searchable text or an OCR/text objectives document; Pummy reports no explicit objectives instead of inventing a replacement. A document with a generic filename can be marked with the Objectives source type. Originals remain unchanged.
+
+The live respiratory source exposed Lecturio assignment lists immediately after objective sections. The extractor now stops at assignment headings and resumes at the next explicit objective heading. This is covered by a regression test; the live pull produced eleven source-backed objectives.

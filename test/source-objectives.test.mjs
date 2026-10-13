@@ -15,6 +15,9 @@ import {PluginCourse,emptyCourse} from '../worker/course.js';
 import {grounding,formatGrounding,MAX_CONTEXT} from '../worker/grounding.js';
 import {uploadPresentationFile} from '../app/tutor-files.js';
 const question={term:'Venous return',stem:'Which vessel?',options:['Vein','Aorta'],answer:[0]};
+test('assignment sections do not become part of the preceding PowerPoint objective',()=>{
+ const goals=sourceObjectives({id:'s',name:'Respiratory.pptx',pages:[{page:2,text:'Learning objectives\nExplain lung compliance.\nLecturio Assignments\nBreathing Mechanics (4:29 min & 2 questions)\nRespiratory – 2\nObjectives\nDiscuss pulmonary blood flow.\nLecturio Assignments\nPulmonary Blood Flow (2:35 min & 1 question)'}]});assert.deepEqual(goals.map(o=>o.text),['Explain lung compliance.','Discuss pulmonary blood flow.']);assert.ok(goals.every(o=>o.page===2));
+});
 test('long objective wording stays complete while grounding context remains bounded',()=>{
  const model=new PluginCourse(emptyCourse('long','Long objectives')),texts=Array.from({length:6},(_,i)=>'Describe '+String(i)+' '+('cardiovascular physiology '.repeat(110)).trim()+'.');model.sources.set('s',{id:'s',name:'Objectives.txt'});model.texts.set('s',texts.map((s,i)=>`${i+1}. ${s}`).join('\n'));model.objectives=sourceObjectives(model.sources.get('s'),model.texts.get('s'));const g=grounding(model,'cardiovascular physiology',12000);assert.ok(g.objectives.length);assert.ok(g.objectives.every(o=>texts.includes(o.text)));assert.ok(formatGrounding(g).length<=MAX_CONTEXT);
 });
