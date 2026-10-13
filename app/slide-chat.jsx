@@ -92,7 +92,7 @@ export function ExplainSlideButton({p,slide,image,annotations=[],region,index,co
   const captured=structuredClone({courseId:p.courseId,presentationId:p.id,slideId:slide.id,annotationIds:annotations.slice(0,30).map(a=>a.id),...(region?{region}:{}),allowGeneral:false}),page=slide.page,presentation=p,original=image;
   try{queue.enqueue({...captured,requestId:crypto.randomUUID(),mode:'explain',oneSlide:true,question:'Explain this slide using the four required sections and one selectable check when testable.'},page,async()=>originalVisual(original||await renderSlide(call,presentation,page,1000),captured.region));setError('');}catch(e){setError(e.message);}
  }
- const active=items[0];
+ const deliveryError=items.find(item=>item.status==='uncertain'&&item.error)?.error;
 
  const stick=c=>{cornerRef.current=c;try{localStorage.setItem(POSITION_KEY+':corner',c);}catch{}setCorner(c);const n=cornerPosition(c,ref.current);if(n)setPos(place(n.x,n.y));};
  function down(e){if(e.button!==0)return;e.currentTarget.setPointerCapture(e.pointerId);drag.current={id:e.pointerId,sx:e.clientX,sy:e.clientY,ox:pos.x,oy:pos.y,moved:false};}
@@ -117,7 +117,7 @@ export function ExplainSlideButton({p,slide,image,annotations=[],region,index,co
   </div>
   {open&&toolStatus&&!message&&<p className="explain-slide-status explain-slide-tool">{toolStatus}</p>}
   {message&&<p role="status" className="explain-slide-status">{message}</p>}
-  {open&&active&&<div className="explain-slide-status tutor-explain-controls"><span role="status">Slide {active.page}: {active.status==='sent'?'sent to ChatGPT':active.status}. {Math.max(0,items.length-1)} queued.</span><button disabled={!['sent','uncertain','held'].includes(active.status)} onClick={()=>queue.confirmFinished().catch(e=>setError(e.message))}>ChatGPT finished — {items.length>1?'send next slide':'ready for next slide'}</button><small>Wait until ChatGPT finishes before continuing. ChatGPT controls message boundaries; queued slides are sent one at a time.</small>{active.error&&<span role="alert">{active.error} Delivery will not be retried automatically.</span>}</div>}
+  {open&&deliveryError&&<p role="alert" className="explain-slide-status">{deliveryError} Delivery will not be retried automatically.</p>}
   {open&&error&&<p role="alert" className="explain-slide-status">{error}</p>}
  </div>;
 }

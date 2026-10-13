@@ -43,15 +43,16 @@ try{
  await viewer.getByRole('button',{name:'Open course',exact:true}).click();await viewer.getByRole('button',{name:'Open sidebar',exact:true}).click();await viewer.getByRole('button',{name:'Interactive Tutor',exact:true}).click();await viewer.getByRole('button',{name:/Lecture.pdf/}).click();
  await viewer.locator('.explain-slide-fab').hover();await viewer.getByRole('combobox',{name:'Go to slide'}).selectOption('3');await viewer.locator('.explain-slide-fab').hover();await viewer.getByRole('button',{name:'Explain the slide',exact:true}).click();
  await viewer.locator('.explain-slide-fab').hover();await viewer.getByRole('combobox',{name:'Go to slide'}).selectOption('4');await viewer.locator('.explain-slide-fab').hover();await viewer.getByRole('button',{name:'Explain the slide',exact:true}).click();
- await page.waitForFunction(()=>handoffs.length===1);await viewer.getByText(/1 queued\./).waitFor();
- const releaseButton=viewer.getByRole('button',{name:'ChatGPT finished — send next slide',exact:true});await releaseButton.waitFor();assert.equal(await releaseButton.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(163, 50, 22)');
+ await page.waitForFunction(()=>handoffs.length===2);
+ assert.equal(await viewer.getByRole('button',{name:/ChatGPT finished/}).count(),0);
+ assert.equal(await viewer.locator('.tutor-explain-controls').count(),0);
+ const prompt=await page.evaluate(()=>handoffs[0].content[0].text);assert.match(prompt,/BEFORE calling render_slide_check/);assert.match(prompt,/FINAL tool call and final generated content/);
  const requestFrom=text=>JSON.parse(text.match(/Pummy request: (\{.*?\})\./)[1]);
  const fourth=requestFrom((await page.evaluate(()=>handoffs[0])).content[0].text);assert.equal(fourth.slideId,p.slides[3].id);
  const result4=await call('read_slide_tutor',fourth);assert.match(result4.tutor.requests[0].context.professorSlide.text,/Professor slide 4/);
  const answer='A. Reading the Slide\nProfessor arithmetic.\nB. Understanding the Material\nAdd one.\nC. What to Remember\nThe next integer.\nD. Check Your Understanding\nSelect an answer in the slide check.';
  const finish=async(ref,pageNumber)=>{await call('provide_slide_tutor',{...ref,answer,testable:true,citations:[{sourceId:`presentation-${p.id}`,page:pageNumber}],questions:[{stem:`What is ${pageNumber} plus one?`,options:[String(pageNumber+1),String(pageNumber)],answer:[0],definition:'Adding one gives the next integer.'}]});return {structuredContent:await call('render_slide_check',ref)};};
- const check4=await finish(fourth,4);assert.equal(await page.evaluate(()=>handoffs.length),1,'tool completion cannot advance host turns');
- await viewer.locator('.explain-slide-fab').hover();await viewer.getByRole('button',{name:'ChatGPT finished — send next slide',exact:true}).click();await page.waitForFunction(()=>handoffs.length===2);
+ const check4=await finish(fourth,4);assert.equal(await page.evaluate(()=>handoffs.length),2,'tool completion cannot send another request');
  const fifth=requestFrom((await page.evaluate(()=>handoffs[1])).content[0].text);assert.equal(fifth.slideId,p.slides[4].id);assert.notEqual(fourth.requestId,fifth.requestId);const check5=await finish(fifth,5);
  for(const [id,result] of [['check4',check4],['check5',check5]])await page.evaluate(({id,result})=>{checks[id]=result;const f=document.createElement('iframe');f.id=id;f.className='check';f.src='/check';document.body.append(f);},{id,result});
  const c4=page.frameLocator('#check4'),c5=page.frameLocator('#check5');
@@ -63,11 +64,11 @@ try{
  await page.evaluate(result=>document.querySelector('#check4').contentWindow.postMessage({jsonrpc:'2.0',method:'ui/notifications/tool-result',params:result},'*'),check5);
  assert.equal(await c4.getByRole('heading',{name:/Slide 4/}).count(),1);assert.equal(await c5.getByText('Incorrect',{exact:true}).count(),1);
  // Explicit uncertain delivery is never automatically sent again, including after remount.
- await viewer.locator('.explain-slide-fab').hover();await viewer.getByRole('button',{name:'ChatGPT finished — ready for next slide',exact:true}).click();await page.evaluate(()=>failNext=true);
+ await viewer.locator('.explain-slide-fab').hover();await page.evaluate(()=>failNext=true);
  await viewer.locator('.explain-slide-fab').hover();await viewer.getByRole('button',{name:'Explain the slide',exact:true}).click();await viewer.locator('.explain-slide-fab').hover();await viewer.getByText(/Delivery will not be retried automatically/).waitFor();assert.equal(await page.evaluate(()=>handoffs.length),3);
  await page.locator('#viewer').evaluate(f=>f.contentWindow.location.reload());await viewer.getByRole('button',{name:'Open course',exact:true}).click();await viewer.getByRole('button',{name:'Open sidebar',exact:true}).click();await viewer.getByRole('button',{name:'Interactive Tutor',exact:true}).click();await viewer.getByRole('button',{name:/Lecture.pdf/}).click();await viewer.locator('.explain-slide-fab').hover();await viewer.getByText(/Delivery will not be retried automatically/).waitFor();assert.equal(await page.evaluate(()=>handoffs.length),3);
  assert.deepEqual(await repo.get(state.courseId),before);assert.deepEqual((await call('read_presentation',{courseId:state.courseId,presentationId:p.id})).presentation,p);assert.deepEqual(errors,[]);
  await mkdir('/private/tmp/pummy-slide-qa',{recursive:true});await viewer.locator('.explain-slide-fab').hover();await page.waitForFunction(()=>{const f=document.querySelector('#viewer'),b=f.contentDocument.querySelector('.explain-slide-fab').getBoundingClientRect();return b.right<=f.contentWindow.innerWidth&&b.left>=0;});await page.screenshot({path:'/private/tmp/pummy-slide-qa/checks.png',fullPage:true});
- console.log('Slide browser checks passed: rapid slides 4/5, manual FIFO release, captured grounding, two independent selectable questions, persisted checked answers on replay, stale-result isolation, uncertain delivery/remount, and unchanged exam/presentation.');
+ console.log('Slide browser checks passed: rapid slides 4/5, FIFO delivery without confirmation, captured grounding, two independent selectable questions, persisted checked answers on replay, stale-result isolation, uncertain delivery/remount, and unchanged exam/presentation.');
 }catch(e){if(page){await mkdir('/private/tmp/pummy-slide-qa',{recursive:true});await page.screenshot({path:'/private/tmp/pummy-slide-qa/failure.png',fullPage:true});console.error(await page.locator('body').innerText());}throw e;}
 finally{await browser?.close();await new Promise(resolve=>server.close(resolve));db.close();}
