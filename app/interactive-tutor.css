@@ -205,3 +205,9 @@
 .interactive-tutor .tutor-audio-track>span{color:var(--muted);max-width:100%}
 .interactive-tutor .tutor-audio-track audio{display:block;width:min(340px,100%);min-width:0;color-scheme:inherit;accent-color:var(--accent)}
 @media(max-width:650px){.interactive-tutor .tutor-audio{margin:8px;padding:10px}.interactive-tutor .tutor-audio-track>span{flex-basis:100%}}
+.tutor-explain-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line)}
+.tutor-explain-controls small,.tutor-explain-controls [role=alert]{flex-basis:100%}
+.explain-slide-fab.is-open{width:max-content}
+.explain-slide-fab .tutor-explain-controls{width:min(360px,calc(100vw - 48px));box-sizing:border-box;max-height:45vh;overflow:auto;touch-action:auto}
+.interactive-tutor .explain-slide-fab .tutor-explain-controls button{background:#a33216;color:#fff;min-height:36px;padding:8px 12px;white-space:normal;touch-action:manipulation}
+.interactive-tutor .explain-slide-fab .tutor-explain-controls button:hover:not(:disabled){background:#822810}

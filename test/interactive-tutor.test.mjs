@@ -30,7 +30,7 @@ test('explain slide returns lecture context without changing annotations, reques
  const args={courseId:p.courseId,presentationId:p.id,slideId:p.slides[0].id};
  assert.equal((await call('read_slide_context',args)).context.explainSkill,undefined);
  const first=(await call('read_slide_context',{...args,explain:true})).context;
- assert.match(first.explainSkill,/Check your understanding/);assert.match(first.explainSkill,/Do not advance slides/);
+ assert.match(first.explainSkill,/D\. Check Your Understanding/);assert.match(first.explainSkill,/Do not advance slides/);
  assert.equal(first.slideCount,2);assert.deepEqual(first.previousSlides,[]);assert.equal(first.nextSlides[0].page,2);
  const second=(await call('read_slide_context',{...args,slideId:p.slides[1].id,explain:true})).context;
  assert.equal(second.previousSlides[0].page,1);assert.match(second.previousSlides[0].notes,/Professor speaker note/);assert.deepEqual(second.nextSlides,[]);
@@ -100,4 +100,40 @@ test('visual-only professor slides can create cited figure questions without pro
  await call('request_slide_tutor',{courseId:p.courseId,presentationId:p.id,slideId:p.slides[0].id,requestId,question:'Question about the visible figure',mode:'practice',visual});
  await call('provide_slide_tutor',{courseId:p.courseId,presentationId:p.id,requestId,answer:'A figure-grounded question.',citations:[{sourceId:`presentation-${p.id}`,page:1}],questions:[{term:'Shape',stem:'Which shape is visible?',options:['Circle','Triangle'],answer:[0],definition:'The supplied professor visual shows a circle.'}]});
  await call('save_tutor_questions',{courseId:p.courseId,presentationId:p.id,requestId});const saved=(await repo.get(p.courseId)).data;assert.equal(saved.questions[1].figure.dataUrl,visual);assert.match(new Map(saved.texts).get(`presentation-${p.id}`),/Professor visual slide 1/);
+});
+
+test('one-slide explanations enforce format, independent checks and idempotent delivery without changing course or annotations',async t=>{
+ const {call,state,repo,db}=await setup(t),p=await presentation(call,state.courseId,'pptx');
+ await call('start_test',{courseId:p.courseId,revision:state.revision,size:1,adaptive:false});
+ const before=await repo.get(p.courseId),beforeP=(await call('read_presentation',{courseId:p.courseId,presentationId:p.id})).presentation;
+ const refs=p.slides.map(s=>({courseId:p.courseId,presentationId:p.id,slideId:s.id,requestId:crypto.randomUUID()}));
+ for(const ref of refs)await call('request_slide_tutor',{...ref,question:'Explain',oneSlide:true});
+ assert.equal((await call('read_slide_tutor',{courseId:p.courseId,presentationId:p.id})).tutor.requests.length,0,'bulk reads must not drain queued clicks');
+ for(const [index,ref] of refs.entries()){
+  const claims=await Promise.all([call('claim_slide_message',ref),call('claim_slide_message',ref)]);assert.equal(claims.filter(r=>r.tutor.claimed).length,1);
+  const read=await call('read_slide_tutor',ref);assert.equal(read.tutor.requests.length,1);assert.equal(read.tutor.requests[0].slideId,ref.slideId);
+  const answer='A. Reading the Slide\nProfessor content.\nB. Understanding the Material\nExplanation.\nC. What to Remember\nKey point.\nD. Check Your Understanding\nUse the selectable check.';
+  const payload={...ref,answer,testable:true,citations:[{sourceId:`presentation-${p.id}`,page:index+1}],questions:[q]};
+  await assert.rejects(call('provide_slide_tutor',{...payload,answer:'Merged slides'}),/headings/);
+  await assert.rejects(call('provide_slide_tutor',{...payload,questions:[q,q]}),/exactly one/);
+  await assert.rejects(call('provide_slide_tutor',{...payload,questions:[{...q,answer:[0,1]}]}),/single-answer/);
+  await assert.rejects(call('provide_slide_tutor',{...payload,questions:[{...q,page:index===0?2:1}]}),/another slide/);
+  const saved=await call('provide_slide_tutor',payload);assert.equal(saved.tutor.request.slideId,ref.slideId);
+  const check=(await call('render_slide_check',ref)).tutor.check;assert.equal(check.answer,undefined);assert.equal(check.selected,null);
+  await call('answer_slide_check',{...ref,option:index,check:false});
+  assert.equal((await call('render_slide_check',ref)).tutor.check.selected,index);
+  await call('answer_slide_check',{...ref,option:index,check:true});
+  assert.equal((await call('render_slide_check',ref)).tutor.check.correct,index===0);
+  await call('provide_slide_tutor',{...payload,answer:'Overwrite attempt'});
+  assert.equal((await call('read_slide_tutor',ref)).tutor.requests[0].answer,answer);
+ }
+ await call('answer_slide_check',{...refs[0],option:1,check:true});
+ assert.equal((await call('render_slide_check',refs[0])).tutor.check.selected,0);
+ assert.equal((await call('render_slide_check',refs[1])).tutor.check.selected,1);
+ const history=(await call('read_slide_tutor',refs[1])).tutor.history;assert.equal(history[0].slideId,refs[0].slideId);
+ assert.deepEqual(await repo.get(p.courseId),before);assert.deepEqual((await call('read_presentation',{courseId:p.courseId,presentationId:p.id})).presentation,beforeP);
+ await assert.rejects(executeTool(new CourseRepository(db,'other-student'),'render_slide_check',refs[0]),/not found/i);
+ const administrative={...refs[0],requestId:crypto.randomUUID()};await call('request_slide_tutor',{...administrative,oneSlide:true,question:'Explain title slide'});
+ await call('provide_slide_tutor',{...administrative,answer:'A. Reading the Slide\nTitle.\nB. Understanding the Material\nLecture title.\nC. What to Remember\nNo new facts.\nD. Check Your Understanding\nNo testable information.',testable:false,questions:[]});
+ assert.equal((await call('render_slide_check',administrative)).tutor.check.testable,false);
 });
