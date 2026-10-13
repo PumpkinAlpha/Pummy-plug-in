@@ -28,6 +28,9 @@ export async function syncSources(repo,saved,model,args,view,refresh){
  for(const src of args.sources){
   unique((src.pages||[]).map(p=>({id:p.page})),'page');
   const old=model.sources.get(src.id),oldText=model.texts.get(src.id)||'';
+  // Folder sync is a background copy operation, never a restore action. Check
+  // again here because a prepared scan/upload can outlive a source deletion.
+  if(old?.deletedAt&&src.metadata?.localFolderId)throw new Error(`Source ${src.id} is in Recently deleted. Restore it before syncing this file.`);
   const contentHash=await digest(sourceContent(src,src.text));
   if(src.contentHash&&src.contentHash.toLowerCase()!==contentHash)throw new Error(`Sync rejected: contentHash mismatch for ${src.id}. No changes were saved.`);
   const rank=src.rank??old?.rank??DEFAULT_RANKS[src.sourceType||'other'];

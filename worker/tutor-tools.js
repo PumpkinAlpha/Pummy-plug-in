@@ -34,7 +34,9 @@ const sourceId=(p,page)=>slideMaterial(p,page).id;
 function stripVisual(r){const {visual,...rest}=r;return rest;}
 export async function executeTutor(courseRepo,name,args,append){
  const repo=new TutorRepository(courseRepo),saved=await repo.authorize(args.courseId);
- if(name==='list_presentations')return {presentations:await repo.list(args.courseId),presentationCapabilities:{nativePowerPoint:true,automaticConversion:!!courseRepo.converter,maxConversionBytes:MAX_CONVERSION_BYTES}};
+ const deletedSources=new Set(saved.data.sources.filter(s=>s.deletedAt).map(s=>s.id));
+ if(name==='list_presentations')return {presentations:(await repo.list(args.courseId)).filter(p=>!deletedSources.has(p.sourceId)),presentationCapabilities:{nativePowerPoint:true,automaticConversion:!!courseRepo.converter,maxConversionBytes:MAX_CONVERSION_BYTES}};
+ if(args.sourceId&&deletedSources.has(args.sourceId))throw new Error('This course source is in Recently deleted. Restore it before opening its presentation.');
  if(name==='begin_presentation_upload'){
   if(args.chunks!==Math.ceil(Math.ceil(args.bytes/3)*4/CHUNK_SIZE))throw new Error('Invalid upload chunk count.');
   const {results}=await repo.query('SELECT id FROM tutor_assets WHERE user_id=? AND course_id=?',args.courseId).all();if(results.length>=100&&!results.some(a=>a.id===args.assetId))throw new Error('Use up to 100 presentation files per course.');
@@ -96,6 +98,7 @@ export async function executeTutor(courseRepo,name,args,append){
   return {presentation:result};
  }
  const p=await repo.get(args.courseId,args.presentationId);
+ if(deletedSources.has(p.sourceId))throw new Error('This course source is in Recently deleted. Restore it before opening its presentation.');
  if(name==='read_presentation')return {presentation:p,tutor:{messages:(await repo.requestList(args.courseId,p.id)).map(stripVisual)}};
  if(name==='save_slide_annotations'){
   assertSlide(p,args.slideId);const changes=(args.annotations||args.upserts).map(a=>{if(a.courseId!==args.courseId||a.presentationId!==p.id||a.slideId!==args.slideId)throw new Error('Annotation ownership mismatch.');return {...a,author:courseRepo.userId};});

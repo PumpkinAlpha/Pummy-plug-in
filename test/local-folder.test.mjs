@@ -18,6 +18,29 @@ test('folder receipt retries a lost response without duplicating originals or re
  const {repo,call}=setup(t),{state}=await call('create_course',{requestId:crypto.randomUUID(),name:'Retries'}),plan=await planFolderSync({files:files('Notes'),binding,state});let fail=true;
  await saveFolderSync(async(n,a)=>{const r=await call(n,a);if(n==='sync_course_sources'&&fail){fail=false;throw Error('Lost response');}return r;},state.courseId,plan.entries);assert.equal(plan.entries[0].status,'failed');await saveFolderSync(call,state.courseId,plan.entries);assert.equal(plan.entries[0].status,'saved');assert.equal((await repo.get(state.courseId)).data.sources.length,1);
 });
+test('folder sync skips deleted copies after rescan and after a plan was prepared, while local deletions keep saved originals',async t=>{
+ const {repo,call}=setup(t);let {state}=await call('create_course',{requestId:crypto.randomUUID(),name:'Deletion'});
+ let plan=await planFolderSync({files:files('Original notes'),binding,state});await saveFolderSync(call,state.courseId,plan.entries);state=(await call('read_course_state',{courseId:state.courseId})).state;
+ const source=state.sources[0],pending=await planFolderSync({files:files('Changed notes'),binding,state});
+ state=(await call('delete_source',{courseId:state.courseId,revision:state.revision,sourceId:source.id})).state;const before=await repo.get(state.courseId);
+ let uploads=0;assert.equal(await saveFolderSync(async(n,a)=>{if(n==='begin_presentation_upload')uploads++;return call(n,a);},state.courseId,pending.entries),0);assert.equal(uploads,0);assert.equal(pending.entries[0].status,'deleted');assert.equal(pending.entries[0].selected,false);
+ plan=await planFolderSync({files:files('Changed again'),binding,state});assert.equal(plan.entries[0].status,'deleted');assert.equal(plan.entries[0].selected,false);assert.deepEqual(await repo.get(state.courseId),before);
+ state=(await call('restore_source',{courseId:state.courseId,revision:state.revision,sourceId:source.id})).state;
+ assert.equal(new TextDecoder().decode(await loadAsset(call,state.courseId,state.sources[0].originalFile)),'Original notes');
+ plan=await planFolderSync({files:[],binding,state});assert.deepEqual(plan.missing,['Week 1/Notes.txt']);assert.equal((await repo.get(state.courseId)).data.sources.length,1);
+ plan=await planFolderSync({files:files('Restored update'),binding,state});assert.equal(plan.entries[0].attempt.sourceId,source.id);await saveFolderSync(call,state.courseId,plan.entries);assert.equal(plan.entries[0].status,'saved');
+});
+test('a deletion during folder upload cannot be undone by its late sync or a retry',async t=>{
+ const {repo,call}=setup(t);let {state}=await call('create_course',{requestId:crypto.randomUUID(),name:'Concurrent deletion'});
+ let plan=await planFolderSync({files:files('Original notes'),binding,state});await saveFolderSync(call,state.courseId,plan.entries);state=(await call('read_course_state',{courseId:state.courseId})).state;
+ const original=state.sources[0];plan=await planFolderSync({files:files('Late upload'),binding,state});let removed=false;
+ await saveFolderSync(async(n,a)=>{const r=await call(n,a);if(n==='upload_presentation_chunk'&&!removed){removed=true;const fresh=(await call('read_course_state',{courseId:state.courseId})).state;await call('delete_source',{courseId:state.courseId,revision:fresh.revision,sourceId:original.id});}return r;},state.courseId,plan.entries);
+ assert.equal(plan.entries[0].status,'failed');assert.match(plan.entries[0].error,/Recently deleted/);
+ assert.equal(await saveFolderSync(call,state.courseId,plan.entries),0);assert.equal(plan.entries[0].status,'deleted');
+ state=(await call('read_course_state',{courseId:state.courseId})).state;assert.equal(state.sources.length,0);assert.deepEqual((await repo.get(state.courseId)).data.sources[0].originalFile,original.originalFile);
+ assert.equal(new TextDecoder().decode(await loadAsset(call,state.courseId,original.originalFile)),'Original notes');
+ assert.match((await repo.get(state.courseId)).data.texts[0][1],/Original notes/);
+});
 test('folder paths distinguish duplicate filenames, reject traversal and skip unsupported files',async()=>{
  const state={sources:[]},raw=new File(['Notes'],'Notes.txt'),plan=await planFolderSync({files:[{raw,path:'A/Notes.txt'},{raw,path:'B/Notes.txt'}],binding,state});assert.notEqual(plan.entries[0].attempt.sourceId,plan.entries[1].attempt.sourceId);
  await assert.rejects(planFolderSync({files:[{raw,path:'../Notes.txt'}],binding,state}),/unsupported relative path/);assert.equal(selectedDirectoryFiles([new File(['x'],'macro.exe'),raw]).length,1);

@@ -1,0 +1,34 @@
+import {createServer} from 'node:http';
+import {mkdir} from 'node:fs/promises';
+import assert from 'node:assert/strict';
+import {chromium} from '@playwright/test';
+import {LocalD1} from '../scripts/local-db.mjs';
+import {CourseRepository} from '../worker/repository.js';
+import {executeTool} from '../worker/tools.js';
+import {uploadPresentationFile,loadAsset} from '../app/tutor-files.js';
+import {fixturePDF,object} from './tutor-fixtures.mjs';
+import worker from '../dist/server/index.js';
+const directory='work/deletion-qa';await mkdir(directory,{recursive:true});
+const db=new LocalD1(),repo=new CourseRepository(db,'deletion-browser'),call=(n,a)=>executeTool(repo,n,a);
+let {state}=await call('import_questions',{requestId:crypto.randomUUID(),name:'Deletion QA',questions:[{stem:'Which is even?',options:['One','Two'],answer:[1],sourceId:'lecture'}],sources:[{id:'lecture',name:'Lecture.pdf',lecture:'Week 1',text:'Two is even.'}]});
+const bytes=await fixturePDF(),assetId=await uploadPresentationFile(call,state.courseId,new File([bytes],'Lecture.pdf'));
+state=(await call('attach_source_original',{courseId:state.courseId,revision:state.revision,sourceId:'lecture',assetId})).state;
+const {presentation:p}=await call('import_course_presentation',{courseId:state.courseId,sourceId:'lecture',presentationId:crypto.randomUUID()});
+await call('save_slide_annotations',{courseId:state.courseId,presentationId:p.id,slideId:p.slides[0].id,revision:p.revision,requestId:crypto.randomUUID(),annotations:[object(p,p.slides[0].id)]});
+const before=await repo.get(state.courseId),banks=(await call('list_practice_banks',{courseId:state.courseId})).banks;
+const server=createServer(async(req,res)=>{try{const chunks=[];for await(const c of req)chunks.push(c);const headers=new Headers(req.headers);headers.set('oai-authenticated-user-id','deletion-browser');const r=await worker.fetch(new Request(`http://127.0.0.1:${server.address().port}${req.url}`,{method:req.method,headers,...(chunks.length?{body:Buffer.concat(chunks)}:{})}),{DB:db});res.writeHead(r.status,Object.fromEntries(r.headers));res.end(Buffer.from(await r.arrayBuffer()));}catch(e){res.writeHead(500);res.end(e.message);}});
+await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser,page;const errors=[];
+try{
+ browser=await chromium.launch({headless:true,executablePath:process.env.PUMMY_BROWSER_EXECUTABLE||'C:/Program Files/Google/Chrome/Application/chrome.exe'});page=await browser.newPage({viewport:{width:1400,height:1000}});page.setDefaultTimeout(12000);page.on('pageerror',e=>errors.push(e.message));const url=`http://127.0.0.1:${server.address().port}`;
+ async function course(){await page.getByRole('button',{name:'Open course',exact:true}).click();await page.getByRole('button',{name:'Open sidebar',exact:true}).click();}
+ async function sources(){await page.getByRole('button',{name:'Course & sources',exact:true}).click();}
+ await page.goto(url);await course();await sources();
+ await page.getByRole('button',{name:'Delete source Lecture.pdf',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();assert.equal((await repo.get(state.courseId)).revision,before.revision);
+ await page.getByRole('button',{name:'Delete source Lecture.pdf',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Delete source',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});
+ assert.equal(await page.getByRole('button',{name:'Delete source Lecture.pdf',exact:true}).count(),0);await page.locator('.deleted-sources summary').click();await page.getByRole('button',{name:'Restore source Lecture.pdf',exact:true}).waitFor();await page.screenshot({path:directory+'/recently-deleted.png',fullPage:true});
+ await page.getByRole('button',{name:'Interactive Tutor',exact:true}).click();await page.getByRole('heading',{name:'Saved presentations',exact:true}).waitFor();assert.equal(await page.locator('.tutor-presentation').count(),0);assert.equal(await page.locator('#tutor-sources-panel option').count(),1);
+ await page.reload();await course();await sources();await page.locator('.deleted-sources summary').click();await page.getByRole('button',{name:'Restore source Lecture.pdf',exact:true}).click();await page.getByRole('button',{name:'Download original Lecture.pdf',exact:true}).waitFor();
+ const after=await repo.get(state.courseId);for(const key of ['sources','texts','questions','session','concepts','history'])assert.deepEqual(after.data[key],before.data[key],key);assert.deepEqual((await call('list_practice_banks',{courseId:state.courseId})).banks,banks);assert.deepEqual(await loadAsset(call,state.courseId,after.data.sources[0].originalFile),bytes);
+ await page.getByRole('button',{name:'Interactive Tutor',exact:true}).click();await page.locator('.tutor-presentation').getByText('Lecture.pdf',{exact:true}).waitFor();await page.locator('.tutor-presentation').click();await page.locator('.interactive-tutor').waitFor();await page.waitForFunction(()=>document.querySelector('.tutor-canvas image')?.getAttribute('href')?.startsWith('data:image/png'));assert.equal((await call('read_presentation',{courseId:state.courseId,presentationId:p.id})).presentation.annotations[p.slides[0].id].length,1);await page.screenshot({path:directory+'/restored-presentation.png',fullPage:true});
+ assert.deepEqual(errors,[]);console.log('Source deletion browser passed: cancel, recoverable delete, whole-course tutor hiding, reload, restore, original bytes, annotations, questions and banks preserved.');
+}catch(e){if(page){console.error(await page.locator('body').innerText());await page.screenshot({path:directory+'/failure.png',fullPage:true});}throw e;}finally{await browser?.close();await new Promise(r=>server.close(r));db.close();}

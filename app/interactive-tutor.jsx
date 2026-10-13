@@ -22,7 +22,7 @@ export function InteractiveTutor({state,folderScope=null,onSource,onFolderChange
   const folder=presentation.sourceId?studyFolders(state).find(f=>sourcesInFolder(state,f).some(s=>s.id===presentation.sourceId)):presentation.folder;
   if(folder)onFolderChange?.(folder);setP(presentation);onPresentation(presentation.id);
  }
- const visiblePresentations=list.filter(item=>!folderScope||(item.sourceId?scopedSources.some(s=>s.id===item.sourceId):item.folder?.kind===folderScope.kind&&item.folder?.label===folderScope.label));
+ const visiblePresentations=list.filter(item=>!state.deletedSources?.some(s=>s.id===item.sourceId)&&(!folderScope||(item.sourceId?scopedSources.some(s=>s.id===item.sourceId):item.folder?.kind===folderScope.kind&&item.folder?.label===folderScope.label)));
  const refresh=async()=>{const r=await call('list_presentations',{courseId:state.courseId});if(mounted.current){setList(r.presentations);setCapabilities(r.presentationCapabilities||null);}return r;};
  useEffect(()=>{mounted.current=true;refresh().catch(e=>setError(e.message));return()=>{mounted.current=false;};},[state.courseId]);
  async function run(fn){if(busy)return;setBusy(true);setError('');try{await fn();}catch(e){setError(e.message);}finally{if(mounted.current)setBusy(false);}}

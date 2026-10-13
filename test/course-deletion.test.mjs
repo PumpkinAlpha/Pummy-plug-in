@@ -5,7 +5,7 @@ import {CourseRepository} from '../worker/repository.js';
 import {executeTool} from '../worker/tools.js';
 import {uploadPresentationFile} from '../app/tutor-files.js';
 import {fixturePDF,object} from './tutor-fixtures.mjs';
-const tables=['tutor_asset_chunks','tutor_assets','tutor_presentations','tutor_slide_annotations','tutor_revisions','tutor_requests','tutor_conversions'];
+const tables=['practice_banks','course_source_content','tutor_asset_chunks','tutor_assets','tutor_presentations','tutor_slide_annotations','tutor_revisions','tutor_requests','tutor_conversions'];
 class Bucket {
  objects=new Map();fail=false;pages=0;
  async put(key,data){this.objects.set(key,data);}
@@ -15,7 +15,7 @@ class Bucket {
 }
 async function setup(t){
  const db=new LocalD1(),bucket=new Bucket();t.after(()=>db.close());const repo=new CourseRepository(db,'alice',null,bucket),call=(n,a)=>executeTool(repo,n,a);
- const {state}=await call('create_course',{requestId:crypto.randomUUID(),name:'Private lecture'}),pdf=await fixturePDF();
+ const {state}=await call('import_questions',{requestId:crypto.randomUUID(),name:'Private lecture',questions:[{stem:'Which is even?',options:['One','Two'],answer:[1],sourceId:'lecture'}],sources:[{id:'lecture',name:'Lecture',text:'Two is even.'}]}),pdf=await fixturePDF();
  const assetId=await uploadPresentationFile(call,state.courseId,new File([pdf],'lecture.pdf'));
  const {presentation:p}=await call('import_presentation',{courseId:state.courseId,presentationId:crypto.randomUUID(),originalAssetId:assetId,pdfAssetId:assetId});
  await call('save_slide_annotations',{courseId:state.courseId,presentationId:p.id,slideId:p.slides[0].id,revision:p.revision,requestId:crypto.randomUUID(),annotations:[object(p,p.slides[0].id)]});
