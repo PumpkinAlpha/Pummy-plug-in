@@ -10,6 +10,9 @@ test('coverage mode lets source breadth determine count and reserves final recei
  assert.match(prompt,/Full coverage mode/);
  assert.match(prompt,/do not use a fixed question count/);
  assert.match(prompt,/FINAL add_questions call: final-request/);
+ assert.match(prompt,/On EVERY add_questions call.*generationId to final-request/);
+ assert.match(prompt,/bankSourceIds to \["slide"\]/);
+ assert.match(prompt,/verified objectiveId/);
  assert.match(prompt,/explanation:/);
  assert.equal(generationCapacity(state),490);
 });
