@@ -30,13 +30,13 @@ test('32 MB source uploads stream small slices into object storage and preserve 
 test('object upload failures retry with the same ID and conflicting retries never overwrite originals',async t=>{
  const db=new LocalD1(),bucket=new Bucket();t.after(()=>db.close());const repo=new CourseRepository(db,'retry-owner',null,bucket),call=(n,a)=>executeTool(repo,n,a),{state}=await call('create_course',{requestId:crypto.randomUUID(),name:'Retries'}),file=new File(['Original text'],'original.txt');
  const put=bucket.put.bind(bucket);let fail=true;bucket.put=async(...args)=>{if(fail){fail=false;throw new Error('Storage interrupted');}return put(...args);};
- await assert.rejects(uploadPresentationFile(call,state.courseId,file,{source:true}),/interrupted/);const assetId=await uploadPresentationFile(call,state.courseId,file,{source:true});
+ const assetId=await uploadPresentationFile(call,state.courseId,file,{source:true});assert.equal(fail,false);
  const args={courseId:state.courseId,assetId,index:0,data:encode64(new TextEncoder().encode('Original text'))};bucket.objects.clear();await call('upload_presentation_chunk',args);assert.equal(bucket.objects.size,1);
  await assert.rejects(call('upload_presentation_chunk',{...args,data:encode64(new TextEncoder().encode('Replaced text'))}),/cannot be overwritten/);
  const fresh=(await call('read_course_state',{courseId:state.courseId})).state;await call('attach_source_original',{courseId:state.courseId,revision:fresh.revision,sourceId:'missing',assetId}).then(()=>assert.fail('Missing sources must fail'),e=>assert.match(e.message,/not found/));
 });
 test('profiles use only trusted current identity and reject client-selected account IDs',async t=>{
  const profile=connectedProfile(new Request('https://pummy.test/',{headers:{'oai-authenticated-user-full-name':'Daniel%20Dehkordi','oai-authenticated-user-full-name-encoding':'percent-encoded-utf-8','oai-authenticated-user-email':'demo@example.test'}}));assert.equal(profile.name,'Daniel Dehkordi');
- const db=new LocalD1();t.after(()=>db.close());const repo=new CourseRepository(db,'current',null,null,profile);assert.deepEqual((await executeTool(repo,'read_connected_profile',{})).profile,profile);
+ const db=new LocalD1();t.after(()=>db.close());const repo=new CourseRepository(db,'current',null,null,profile);const current=(await executeTool(repo,'read_connected_profile',{})).profile;assert.deepEqual({name:current.name,email:current.email},profile);assert.match(current.recoveryScope,/^[a-f0-9]{64}$/);const other=(await executeTool(new CourseRepository(db,'other'),'read_connected_profile',{})).profile;assert.notEqual(current.recoveryScope,other.recoveryScope);
  await assert.rejects(executeTool(repo,'read_connected_profile',{userId:'other-account'}),/Check/);
 });

@@ -17,7 +17,7 @@ export class LocalD1 {
  }
  prepare(sql){
   const db=this.db;let args=[];
-  const execute=()=>{const result=db.prepare(sql).run(...args);return {meta:{changes:Number(result.changes)}};};
+  const execute=()=>{if(/^\s*(SELECT|WITH|PRAGMA)\b/i.test(sql))return {results:db.prepare(sql).all(...args),meta:{changes:0}};const result=db.prepare(sql).run(...args);return {meta:{changes:Number(result.changes)}};};
   return {bind(...values){args=values;return this;},async first(){return db.prepare(sql).get(...args)||null;},async all(){return {results:db.prepare(sql).all(...args)};},async run(){return execute();},_execute:execute};
  }
  async batch(statements){this.db.exec('BEGIN');try{const results=statements.map(s=>s._execute());this.db.exec('COMMIT');return results;}catch(e){this.db.exec('ROLLBACK');throw e;}}

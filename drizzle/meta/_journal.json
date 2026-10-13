@@ -29,6 +29,27 @@
       "when": 1791493374422,
       "tag": "0003_long_goliath",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791820800000,
+      "tag": "0004_course_deletions",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1791820800001,
+      "tag": "0005_course_source_content",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791848559568,
+      "tag": "0006_practice_banks",
+      "breakpoints": true
     }
   ]
 }

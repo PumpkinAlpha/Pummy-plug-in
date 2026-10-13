@@ -98,13 +98,6 @@
 .ppt-ribbon .tutor-ribbon-tabs{cursor:pointer;min-height:36px}
 .ppt-ribbon .tutor-ribbon-tabs button[aria-expanded=false]{border-bottom-color:#c8c6c4;color:var(--ppt-ink)}
 
-/* Fullscreen title bar collapses to a strip; hover, focus or Escape reveals it */
-.interactive-tutor.is-expanded .ppt-titlebar{transition:max-height 180ms ease,padding 180ms ease}
-.interactive-tutor.is-expanded .ppt-titlebar.is-collapsed{max-height:8px;min-height:8px;padding:0 10px;overflow:hidden;cursor:pointer}
-.interactive-tutor.is-expanded .ppt-titlebar.is-collapsed>*{visibility:hidden}
-.interactive-tutor.is-expanded .ppt-titlebar:not(.is-collapsed){max-height:200px}
-@media(prefers-reduced-motion:reduce){.interactive-tutor.is-expanded .ppt-titlebar{transition:none}}
-
 /* Editor fills the remaining screen; slide and thumbnails share the space with no page scroll */
 .interactive-tutor{overflow:hidden;box-sizing:border-box}
 .interactive-tutor>*{flex:none}
@@ -126,7 +119,7 @@
 
 /* Thumbnail panel height follows the slide box beside it */
 .interactive-tutor .tutor-navigator{align-self:flex-start;max-height:100%}
-.interactive-tutor.is-expanded .ppt-titlebar.is-collapsed{min-height:12px;max-height:12px}
+
 
 /* Measured area fills the column; the slide box inside fits the slide exactly and the thumbnails match it */
 .interactive-tutor .tutor-canvas-column>.tutor-canvas-fit{flex:1 1 auto;min-height:120px;overflow:hidden;display:flex;align-items:flex-start;justify-content:center}
@@ -171,9 +164,12 @@
 .interactive-tutor>.ppt-notes{flex:none;width:100%;box-sizing:border-box}
 
 /* Keep floating controls usable on narrow screens. */
-.explain-slide-fab{max-width:calc(100vw - 16px)}
+.explain-slide-fab{max-width:calc(100vw - 24px)}
 .explain-slide-bar{max-width:100%;flex-wrap:wrap;justify-content:flex-end;border-radius:24px;box-sizing:border-box}
 .explain-slide-status{max-width:min(320px,calc(100vw - 32px));overflow-wrap:anywhere}
+.explain-slide-fab[data-dock-corner$="l"]{align-items:flex-start}
+.explain-slide-fab[data-dock-corner$="l"] .explain-slide-bar{justify-content:flex-start}
+.explain-slide-fab[data-dock-corner^="b"]{flex-direction:column-reverse}
 
 /* Retain the app's reading themes in the new presentation layout. */
 .interactive-tutor{--ppt-canvas:var(--sunk);--ppt-ink:var(--ink);--ppt-muted:var(--muted);--ppt-line:var(--line);--ppt-ribbon:var(--raised);color:var(--ink)}
@@ -183,3 +179,29 @@
 .interactive-tutor .ppt-ribbon .tutor-ribbon-tabs button:not([aria-pressed=true]){color:var(--ink)}
 .interactive-tutor .ppt-ribbon .tutor-tools select{background:var(--panel);color:var(--ink);border-color:var(--line)}
 .interactive-tutor .ppt-ribbon .tutor-ribbon-tabs button[aria-pressed=true]{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* Fixed row height prevents title/ribbon collisions; controls remain reachable on touch. */
+.interactive-tutor.is-expanded .ppt-titlebar{position:relative;top:auto;min-height:56px;height:auto;max-height:none;padding:8px 12px;gap:8px;background:var(--panel);color:var(--ink);border-bottom:1px solid var(--line)}
+.ppt-titlebar h1{color:var(--ink);font-size:14px;line-height:1.3}
+.ppt-titlebar .fine,.ppt-titlebar .tutor-save{color:var(--muted)}
+.ppt-titlebar button,.ppt-titlebar select{color:var(--ink);min-height:36px;background:var(--raised);border-color:var(--line);border-radius:6px}
+.ppt-titlebar button:hover:not(:disabled){background:var(--accent-soft)!important}
+.ppt-titlebar select{min-width:150px;max-width:220px}
+.ppt-titlebar>div{flex:1;min-width:150px}
+.ppt-titlebar .tutor-save{color:var(--good)}
+.ppt-titlebar .tutor-save.failed{color:var(--bad)}
+.interactive-tutor .tutor-ribbon-tabs{min-height:42px}
+@media(max-width:650px){.interactive-tutor.is-expanded .ppt-titlebar{gap:6px;padding:8px}.ppt-titlebar>div{min-width:calc(100% - 84px);order:-1}.ppt-titlebar>button:first-child{order:-2}.ppt-titlebar>div .fine{display:none}.ppt-titlebar button,.ppt-titlebar select{min-height:36px;font-size:12px}.ppt-titlebar>button:nth-of-type(2){display:none}.ppt-titlebar select{flex:1;max-width:none;min-width:100px}.ppt-titlebar .tutor-save{margin-inline-start:auto}}
+
+.interactive-tutor .tutor-audio{background:var(--panel);color:var(--ink)}
+.interactive-tutor .tutor-audio .fine{color:var(--muted)}
+.interactive-tutor .tutor-audio{border-color:var(--line);max-height:30dvh;overflow:auto;scrollbar-width:thin;min-width:0}
+.interactive-tutor .tutor-audio h3{color:var(--ink)}
+.interactive-tutor .tutor-audio [role=alert]{color:var(--bad)}
+.interactive-tutor .tutor-audio button{background:var(--raised);color:var(--ink);border:1px solid var(--line-2);min-height:36px;padding:6px 10px}
+.interactive-tutor .tutor-audio button:hover:not(:disabled){background:var(--accent-soft);color:var(--ink);border-color:var(--accent)}
+.interactive-tutor .tutor-audio button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.interactive-tutor .tutor-audio-track{gap:8px 12px}
+.interactive-tutor .tutor-audio-track>span{color:var(--muted);max-width:100%}
+.interactive-tutor .tutor-audio-track audio{display:block;width:min(340px,100%);min-width:0;color-scheme:inherit;accent-color:var(--accent)}
+@media(max-width:650px){.interactive-tutor .tutor-audio{margin:8px;padding:10px}.interactive-tutor .tutor-audio-track>span{flex-basis:100%}}

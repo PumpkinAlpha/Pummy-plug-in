@@ -13,7 +13,7 @@ test('studying a folder ignores unrelated saved filters and includes question-on
   let state=(await executeTool(repo,'import_questions',{requestId:crypto.randomUUID(),name:'Folders',questions:[
    {term:'Old selection',stem:'Old question?',options:['Yes','No'],answer:[0],sourceId:'old-source',objectiveId:'old-objective',setId:'old-set',weekId:'week1'},
    {term:'New folder',stem:'New question?',options:['One','Two','Three'],answer:[0,1],multi:true,weekId:'week2'}
-  ],sources:[{id:'old-source',name:'Week 1 source',text:'Old material.',weekId:'week1'}],objectives:[{id:'old-objective',text:'Old objective'}]})).state;
+  ],sources:[{id:'old-source',name:'Week 1 source',text:'Old material.\nLearning objectives\n1. Old objective',weekId:'week1'}],objectives:[{id:'old-objective',text:'Old objective',sourceId:'old-source'}]})).state;
   state=(await executeTool(repo,'save_preferences',{courseId:state.courseId,revision:state.revision,size:1,adaptive:false,includeReviews:false,sourceIds:['old-source'],objectiveIds:['old-objective'],types:['mcq'],setId:'old-set',weekId:'week1'})).state;
   const exam=(await executeTool(repo,'start_test',{courseId:state.courseId,revision:state.revision,...dashboardExamSettings(state,{weekId:'week2'},false)})).state;
   assert.equal(exam.question.term,'New folder');

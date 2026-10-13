@@ -23,7 +23,7 @@ test('attached PowerPoint opens as a tutor presentation, reuses conversion and p
  current=(await call('attach_source_original',{courseId:state.courseId,revision:current.revision,sourceId:'lecture',assetId})).state;
  const before=await repo.get(state.courseId),args={courseId:state.courseId,presentationId:crypto.randomUUID(),sourceId:'lecture'};
  const first=(await call('import_course_presentation',args)).presentation,again=(await call('import_course_presentation',args)).presentation;
- assert.equal(first.id,again.id);assert.equal(first.originalAssetId,assetId);assert.equal(first.sourceId,'lecture');assert.equal(first.kind,'pptx');assert.equal(first.slides.length,2);assert.equal(calls,1);
+ assert.equal(first.id,again.id);assert.equal(first.originalAssetId,assetId);assert.equal(first.sourceId,'lecture');assert.equal(first.kind,'pptx');assert.equal(first.slides.length,2);assert.equal(first.renderMode,'powerpoint');assert.equal(calls,0);
  assert.deepEqual(await repo.get(state.courseId),before);
  assert.deepEqual(decode64((await call('read_presentation_chunk',{courseId:state.courseId,assetId,index:0})).asset.data),bytes);
 });
@@ -51,5 +51,5 @@ test('native converter rejects corrupt, macro-enabled input before starting Offi
  const converter=createPresentationConverter({executable:'/missing/soffice'});
  assert.equal((await converter.fetch(new Request('https://converter',{method:'GET'}))).status,405);
  const request=(bytes,type='application/vnd.ms-powerpoint',extra={})=>new Request('https://converter',{method:'POST',headers:{'Content-Type':type,...extra},body:bytes});
- assert.equal((await converter.fetch(request(new Uint8Array([1])))).status,400);assert.equal((await converter.fetch(request(fixtureLegacyPPT({macro:true})))).status,400);assert.equal((await converter.fetch(request('x','text/plain'))).status,415);assert.equal((await converter.fetch(request('x','application/vnd.ms-powerpoint',{'Content-Length':String(25*1024*1024)}))).status,400);
+ assert.equal((await converter.fetch(request(new Uint8Array([1])))).status,400);assert.equal((await converter.fetch(request(fixtureLegacyPPT({macro:true})))).status,400);assert.equal((await converter.fetch(request('x','text/plain'))).status,415);assert.equal((await converter.fetch(request('x','application/vnd.ms-powerpoint',{'Content-Length':String(25*1024*1024)}))).status,413);
 });

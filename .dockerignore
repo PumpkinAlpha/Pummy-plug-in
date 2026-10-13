@@ -1,0 +1,10 @@
+*
+!package.json
+!package-lock.json
+!lib/
+!lib/**
+!worker/
+!worker/presentation-converter.js
+!scripts/
+!scripts/presentation-converter.mjs
+!scripts/converter-server.mjs

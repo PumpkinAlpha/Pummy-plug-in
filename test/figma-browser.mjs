@@ -7,13 +7,14 @@ import {LocalD1} from '../scripts/local-db.mjs';
 import {CourseRepository} from '../worker/repository.js';
 import {executeTool} from '../worker/tools.js';
 import {fixturePDF,fixturePPTX} from './tutor-fixtures.mjs';
+import {nativePPTX} from './native-fixtures.mjs';
 import {encode64,CHUNK_SIZE} from '../lib/tutor/presentations.js';
 import worker from '../dist/server/index.js';
 const directory=new URL('../work/figma-qa/',import.meta.url);await mkdir(directory,{recursive:true});
 const db=new LocalD1(),repo=new CourseRepository(db,'figma-qa',{fetch:async()=>new Response(await fixturePDF())}),call=(name,args)=>executeTool(repo,name,args);
 let {state}=await call('import_questions',{requestId:crypto.randomUUID(),name:'Figma integration preview',questions:[{stem:'Which number is even?',options:['One','Two'],answer:[1]}],sources:[{id:'lecture',name:'Anatomy lecture',text:'The jugular and subclavian veins unite.'}]});
 async function upload(bytes,kind){const data=encode64(bytes),assetId=crypto.randomUUID();await call('begin_presentation_upload',{courseId:state.courseId,assetId,name:'Anatomy lecture.'+kind,kind,bytes:bytes.length,chunks:Math.ceil(data.length/CHUNK_SIZE)});for(let index=0;index<Math.ceil(data.length/CHUNK_SIZE);index++)await call('upload_presentation_chunk',{courseId:state.courseId,assetId,index,data:data.slice(index*CHUNK_SIZE,(index+1)*CHUNK_SIZE)});return assetId;}
-const originalAssetId=await upload(fixturePPTX(),'pptx');state=(await call('attach_source_original',{courseId:state.courseId,revision:state.revision,sourceId:'lecture',assetId:originalAssetId})).state;
+const originalAssetId=await upload(nativePPTX(),'pptx');state=(await call('attach_source_original',{courseId:state.courseId,revision:state.revision,sourceId:'lecture',assetId:originalAssetId})).state;
 const p=(await call('import_course_presentation',{courseId:state.courseId,presentationId:crypto.randomUUID(),sourceId:'lecture'})).presentation,before=await repo.get(state.courseId);
 const host=`<!doctype html><style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style><iframe src="/"></iframe><script>
 window.handoffs=[];window.contexts=[];window.displayRequests=[];addEventListener('message',async e=>{const m=e.data;if(!m||m.jsonrpc!=='2.0'||m.id==null)return;try{let result={};if(m.method==='ui/initialize')result={protocolVersion:'2026-01-26',hostInfo:{name:'QA host',version:'1'},hostCapabilities:{serverTools:{},message:{text:{}},updateModelContext:{structuredContent:{}}},hostContext:{displayMode:'inline',availableDisplayModes:['inline','fullscreen']}};else if(m.method==='tools/call')result=await fetch('/api/tool',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(m.params)}).then(r=>r.json());else if(m.method==='ui/message')handoffs.push(m.params);else if(m.method==='ui/update-model-context')contexts.push(m.params);else if(m.method==='ui/request-display-mode')displayRequests.push(m.params);e.source.postMessage({jsonrpc:'2.0',id:m.id,result},'*');}catch(error){e.source.postMessage({jsonrpc:'2.0',id:m.id,error:{code:-32603,message:error.message}},'*');}});
@@ -26,7 +27,7 @@ try{
  await page.goto(`http://127.0.0.1:${server.address().port}`);await page.getByRole('button',{name:'Open course',exact:true}).click();
  await page.getByRole('button',{name:'Open sidebar',exact:true}).click();await page.getByRole('button',{name:'Interactive Tutor',exact:true}).click();
  const add=page.getByRole('button',{name:'Add a presentation',exact:true}),sources=page.getByRole('button',{name:'Existing course sources',exact:true});
- assert.equal(await add.getAttribute('aria-expanded'),'true');await sources.click();assert.equal(await add.getAttribute('aria-expanded'),'false');await page.getByLabel('Open an attached professor PDF or PowerPoint').selectOption('lecture');assert.equal(await page.getByLabel('Choose exported PDF for attached PowerPoint').count(),1);await add.click();
+ assert.equal(await add.getAttribute('aria-expanded'),'false');assert.equal(await sources.getAttribute('aria-expanded'),'true');await page.getByLabel('Open an attached professor PDF or PowerPoint').selectOption('lecture');assert.equal(await page.getByLabel('Choose exported PDF for attached PowerPoint').count(),1);await add.click();
  await page.getByRole('button',{name:/Anatomy lecture.pptx/}).click();await page.locator('.interactive-tutor.is-expanded').waitFor();await page.waitForFunction(()=>!!document.querySelector('.tutor-canvas image')?.getAttribute('href'));
  assert.equal(await page.evaluate(()=>window.fullscreenCalls),0);assert.equal(await page.locator('.tutor-tools').count(),0);assert.equal(await page.locator('.tutor-navigator').count(),0);
  const fab=page.getByRole('toolbar',{name:'Slide tutor controls'});await fab.hover();await page.getByRole('button',{name:'Explain the slide',exact:true}).click();await page.getByText('Open Pummy in ChatGPT to explain slides.',{exact:true}).waitFor();

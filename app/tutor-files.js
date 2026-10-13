@@ -3,26 +3,43 @@ import {PDFDocument} from 'pdf-lib';
 import {zipSync,unzipSync,strToU8,strFromU8} from 'fflate';
 import {CHUNK_SIZE,encode64,decode64,pptxMetadata} from '../lib/tutor/presentations.js';
 import {annotationSVG} from '../lib/tutor/annotations.js';
+import {isNativePowerPoint,nativeSlideImage,nativeTextAt} from './powerpoint.js';
 const assets=new Map(),uploads=new WeakMap();let documentCache=null;
-export async function uploadPresentationFile(call,courseId,file,{source=false}={}){
+export async function uploadPresentationFile(call,courseId,file,{source=false,onProgress=()=>{}}={}){
  if(!file||!file.size)throw new Error('Choose a nonempty file.');
  const extension=file.name.toLowerCase().split('.').at(-1),kind=(source?['pdf','ppt','pptx','docx','txt','md']:['pdf','ppt','pptx']).includes(extension)?extension:null;
  if(!kind)throw new Error(source?'Choose a PDF, PowerPoint, Word, TXT or Markdown file.':'Choose a PDF, PPT or PPTX file.');
  let transfer=uploads.get(file)?.get(courseId);
- if(!transfer){transfer={assetId:crypto.randomUUID(),chunks:Math.ceil(file.size/(CHUNK_SIZE/4*3)),next:0};if(!uploads.has(file))uploads.set(file,new Map());uploads.get(file).set(courseId,transfer);}
+ if(!transfer){transfer={assetId:crypto.randomUUID(),chunks:Math.ceil(file.size/(CHUNK_SIZE/4*3)),done:new Set()};if(!uploads.has(file))uploads.set(file,new Map());uploads.get(file).set(courseId,transfer);}
  await call('begin_presentation_upload',{courseId,assetId:transfer.assetId,name:file.name,kind,bytes:file.size,chunks:transfer.chunks});
- for(let index=transfer.next;index<transfer.chunks;index++){await call('upload_presentation_chunk',{courseId,assetId:transfer.assetId,index,data:encode64(new Uint8Array(await (file.slice?file.slice(index*CHUNK_SIZE/4*3,(index+1)*CHUNK_SIZE/4*3).arrayBuffer():file.arrayBuffer().then(buffer=>buffer.slice(index*CHUNK_SIZE/4*3,(index+1)*CHUNK_SIZE/4*3)))))});transfer.next=index+1;}
+ const remaining=Array.from({length:transfer.chunks},(_,i)=>i).filter(i=>!transfer.done.has(i));let cursor=0,failure;
+ const progress=()=>onProgress({completed:transfer.done.size,total:transfer.chunks,bytes:Math.min(file.size,transfer.done.size*CHUNK_SIZE/4*3),totalBytes:file.size});progress();
+ await Promise.all(Array.from({length:Math.min(3,remaining.length)},async()=>{while(!failure&&cursor<remaining.length){const index=remaining[cursor++];try{const start=index*CHUNK_SIZE/4*3,end=(index+1)*CHUNK_SIZE/4*3,buffer=file.slice?await file.slice(start,end).arrayBuffer():(await file.arrayBuffer()).slice(start,end);const args={courseId,assetId:transfer.assetId,index,data:encode64(new Uint8Array(buffer))};
+  for(let retry=0;;retry++){try{await call('upload_presentation_chunk',args);break;}catch(e){if(retry>=2||!/timeout|timed out|network|fetch|temporar|storage|interrupted|unavailable|502|503|504|10001/i.test(e.message))throw e;await new Promise(r=>setTimeout(r,250*(retry+1)));}}
+  transfer.done.add(index);progress();}catch(e){failure=e;}}}));if(failure)throw failure;
+
  return transfer.assetId;
 }
-export async function loadAsset(call,courseId,asset){const key=courseId+':'+asset.id;if(assets.has(key))return assets.get(key);const parts=[];for(let index=0;index<asset.chunks;index++)parts.push(decode64((await call('read_presentation_chunk',{courseId,assetId:asset.id,index})).asset.data));const bytes=new Uint8Array(parts.reduce((n,c)=>n+c.length,0));let offset=0;for(const part of parts){bytes.set(part,offset);offset+=part.length;}if(assets.size>=3)assets.delete(assets.keys().next().value);assets.set(key,bytes);return bytes;}
+export async function loadAsset(call,courseId,asset){const key=courseId+':'+asset.id;if(assets.has(key))return assets.get(key);const pending=(async()=>{const parts=new Array(asset.chunks);let cursor=0;await Promise.all(Array.from({length:Math.min(3,asset.chunks)},async()=>{while(cursor<asset.chunks){const index=cursor++;parts[index]=decode64((await call('read_presentation_chunk',{courseId,assetId:asset.id,index})).asset.data);}}));const bytes=new Uint8Array(parts.reduce((n,c)=>n+c.length,0));let offset=0;for(const part of parts){bytes.set(part,offset);offset+=part.length;}return bytes;})();if(assets.size>=3)assets.delete(assets.keys().next().value);assets.set(key,pending);try{return await pending;}catch(e){if(assets.get(key)===pending)assets.delete(key);throw e;}}
+
 export async function renderSlide(call,presentation,page,width=1500){
+ if(isNativePowerPoint(presentation))return nativeSlideImage(call,presentation,page,width,loadAsset);
  const key=presentation.courseId+':'+presentation.pdfAssetId;
- if(documentCache?.key!==key){const old=documentCache;const promise=(async()=>{if(old)await (await old.promise).loadingTask.destroy();const bytes=await loadAsset(call,presentation.courseId,presentation.assets.pdf);return getDocumentProxy(bytes.slice(),{isEvalSupported:false,stopAtErrors:true});})();documentCache={key,promise};}
+ if(documentCache?.key!==key){
+  const old=documentCache,entry={key,promise:null};
+  entry.promise=(async()=>{
+   if(old)try{await (await old.promise).loadingTask.destroy();}catch{/* A failed previous document must not block opening another. */}
+   const bytes=await loadAsset(call,presentation.courseId,presentation.assets.pdf);
+   return getDocumentProxy(bytes.slice(),{isEvalSupported:false,stopAtErrors:true});
+  })().catch(e=>{if(documentCache===entry)documentCache=null;throw e;});
+  documentCache=entry;
+ }
  const doc=await documentCache.promise,p=await doc.getPage(page),base=p.getViewport({scale:1}),viewport=p.getViewport({scale:width/base.width}),canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);await p.render({canvasContext:canvas.getContext('2d'),viewport}).promise;return canvas.toDataURL('image/png');
 }
 // Finds the original slide text block (line or paragraph) at a normalized point, read from the
 // rendered PDF so it works for PDF and converted PowerPoint slides. The source file is never changed.
 export async function slideTextAt(call,presentation,page,px,py){
+ if(isNativePowerPoint(presentation))return nativeTextAt(call,presentation,page,px,py,loadAsset);
  await renderSlide(call,presentation,page,200);
  const doc=await documentCache.promise,pg=await doc.getPage(page),v=pg.getViewport({scale:1}),{items}=await pg.getTextContent();
  const runs=items.filter(t=>t.str&&t.str.trim()).map(t=>{const size=Math.hypot(t.transform[2],t.transform[3])||t.height||10,[x,base]=v.convertToViewportPoint(t.transform[4],t.transform[5]);return {str:t.str,x:x/v.width,y:(base-size*.9)/v.height,w:Math.max(t.width,1)/v.width,h:size*1.15/v.height,size:size/v.width,base:base/v.height};});
@@ -93,4 +110,4 @@ export async function exportEditablePPTX(call,p,annotations){if(p.kind!=='pptx')
  for(let i=0;i<ids.length;i++){const name='ppt/'+relMap.get(ids[i]).replace(/^\.\//,''),s=p.slides[i],objects=[...(annotations[s.id]||[])].sort((a,b)=>a.layer-b.layer);if(objects.some(a=>a.type==='image'))throw new Error('Image annotations currently require flattened PPTX export.');let source=strFromU8(files[name]);const last=Math.max(1,...[...source.matchAll(/<p:cNvPr\b[^>]*\bid="(\d+)"/g)].map(m=>Number(m[1])));const additions=objects.map((a,j)=>editableShape(a,last+j+1,Math.round(meta.width*12700),Math.round(meta.height*12700))).join('');if(!source.includes('</p:spTree>'))throw new Error('Unsupported PPTX namespace. Use flattened export.');files[name]=strToU8(source.replace('</p:spTree>',additions+'</p:spTree>'));}
  return zipSync(files);
 }
-export async function exportProject(call,p,annotations){const original=await loadAsset(call,p.courseId,p.assets.original),pdf=await loadAsset(call,p.courseId,p.assets.pdf);return JSON.stringify({format:'pummy-tutor-project',version:1,presentation:p,annotations,original:encode64(original),pdf:p.kind==='pdf'?null:encode64(pdf)});}
+export async function exportProject(call,p,annotations){const original=await loadAsset(call,p.courseId,p.assets.original),pdf=p.assets.pdf?await loadAsset(call,p.courseId,p.assets.pdf):null;return JSON.stringify({format:'pummy-tutor-project',version:1,presentation:p,annotations,original:encode64(original),pdf:p.kind==='pdf'||!pdf?null:encode64(pdf)});}

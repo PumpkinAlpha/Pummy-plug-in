@@ -1,13 +1,14 @@
-import {decode64} from '../lib/tutor/presentations.js';
+import {CHUNK_SIZE,decode64} from '../lib/tutor/presentations.js';
+import {retryStorage} from './storage-retry.js';
 const conflict=()=>Object.assign(new Error('Annotations changed in another window. Your local changes are kept. Reload before saving.'),{code:'conflict'});
 export class TutorRepository {
  constructor(courseRepo){this.db=courseRepo.db;this.userId=courseRepo.userId;this.courses=courseRepo;this.assetStore=courseRepo.assetStore;}
  async authorize(courseId){const c=await this.courses.get(courseId);if(!c)throw new Error('Course not found.');return c;}
  query(sql,...params){return this.db.prepare(sql).bind(this.userId,...params);}
- async list(courseId){const {results}=await this.query('SELECT id,metadata,revision,updated_at FROM tutor_presentations WHERE user_id=? AND course_id=? ORDER BY updated_at DESC',courseId).all();return results.map(r=>{const p=JSON.parse(r.metadata);return {id:p.id,name:p.name,kind:p.kind,slideCount:p.slides.length,originalAssetId:p.originalAssetId,pdfAssetId:p.pdfAssetId,revision:r.revision,updatedAt:r.updated_at};});}
+ async list(courseId){const {results}=await this.query('SELECT id,metadata,revision,updated_at FROM tutor_presentations WHERE user_id=? AND course_id=? ORDER BY updated_at DESC',courseId).all();return results.map(r=>{const p=JSON.parse(r.metadata);return {id:p.id,name:p.name,kind:p.kind,sourceId:p.sourceId||null,folder:p.folder||null,slideCount:p.slides.length,originalAssetId:p.originalAssetId,pdfAssetId:p.pdfAssetId,revision:r.revision,updatedAt:r.updated_at};});}
  async get(courseId,id){const r=await this.query('SELECT * FROM tutor_presentations WHERE user_id=? AND course_id=? AND id=?',courseId,id).first();if(!r)throw new Error('Presentation not found.');const {results}=await this.query('SELECT slide_id,data FROM tutor_slide_annotations WHERE user_id=? AND course_id=? AND presentation_id=?',courseId,id).all();return {...JSON.parse(r.metadata),annotations:{...JSON.parse(r.annotations),...Object.fromEntries(results.map(s=>[s.slide_id,JSON.parse(s.data)]))},revision:r.revision,lastRequest:r.last_request};}
  async create(courseId,id,metadata){
-  const ready=this.db.prepare("UPDATE tutor_assets SET ready=1 WHERE user_id=? AND course_id=? AND id IN (?,?) AND EXISTS(SELECT 1 FROM tutor_presentations WHERE user_id=? AND course_id=? AND id=? AND json_extract(metadata,'$.originalAssetId')=? AND json_extract(metadata,'$.pdfAssetId')=? AND coalesce(json_extract(metadata,'$.sourceId'),'')=?)").bind(this.userId,courseId,metadata.originalAssetId,metadata.pdfAssetId,this.userId,courseId,id,metadata.originalAssetId,metadata.pdfAssetId,metadata.sourceId||'');
+  const ready=this.db.prepare("UPDATE tutor_assets SET ready=1 WHERE user_id=? AND course_id=? AND id IN (?,?) AND EXISTS(SELECT 1 FROM tutor_presentations WHERE user_id=? AND course_id=? AND id=? AND json_extract(metadata,'$.originalAssetId')=? AND json_extract(metadata,'$.pdfAssetId') IS ? AND coalesce(json_extract(metadata,'$.sourceId'),'')=?)").bind(this.userId,courseId,metadata.originalAssetId,metadata.pdfAssetId,this.userId,courseId,id,metadata.originalAssetId,metadata.pdfAssetId,metadata.sourceId||'');
   // Publishing metadata and making validated immutable assets readable is one transaction.
   // The conditional update also prevents a concurrent import from reusing another import's ID.
   await this.db.batch([this.query('INSERT OR IGNORE INTO tutor_presentations(user_id,course_id,id,metadata,updated_at) VALUES(?,?,?,?,?)',courseId,id,JSON.stringify(metadata),Date.now()),ready]);
@@ -37,17 +38,18 @@ export class TutorRepository {
   if(!this.assetStore)throw new Error('File storage is temporarily unavailable. Retry shortly.');
   const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(data)))].map(b=>b.toString(16).padStart(2,'0')).join('');
   // Content-addressed keys prevent competing uploads from overwriting original bytes.
-  await this.assetStore.put(this.assetKey(courseId,a.id,index,hash),data);
+  await retryStorage(()=>this.assetStore.put(this.assetKey(courseId,a.id,index,hash),data));
   return hash;
  }
  async chunkData(courseId,a,index){
   const row=await this.query('SELECT data FROM tutor_asset_chunks WHERE user_id=? AND course_id=? AND asset_id=? AND chunk_index=?',courseId,a.id,index).first();
   if(!row)throw new Error('Upload is incomplete.');
   if(a.storage!=='r2')return row.data;
-  const object=await this.assetStore?.get(this.assetKey(courseId,a.id,index,row.data));
+  const object=this.assetStore?await retryStorage(()=>this.assetStore.get(this.assetKey(courseId,a.id,index,row.data))):null;
   if(!object)throw new Error('Upload is incomplete. Retry the file upload.');
   return object.text();
  }
+ async assetBytes(courseId,id){const a=await this.asset(courseId,id),bytes=new Uint8Array(a.bytes);let cursor=0;await Promise.all(Array.from({length:Math.min(3,a.chunks)},async()=>{while(cursor<a.chunks){const index=cursor++,part=decode64(await this.chunkData(courseId,a,index)),offset=index*CHUNK_SIZE/4*3;if(part.length!==Math.min(CHUNK_SIZE/4*3,a.bytes-offset))throw new Error('Original source upload has a size mismatch.');bytes.set(part,offset);}}));return bytes;}
  async assetData(courseId,id){const a=await this.asset(courseId,id),parts=[];for(let index=0;index<a.chunks;index++)parts.push(await this.chunkData(courseId,a,index));return parts.join('');}
  async validateAsset(courseId,id){
   const a=await this.asset(courseId,id);let decoded=0;
@@ -58,5 +60,11 @@ export class TutorRepository {
  async request(courseId,presentationId,id){const r=await this.query('SELECT data FROM tutor_requests WHERE user_id=? AND course_id=? AND presentation_id=? AND id=?',courseId,presentationId,id).first();if(!r)throw new Error('Tutor request not found.');return JSON.parse(r.data);}
  async requestList(courseId,presentationId){const {results}=await this.query('SELECT data FROM tutor_requests WHERE user_id=? AND course_id=? AND presentation_id=? ORDER BY updated_at DESC LIMIT 20',courseId,presentationId).all();return results.map(r=>JSON.parse(r.data)).reverse();}
  async putRequest(courseId,presentationId,id,data){await this.query('INSERT OR IGNORE INTO tutor_requests(user_id,course_id,presentation_id,id,data,updated_at) VALUES(?,?,?,?,?,?)',courseId,presentationId,id,JSON.stringify(data),Date.now()).run();return this.request(courseId,presentationId,id);}
- async completeRequest(courseId,presentationId,id,data,expected){const r=await this.db.prepare('UPDATE tutor_requests SET data=?,updated_at=? WHERE user_id=? AND course_id=? AND presentation_id=? AND id=? AND data=?').bind(JSON.stringify(data),Date.now(),this.userId,courseId,presentationId,id,JSON.stringify(expected)).run();if(!r.meta.changes)throw conflict();return data;}
+ async completeRequest(courseId,presentationId,id,data,expected,archive=null){
+  const next=archive?{...data,archiveWriteId:crypto.randomUUID()}:data,json=JSON.stringify(next);
+  const statement=this.db.prepare('UPDATE tutor_requests SET data=?,updated_at=? WHERE user_id=? AND course_id=? AND presentation_id=? AND id=? AND data=?').bind(json,Date.now(),this.userId,courseId,presentationId,id,JSON.stringify(expected));
+  const gate='EXISTS(SELECT 1 FROM tutor_requests WHERE user_id=? AND course_id=? AND presentation_id=? AND id=? AND data=?)';
+  const extra=archive?[archive(gate,[this.userId,courseId,presentationId,id,json])]:[];
+  const [r]=await this.db.batch([statement,...extra]);if(!r.meta.changes)throw conflict();return next;
+ }
 }

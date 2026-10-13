@@ -1,4 +1,5 @@
 import {grounding,formatGrounding,provenance} from './grounding.js';
+import {sourceExplanation} from '../lib/source-objectives.js';
 import {explanationGuidance,hasFullExplanation} from '../lib/explanation-depth.js';
 
 export function bankExplanationSummary(request){return request?{id:request.id,depth:request.depth,total:request.questionIds.length,completed:request.completed.length,pending:request.questionIds.filter(id=>!request.completed.includes(id)).length}:null;}
@@ -33,7 +34,7 @@ export async function executeBankExplanations(repo,model,saved,name,args,view,va
    const q=model.questions.get(questionId);if(!q||hasFullExplanation(q))throw new Error('This question already has an explanation or was removed.');
    if(!hasFullExplanation({explanation}))throw new Error('Include a nonempty explanation body.');
    const g=context(model,q).provenance;validateSources(explanation,g);
-   q.explanation={...explanation,depth:request.depth,grounding:g};request.completed.push(questionId);
+   q.explanation={...sourceExplanation(explanation,model),depth:request.depth,grounding:g};request.completed.push(questionId);
   }
   model.completedRequests=[...model.completedRequests,{id:args.batchId,tool:name}].slice(-40);
  }

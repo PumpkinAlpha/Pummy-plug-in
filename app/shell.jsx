@@ -1,8 +1,9 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {PummyMark} from './dashboard.jsx';
+import {studyFolders} from './folders.js';
 import {Icon} from './icons.jsx';
 
-export function AppHeader({state,courses=[],busy,onHome,onOpenCourse,onTab,onSettings,onToggleSidebar,sidebarOpen,exam,saveStatus,onBack,canBack,autoHide=false}){
+export function AppHeader({state,courses=[],busy,onHome,onOpenCourse,onTab,onFolder,folder,onSettings,onToggleSidebar,sidebarOpen,exam,saveStatus,onBack,canBack,autoHide=false}){
  const [contextOpen,setContextOpen]=useState(false),[revealed,setRevealed]=useState(false),[hovered,setHovered]=useState(false),hideTimer=useRef(null);
  const show=()=>{clearTimeout(hideTimer.current);setHovered(true);};
  const hide=()=>{clearTimeout(hideTimer.current);hideTimer.current=setTimeout(()=>setHovered(false),400);};
@@ -17,7 +18,7 @@ export function AppHeader({state,courses=[],busy,onHome,onOpenCourse,onTab,onSet
   <div className="topbar-left">{state&&!exam&&<button className="shell-icon-btn" type="button" aria-label={sidebarOpen?'Close sidebar':'Open sidebar'} aria-expanded={sidebarOpen} onClick={onToggleSidebar}><Icon name="menu" size={22}/></button>}{canBack&&<button className="shell-icon-btn" aria-label="Back" title="Previous page" onClick={onBack}><Icon name="chevronLeft" size={20}/></button>}{state&&<>
    <button className="brand" onClick={onHome} aria-label="Pummy.Ai home"><PummyMark/><span>Pummy.Ai</span></button>
    <div className="context-menu" data-course-context><button className="course-crumb" type="button" aria-haspopup="menu" aria-expanded={contextOpen} onClick={()=>setContextOpen(!contextOpen)}><span>{state.name}</span>{exam&&<><span className="context-sep">/</span><span>Exam</span></>}<Icon name="chevronDown" size={17}/></button>
-    {contextOpen&&<div className="context-pop" role="menu"><div className="context-heading">{state.name}</div><button role="menuitem" onClick={()=>{onTab('dashboard');setContextOpen(false);}}><Icon name="folder" size={17}/>Course overview</button><button role="menuitem" onClick={()=>{onTab('exam-setup');setContextOpen(false);}}><Icon name="exam" size={17}/>Adaptive exam</button><button role="menuitem" onClick={()=>{onTab('tutor');setContextOpen(false);}}><Icon name="powerpoint" size={17}/>Interactive Tutor</button><button role="menuitem" onClick={()=>{onTab('course');setContextOpen(false);}}><Icon name="library" size={17}/>Course & sources</button>{courses.filter(c=>c.id!==state.courseId).length>0&&<><hr/><div className="context-heading">Switch course</div>{courses.filter(c=>c.id!==state.courseId).map(c=><button key={c.id} role="menuitem" onClick={()=>{onOpenCourse(c.id);setContextOpen(false);}}><Icon name="folder" size={17}/>{c.name}</button>)}</>}</div>}
+    {contextOpen&&<div className="context-pop" role="menu"><div className="context-heading">{state.name}</div>{studyFolders(state).map(item=><button key={item.key} role="menuitem" aria-current={folder?.kind===item.kind&&folder?.label===item.label?'page':undefined} onClick={()=>{onFolder(item);setContextOpen(false);}}><Icon name="folder" size={17}/>{item.displayName}</button>)}{courses.filter(c=>c.id!==state.courseId).length>0&&<><hr/><div className="context-heading">Switch course</div>{courses.filter(c=>c.id!==state.courseId).map(c=><button key={c.id} role="menuitem" onClick={()=>{onOpenCourse(c.id);setContextOpen(false);}}><Icon name="folder" size={17}/>{c.name}</button>)}</>}</div>}
    </div>
   </>}</div>
   <div className="header-actions"><span className={"save-indicator"+(busy?" working":"")} role="status" title={saveStatus||(busy?'Working':'Saved')}><span className="save-label">{saveStatus||(busy?'Working':'Saved')}</span></span><button className="shell-icon-btn" aria-label="Display settings" onClick={onSettings}><Icon name="gear" size={21}/></button></div>

@@ -2,7 +2,7 @@ import React from 'react';
 
 const steps=[
  ['Create a course','Use Add course on the Courses tab, or import an existing question bank. Each course keeps its own sources, questions, exam settings, and progress.'],
- ['Organize the material','Open the course and its study folders, then use Course & sources to add references to the right folder. You can paste an excerpt, import a question file, or sync files available in your current ChatGPT Project conversation.'],
+ ['Organize the material','Open the course and its study folders, then use Course & sources to add references to the right folder. You can paste an excerpt, import a question file, or sync a study folder on your computer.'],
  ['Build a question bank','In Course & sources, choose Build questions from sources. Pick Full coverage, Based on your gaps, or Custom; select references and Quiz, Exam, or MCAT difficulty. You can request full explanations with the questions.'],
  ['Take an exam','Open Adaptive exam to set the question count, week, question types, sources, and objectives. Start with saved questions, or generate a bank and start when it is saved. You can resume an unfinished exam.'],
  ['Review and return','After each answer, read the feedback and source citations. Use Progress for due concepts and objective mastery; Exam history holds completed sessions.']
@@ -15,8 +15,9 @@ const sections=[
  ]},
  {id:'sources',title:'Sources and question banks',items:[
   ['Add and organize sources','Course & sources shows one subfolder at a time. Add a source excerpt, import a question file into that subfolder, and edit each source’s type, priority, or folder. Professor slides, objectives, quizzes, and other materials can have different priorities.'],
-  ['ChatGPT Project files','Linking a Project records its name and URL. To sync its files, open Pummy inside a chat in that Project and choose Sync Project Sources. A saved Project link by itself does not give Pummy access to those files.'],
+  ['Local folder sync','Choose a folder in Course & sources, review the detected files and sync them. Rechecking updates changed files without duplicates. Supported standalone browsers can remember read access and sync every 30 seconds while this page is open; embedded hosts may require reselecting the folder. Files removed locally remain saved in Pummy.'],
   ['Create questions','Full coverage asks for questions across selected material; Based on your gaps uses missed or unmastered concepts; Custom uses your exact count. Difficulty changes the style of the request. Model and effort dropdowns are preferences sent to ChatGPT; set the actual model and effort in ChatGPT before generating.'],
+  ['Interactive Tutor','Open original PDF, PPT or PPTX slides directly. Add editable annotations, export a project, or download the unchanged original. PowerPoint study views are static; an optional PDF exported by PowerPoint supplies exact visuals.'],
   ['Import a bank','You can import a Pummy JSON backup, TXT, Word (.docx), or text PDF question file. Review extracted questions before saving. Scanned PDFs need readable text or a separate text version.']
  ]},
  {id:'exams',title:'Exams and custom tests',items:[
@@ -41,6 +42,6 @@ export function InfoGuide({onAdd,onImport,onCourses}){
   <nav className="info-jump" aria-label="Info sections">{sections.map(section=><a href={`#info-${section.id}`} key={section.id}>{section.title}</a>)}</nav>
   <section className="info-section" aria-labelledby="info-start-title"><div className="info-section-heading"><span className="eyebrow">Start here</span><h2 id="info-start-title">A good first session</h2></div><ol className="info-steps">{steps.map(([title,body])=><li key={title}><h3>{title}</h3><p>{body}</p></li>)}</ol></section>
   {sections.map(section=><section className="info-section" id={`info-${section.id}`} key={section.id} aria-labelledby={`info-${section.id}-title`}><div className="info-section-heading"><h2 id={`info-${section.id}-title`}>{section.title}</h2></div><div className="info-detail-grid">{section.items.map(([title,body])=><article key={title}><h3>{title}</h3><p>{body}</p></article>)}</div></section>)}
-  <aside className="info-connection"><h2>When ChatGPT is needed</h2><p>Open Pummy inside a ChatGPT conversation to sync Project files, generate new questions, request new explanations, or use adaptive follow-ups. The standalone site can still show your saved material and practice existing bank questions.</p><button className="quiet" onClick={onCourses}>Back to courses →</button></aside>
+  <aside className="info-connection"><h2>When ChatGPT is needed</h2><p>Open Pummy inside a ChatGPT conversation to generate new questions, request new explanations, or use adaptive follow-ups. The standalone site can still show your saved material and practice existing bank questions.</p><button className="quiet" onClick={onCourses}>Back to courses →</button></aside>
  </div>;
 }
