@@ -8,7 +8,7 @@ const args=s=>({courseId:s.courseId,revision:s.revision,sessionId:s.session?.id}
 const question=i=>({term:`Concept ${i}`,stem:`Choose the answer for ${i}.`,options:['Correct','Incorrect'],answer:[0],sourceId:i%2?'odd':'even',objectiveId:i%2?'odd-objective':'even-objective',weekId:i%2?'Week 1':'Week 2',setId:i%2?'set-odd':'set-even',multi:!!(i%2)});
 async function setup(t,count=250){
  const db=new LocalD1(),repo=new CourseRepository(db,'all-size');t.after(()=>db.close());
- let s=(await executeTool(repo,'import_questions',{requestId:crypto.randomUUID(),name:'All bank',questions:Array.from({length:Math.min(200,count)},(_,i)=>question(i)),sources:[{id:'even',name:'Even source',text:'Even concepts.'},{id:'odd',name:'Odd source',text:'Odd concepts.'}],objectives:[{id:'even-objective',text:'Even concepts.',sourceId:'even'},{id:'odd-objective',text:'Odd concepts.',sourceId:'odd'}]})).state;
+ let s=(await executeTool(repo,'import_questions',{requestId:crypto.randomUUID(),name:'All bank',questions:Array.from({length:Math.min(200,count)},(_,i)=>question(i)),sources:[{id:'even',name:'Even source',text:'Learning objectives\n1. Even concepts.'},{id:'odd',name:'Odd source',text:'Learning objectives\n1. Odd concepts.'}],objectives:[{id:'even-objective',text:'Even concepts.',sourceId:'even'},{id:'odd-objective',text:'Odd concepts.',sourceId:'odd'}]})).state;
  for(let offset=200;offset<count;offset+=200)s=(await executeTool(repo,'add_questions',{...args(s),requestId:crypto.randomUUID(),questions:Array.from({length:Math.min(200,count-offset)},(_,i)=>question(i+offset))})).state;
  return {db,repo,state:s};
 }

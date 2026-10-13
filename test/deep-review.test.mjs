@@ -33,7 +33,7 @@ test('list presentations reports actual converter availability and its input lim
 });
 test('lost append response resumes after reload using only account-scoped receipt IDs',async t=>{
  const {call,repo}=setup(t),storage=memory();let fail=true;
- const interrupted=async(n,a)=>{const result=await call(n,a);if(n==='add_questions'&&fail){fail=false;throw Error('Lost response');}return result;};
+ const interrupted=async(n,a)=>{const result=await call(n,a);if(n==='append_saved_bank'&&fail){fail=false;throw Error('Lost response');}return result;};
  await assert.rejects(importBankFiles({banks:[bank],attemptRef:{current:null},call:interrupted,storage,recoveryScope:'account-a'}),/after reloading/);
  const journal=[...storage.values.values()][0];assert.ok(!journal.includes('Question 0')&&!journal.includes('Reload recovery'));
  await importBankFiles({banks:[structuredClone(bank)],attemptRef:{current:null},call,storage,recoveryScope:'account-a'});
@@ -41,7 +41,7 @@ test('lost append response resumes after reload using only account-scoped receip
 });
 test('another account cannot consume a recovery journal and malformed journals are ignored',async t=>{
  const {call,repo}=setup(t),storage=memory();let fail=true;
- await assert.rejects(importBankFiles({banks:[bank],attemptRef:{current:null},call:async(n,a)=>{const r=await call(n,a);if(n==='import_questions'&&fail){fail=false;throw Error('Lost response');}return r;},storage,recoveryScope:'account-a'}));
+ await assert.rejects(importBankFiles({banks:[bank],attemptRef:{current:null},call:async(n,a)=>{const r=await call(n,a);if(n==='restore_saved_bank'&&fail){fail=false;throw Error('Lost response');}return r;},storage,recoveryScope:'account-a'}));
  await importBankFiles({banks:[bank],attemptRef:{current:null},call,storage,recoveryScope:'account-b'});assert.equal((await repo.list()).length,2);assert.equal(storage.values.size,1);
  storage.setItem('pummy-bank-import:account-b','invalid json');await importBankFiles({banks:[{...bank,questions:bank.questions.slice(0,1)}],attemptRef:{current:null},call,storage,recoveryScope:'account-b'});assert.equal((await repo.list()).length,3);
 });

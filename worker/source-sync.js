@@ -1,4 +1,5 @@
 import {TutorRepository} from './tutor-repository.js';
+import {validateSourceObjectives,pullSourceObjectives} from '../lib/source-objectives.js';
 import {z} from 'zod/v4';
 export const SOURCE_TYPES=['professor_slides','objectives','group_activity','professor_quiz','course_supplement','approved_external','other'];
 export const DEFAULT_RANKS={professor_slides:1,objectives:2,group_activity:2,professor_quiz:3,course_supplement:4,approved_external:5,other:6};
@@ -7,7 +8,7 @@ const nonempty=n=>z.string().max(n).refine(v=>v.trim().length>0,'Must not be bla
 export const sourcePage=z.object({page:z.number().int().positive().max(100000),text:nonempty(60000).describe('Educational page/slide text. Omit unrelated personal contact details and administrative contact blocks before calling.'),unit:z.enum(['page','slide']).optional()}).strict();
 const metadata=z.object({localFolderId:z.string().uuid().optional(),relativePath:nonempty(600).optional(),fileHash:z.string().regex(/^[a-f0-9]{64}$/).optional(),originalFileName:nonempty(300).optional(),mimeType:nonempty(160).optional(),pageCount:z.number().int().positive().max(100000).optional(),projectName:nonempty(160).optional(),projectUrl:z.string().url().max(800).optional(),sourceOrigin:z.enum(['project_conversation','student_upload','manual','import']).optional(),syncTimestamp:z.string().datetime().optional()}).strict();
 export const syncSource=z.object({id:sourceId,name:nonempty(300),originalAssetId:z.string().uuid().optional(),text:nonempty(60000).describe('Extracted educational source text, not a URL. Omit unrelated instructor/student contact details, email addresses, phone numbers and administrative contact blocks before calling.'),sourceType:z.enum(SOURCE_TYPES).optional(),rank:z.number().int().min(1).max(6).optional(),lecture:nonempty(300).optional(),weekId:nonempty(180).nullish(),pages:z.array(sourcePage).max(1000).optional(),metadata:metadata.optional(),contentHash:z.string().regex(/^[a-fA-F0-9]{64}$/,'Use a SHA-256 hexadecimal hash.').optional()}).strict();
-export const syncObjective=z.object({id:sourceId,text:nonempty(4000),num:z.union([nonempty(40),z.number().finite()]).optional(),sourceId:sourceId.nullish(),lecture:nonempty(300).optional(),weekId:nonempty(180).nullish()}).strict();
+export const syncObjective=z.object({id:sourceId,text:nonempty(4000),num:z.union([nonempty(40),z.number().finite()]).optional(),sourceId:sourceId.nullish(),page:z.number().int().positive().optional(),lecture:nonempty(300).optional(),weekId:nonempty(180).nullish()}).strict();
 export const syncFields={requestId:z.string().uuid(),sources:z.array(syncSource).max(30).default([]),objectives:z.array(syncObjective).max(200).default([])};
 export function canonical(value){if(Array.isArray(value))return value.map(canonical);if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).filter(k=>value[k]!==undefined).sort().map(k=>[k,canonical(value[k])]));return value;}
 export async function digest(value){const bytes=new TextEncoder().encode(JSON.stringify(canonical(value)));return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');}
@@ -49,7 +50,8 @@ export async function syncSources(repo,saved,model,args,view,refresh){
   model.sources.set(src.id,next);model.texts.set(src.id,text);summary[old?'updated':'added'].push(src.id);changed=true;
  }
  if(model.sources.size>30)throw new Error('Use up to 30 sources per course. No changes were saved.');
- for(const o of args.objectives){if(o.sourceId&&!model.sources.has(o.sourceId))throw new Error(`Objective ${o.id} references a missing source. No changes were saved.`);const i=model.objectives.findIndex(old=>old.id===o.id),old=model.objectives[i],next={...old,...o};if(old&&JSON.stringify(canonical(old))===JSON.stringify(canonical(next))){summary.objectives.unchanged.push(o.id);continue;}if(i<0)model.objectives.push(next);else model.objectives[i]=next;summary.objectives[i<0?'added':'updated'].push(o.id);changed=true;}
+ for(const o of validateSourceObjectives(args.objectives,model)){const i=model.objectives.findIndex(old=>old.id===o.id),old=model.objectives[i],next={...old,...o};if(old&&JSON.stringify(canonical(old))===JSON.stringify(canonical(next))){summary.objectives.unchanged.push(o.id);continue;}if(i<0)model.objectives.push(next);else model.objectives[i]=next;summary.objectives[i<0?'added':'updated'].push(o.id);changed=true;}
+ const extracted=pullSourceObjectives(model,args.sources.map(s=>s.id));if(extracted.length){summary.objectives.added.push(...extracted.map(o=>o.id));changed=true;}
  if(model.objectives.length>200)throw new Error('Use up to 200 objectives per course. No changes were saved.');
  summary.totalSources=model.sources.size;summary.revision=saved.revision+(changed?1:0);
  if(changed){model._index=null;model._markers.clear();refresh(model);}

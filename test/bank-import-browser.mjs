@@ -12,7 +12,7 @@ const directory=new URL('../work/audit-bank-browser/',import.meta.url);await mkd
 const server=createServer(async(req,res)=>{try{
  const chunks=[];for await(const chunk of req)chunks.push(chunk);const body=Buffer.concat(chunks),headers=new Headers(req.headers);headers.set('oai-authenticated-user-id','bank-browser');
  const response=await worker.fetch(new Request(`http://127.0.0.1:${server.address().port}${req.url}`,{method:req.method,headers,...(body.length?{body}:{})}),{DB:db});
- if(req.method==='POST'&&JSON.parse(body).name==='add_questions'&&failAppend){failAppend=false;res.writeHead(503,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Lost import response'}));return;}
+ if(req.method==='POST'&&JSON.parse(body).name==='append_saved_bank'&&failAppend){failAppend=false;res.writeHead(503,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Lost import response'}));return;}
  res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));
  }catch(e){res.writeHead(500);res.end(e.message);}});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));let browser;

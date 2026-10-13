@@ -80,7 +80,7 @@ test('sync accepts named week folders and preserves their source and objective g
  const db=new LocalD1(),repo=new CourseRepository(db,'week-labels');t.after(()=>db.close());
  let s=(await executeTool(repo,'create_course',{requestId:crypto.randomUUID(),name:'Anatomy'})).state;
  s=(await executeTool(repo,'manage_folder',{...args(s),kind:'week',label:'Week 4',action:'create'})).state;
- s=(await executeTool(repo,'sync_course_sources',{courseId:s.courseId,revision:s.revision,requestId:crypto.randomUUID(),sources:[{id:'week-4',name:'Thorax slides',text:'The brachiocephalic trunk is the first arch branch.',weekId:'Week 4'}],objectives:[{id:'arch',text:'Identify arch branches.',sourceId:'week-4',weekId:'Week 4'}]})).state;
+ s=(await executeTool(repo,'sync_course_sources',{courseId:s.courseId,revision:s.revision,requestId:crypto.randomUUID(),sources:[{id:'week-4',name:'Thorax slides',text:'The brachiocephalic trunk is the first arch branch.\nLearning objectives\n1. Identify arch branches.',weekId:'Week 4'}],objectives:[{id:'arch',text:'Identify arch branches.',sourceId:'week-4',weekId:'Week 4'}]})).state;
  assert.equal(s.sources[0].weekId,'Week 4');assert.equal(s.objectives[0].weekId,'Week 4');
  s=(await executeTool(repo,'add_questions',{...args(s),requestId:crypto.randomUUID(),questions:[{...keyed,definition:'Alpha is first.',sourceId:'week-4',objectiveId:'arch',weekId:'Week 4'}]})).state;
  s=(await executeTool(repo,'start_test',{...args(s),size:1,adaptive:false,weekId:'Week 4'})).state;

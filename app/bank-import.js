@@ -52,8 +52,8 @@ export async function importBankFiles({banks,appendCourseId=null,folder=null,att
  let durable=persist(attempt);
  try{for(const plan of attempt.plans){while(plan.next<plan.batches.length){
   const batch=plan.batches[plan.next];let result;
-  if(!plan.courseId)result=await call('import_questions',{...batch,name:plan.name});
-  else{const {state}=await call('read_course_state',{courseId:plan.courseId});result=await call('add_questions',{...batch,courseId:plan.courseId,revision:state.revision});}
+  if(!plan.courseId)result=await call('restore_saved_bank',{...batch,name:plan.name});
+  else{const {state}=await call('read_course_state',{courseId:plan.courseId});result=await call('append_saved_bank',{...batch,courseId:plan.courseId,revision:state.revision});}
   plan.courseId=result.state.courseId;plan.next++;durable=persist(attempt)&&durable;
  }}}catch(e){throw new Error(`${e.message} Select the same JSON file again to retry; completed batches will be kept.${durable?' Recovery is available after reloading for 24 hours.':' Keep this panel open until the import finishes.'}`);}
  attemptRef.current=null;

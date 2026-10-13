@@ -21,7 +21,7 @@ test('a 500-question export restores in bounded batches with every question and 
 
 test('lost responses at either import step reuse receipts without duplicate courses or questions',async t=>{
  const {repo,call}=setup(t),attemptRef={current:null};let failImport=true,failAppend=true;const ids=[];
- const uncertain=async(n,a)=>{const result=await call(n,a);if(a.questions)ids.push(a.requestId);if(n==='import_questions'&&failImport){failImport=false;throw new Error('Lost import response');}if(n==='add_questions'&&failAppend){failAppend=false;throw new Error('Lost append response');}return result;};
+ const uncertain=async(n,a)=>{const result=await call(n,a);if(a.questions)ids.push(a.requestId);if(n==='restore_saved_bank'&&failImport){failImport=false;throw new Error('Lost import response');}if(n==='append_saved_bank'&&failAppend){failAppend=false;throw new Error('Lost append response');}return result;};
  const run=()=>importBankFiles({banks:[bank(204)],attemptRef,call:uncertain});
  await assert.rejects(run(),/Lost import response.*same JSON/);await assert.rejects(run(),/Lost append response.*same JSON/);await run();
  assert.equal((await repo.list()).length,1);assert.equal((await repo.list())[0].questionCount,204);assert.equal(ids[0],ids[1]);assert.equal(ids[2],ids[3]);
