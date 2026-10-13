@@ -31,6 +31,7 @@ export async function syncSources(repo,saved,model,args,view,refresh){
   const old=model.sources.get(src.id),oldText=model.texts.get(src.id)||'';
   // Folder sync is a background copy operation, never a restore action. Check
   // again here because a prepared scan/upload can outlive a source deletion.
+  if(old?.purgedAt)throw new Error(`Source ${src.id} was permanently deleted. Import it with a new source ID to add it again.`);
   if(old?.deletedAt&&src.metadata?.localFolderId)throw new Error(`Source ${src.id} is in Recently deleted. Restore it before syncing this file.`);
   const contentHash=await digest(sourceContent(src,src.text));
   if(src.contentHash&&src.contentHash.toLowerCase()!==contentHash)throw new Error(`Sync rejected: contentHash mismatch for ${src.id}. No changes were saved.`);
@@ -49,11 +50,11 @@ export async function syncSources(repo,saved,model,args,view,refresh){
   next.createdAt=old?.createdAt||now;next.updatedAt=now;next.lastSyncedAt=now;next.syncStatus=old?'updated':'synced';next.chars=text.length;
   model.sources.set(src.id,next);model.texts.set(src.id,text);summary[old?'updated':'added'].push(src.id);changed=true;
  }
- if(model.sources.size>30)throw new Error('Use up to 30 sources per course. No changes were saved.');
+ if([...model.sources.values()].filter(s=>!s.purgedAt).length>30)throw new Error('Use up to 30 sources per course. No changes were saved.');
  for(const o of validateSourceObjectives(args.objectives,model)){const i=model.objectives.findIndex(old=>old.id===o.id),old=model.objectives[i],next={...old,...o};if(old&&JSON.stringify(canonical(old))===JSON.stringify(canonical(next))){summary.objectives.unchanged.push(o.id);continue;}if(i<0)model.objectives.push(next);else model.objectives[i]=next;summary.objectives[i<0?'added':'updated'].push(o.id);changed=true;}
  const extracted=pullSourceObjectives(model,args.sources.map(s=>s.id));if(extracted.length){summary.objectives.added.push(...extracted.map(o=>o.id));changed=true;}
  if(model.objectives.length>200)throw new Error('Use up to 200 objectives per course. No changes were saved.');
- summary.totalSources=model.sources.size;summary.revision=saved.revision+(changed?1:0);
+ summary.totalSources=[...model.sources.values()].filter(s=>!s.purgedAt).length;summary.revision=saved.revision+(changed?1:0);
  if(changed){model._index=null;model._markers.clear();refresh(model);}
  model.sourceSync={...summary,completedAt:now,status:changed?(summary.updated.length||summary.objectives.updated.length?'updated':'synced'):'unchanged'};
  model.completedRequests=[...model.completedRequests,{id:args.requestId,tool:'sync_course_sources',fingerprint,summary}].slice(-40);

@@ -17,6 +17,7 @@
     "test:figma-browser": "node test/figma-browser.mjs",
     "test:uploads-browser": "node test/course-uploads-browser.mjs",
     "test:recovery-browser": "node test/review-fixes-browser.mjs",
+    "test:practice-banks-browser": "node test/practice-banks-browser.mjs",
     "test:bank-browser": "node test/bank-import-browser.mjs",
     "test:all-browser": "node scripts/test-browser.mjs"
   },

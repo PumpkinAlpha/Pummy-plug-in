@@ -3,8 +3,9 @@ import {PDFDocument} from 'pdf-lib';
 import {zipSync,unzipSync,strToU8,strFromU8} from 'fflate';
 import {CHUNK_SIZE,encode64,decode64,pptxMetadata} from '../lib/tutor/presentations.js';
 import {annotationSVG} from '../lib/tutor/annotations.js';
-import {isNativePowerPoint,nativeSlideImage,nativeTextAt} from './powerpoint.js';
+import {isNativePowerPoint,nativeSlideImage,nativeTextAt,clearNativeDeckCache} from './powerpoint.js';
 const assets=new Map(),uploads=new WeakMap();let documentCache=null;
+export function clearCourseAssetCache(courseId){for(const key of assets.keys())if(key.startsWith(courseId+':'))assets.delete(key);if(documentCache?.key.startsWith(courseId+':')){const old=documentCache;documentCache=null;old.promise.then(doc=>doc.loadingTask.destroy()).catch(()=>{});}clearNativeDeckCache(courseId);}
 export async function uploadPresentationFile(call,courseId,file,{source=false,onProgress=()=>{}}={}){
  if(!file||!file.size)throw new Error('Choose a nonempty file.');
  const extension=file.name.toLowerCase().split('.').at(-1),kind=(source?['pdf','ppt','pptx','docx','txt','md']:['pdf','ppt','pptx']).includes(extension)?extension:null;

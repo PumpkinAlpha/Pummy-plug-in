@@ -5,7 +5,7 @@ import {explanationGuidance,hasFullExplanation} from '../lib/explanation-depth.j
 export function bankExplanationSummary(request){return request?{id:request.id,depth:request.depth,total:request.questionIds.length,completed:request.completed.length,pending:request.questionIds.filter(id=>!request.completed.includes(id)).length}:null;}
 function context(model,q){const g=grounding(model,`${q.term||''} ${q.stem} ${(q.options||[]).join(' ')}`,3500,{question:q,preferSids:[q.sourceId].filter(Boolean)});const prompt=formatGrounding(g);return {prompt,provenance:provenance(g)};}
 export async function executeBankExplanations(repo,model,saved,name,args,view,validateSources){
- const request=model.bankExplanationRequest;
+ const request=model.activeBankExplanationRequest();
  if(name==='read_bank_explanations'){
   if(!request||request.id!==args.requestId)throw new Error('This bank explanation request has expired.');
   const questions=request.questionIds.filter(id=>!request.completed.includes(id)).slice(0,args.limit).map(id=>{
@@ -18,6 +18,7 @@ export async function executeBankExplanations(repo,model,saved,name,args,view,va
  if(receipt)return {state:view(model,saved.revision),message:'This explanation request was already saved.'};
  if(name==='request_bank_explanations'&&request?.id===args.requestId)return {state:view(model,saved.revision)};
  if(args.revision!==saved.revision)throw Object.assign(new Error('Your course changed. Refresh before continuing.'),{code:'conflict'});
+ model.bankExplanationRequest=request;
  if(name==='request_bank_explanations'){
   if(request&&bankExplanationSummary(request).pending)throw new Error('Finish the current bank explanation request before starting another.');
   const roots=new Map(model.rootQuestions().filter(q=>q.keyed).map(q=>[q.id,q]));
