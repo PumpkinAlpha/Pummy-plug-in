@@ -55,12 +55,12 @@ export class CourseRepository {
       await this.db.prepare('DELETE FROM course_deletions WHERE user_id=? AND course_id=? AND revision=?').bind(this.userId,id,revision).run();
     }catch(e){throw new Error('Course deletion is pending. Retry Delete course to finish removing its files. '+e.message);}
   }
-  async save(data,revision,expectedData){
+  async save(data,revision,expectedData,extraWrites=()=>[]){
     const packed=packCourse(data),{json}=packed;
     const write=revision===0
       ?this.db.prepare('INSERT OR IGNORE INTO courses (user_id,id,name,data,revision,updated_at) SELECT ?,?,?,?,1,? WHERE NOT EXISTS(SELECT 1 FROM course_deletions WHERE user_id=? AND course_id=?)').bind(this.userId,data.id,data.name,json,Date.now(),this.userId,data.id)
       :this.db.prepare('UPDATE courses SET name=?,data=?,revision=revision+1,updated_at=? WHERE user_id=? AND id=? AND revision=?'+(expectedData?' AND data=?':'')).bind(data.name,json,Date.now(),this.userId,data.id,revision,...(expectedData?[storedSnapshots.get(expectedData)||JSON.stringify(expectedData)]:[]));
-    const [result]=await this.db.batch([write,...this.contentWrites(data.id,packed,expectedData),...captureBanks(this,data,expectedData,packed.writeId)]);
+    const [result]=await this.db.batch([write,...this.contentWrites(data.id,packed,expectedData),...captureBanks(this,data,expectedData,packed.writeId),...extraWrites(packed.writeId)]);
     if(result.meta.changes!==1)throw Object.assign(new Error('Your test changed in another window. Refresh to continue; your answer has not been overwritten.'),{code:'conflict'});
     return revision+1;
   }

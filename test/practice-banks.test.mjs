@@ -130,3 +130,21 @@ test('coverage uses only verified objective links and stays scoped to each bankâ
  for(const q of bank.questions){const current=(await call('read_practice_bank',{courseId:state.courseId,bankId:b.id})).bank;await call('edit_practice_bank',{courseId:state.courseId,bankId:b.id,bankRevision:current.revision,name:b.name,questionId:q.id,question:{...question,objectiveId:null}});}
  assert.equal((await call('list_practice_banks',{courseId:state.courseId})).banks.find(x=>x.id===b.id).coverage.percent,0);assert.equal((await repo.get(updated.courseId)).revision,updated.revision);
 });
+
+test('bulk archive edits validate every card before committing and keep exam snapshots unchanged',async t=>{
+ const {repo,call,state}=await setup(t),before=await repo.get(state.courseId);let {bank}=await call('read_practice_bank',{courseId:state.courseId,bankId:'import:'+state.courseId});
+ const args={courseId:state.courseId,bankId:bank.id,bankRevision:bank.revision,name:'Cards',questions:[{questionId:bank.questions[0].id,question:{...question,stem:'Edited together?',options:['One','Two','Three'],answer:[0,2],multi:true,type:'multi'}}]};
+ bank=(await call('edit_practice_bank',args)).bank;assert.deepEqual(bank.questions[0].answer,[0,2]);assert.equal(bank.questions[0].options.length,3);
+ await assert.rejects(call('edit_practice_bank',{...args,bankRevision:bank.revision,questions:[...args.questions,{questionId:'missing',question}]}),/not found/);
+ assert.deepEqual((await call('read_practice_bank',{courseId:state.courseId,bankId:bank.id})).bank,bank);assert.deepEqual(await repo.get(state.courseId),before);
+});
+test('Delete forever erases bank contents, cannot restore, and suppresses legacy recovery across reloads',async t=>{
+ const {db,repo,call,state}=await setup(t);await db.prepare('DELETE FROM practice_banks').run();let {banks}=await call('list_practice_banks',{courseId:state.courseId});const b=banks[0],before=await repo.get(state.courseId);
+ await assert.rejects(call('purge_practice_bank',{courseId:state.courseId,bankId:b.id,bankRevision:b.revision,confirmed:true}),/not found/);
+ await call('delete_practice_bank',{courseId:state.courseId,bankId:b.id,bankRevision:b.revision});let {deletedBanks}=await call('list_practice_banks',{courseId:state.courseId});const ref={courseId:state.courseId,bankId:b.id,bankRevision:deletedBanks[0].revision};
+ await assert.rejects(call('purge_practice_bank',ref),/confirmed/);await assert.rejects(call('purge_practice_bank',{...ref,bankRevision:999,confirmed:true}),/changed/);
+ await call('purge_practice_bank',{...ref,confirmed:true});assert.deepEqual(await call('list_practice_banks',{courseId:state.courseId}),{banks:[],deletedBanks:[]});
+ const row=await db.prepare('SELECT data FROM practice_banks').first();assert.ok(!row.data.includes(question.stem));assert.ok(!row.data.includes(question.definition));assert.deepEqual(JSON.parse(row.data).questions,[]);
+ await assert.rejects(call('restore_practice_bank',ref),/not found/);assert.deepEqual(await repo.get(state.courseId),before);
+ const reload=new CourseRepository(db,'student');assert.deepEqual(await executeTool(reload,'list_practice_banks',{courseId:state.courseId}),{banks:[],deletedBanks:[]});
+});

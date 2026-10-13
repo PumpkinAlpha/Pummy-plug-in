@@ -2,6 +2,7 @@ import {legacyPptSlides} from '../lib/tutor/legacy-ppt.js';
 import {parse,slideToSvgFile} from '@web-ppt/core';
 import {unzipSync} from 'fflate';
 let cache=null;
+export function clearNativeDeckCache(courseId){if(cache?.key.includes(':'+courseId+':')){const old=cache;cache=null;old.promise.then(deck=>deck.dispose?.()).catch(()=>{});}}
 export function isNativePowerPoint(p){return p.renderMode==='powerpoint'||(['ppt','pptx'].includes(p.kind)&&!p.assets.pdf);}
 export async function nativeDeck(call,p,loadAsset){
  const key=`${p.ownerId}:${p.courseId}:${p.originalAssetId}`;

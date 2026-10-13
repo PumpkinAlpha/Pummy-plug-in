@@ -1,3 +1,4 @@
+import {purgeSource} from './source-purge.js';
 import {executeBanks} from './practice-banks.js';
 import {validateSourceObjectives,pullSourceObjectives,sourceExplanation} from '../lib/source-objectives.js';
 import {grounding,refreshGrounding,explanationPrompt,provenance,pagesOf,validateProvenance} from './grounding.js';
@@ -38,6 +39,7 @@ export const definitions=[
  {name:'update_course',title:'Course details and sources',description:'Rename a course, set or clear its ChatGPT Project reference, or add source excerpts explicitly supplied by the student or accessible in the current Project chat. Never fabricate project access or replace existing source content.',schema:z.object({...stateArgs,name:z.string().trim().min(1).max(160).optional(),project:project.nullish(),sources:z.array(z.object({id,name:z.string().min(1).max(300),text:z.string().min(1).max(60000),rank:z.number().int().min(1).max(6).default(1)})).max(30).optional()}),readOnly:false},
  {name:'delete_course',title:'Delete course',description:'Delete a course and its saved questions and progress after the student confirms in the app.',schema:z.object(stateArgs),readOnly:false,destructive:true,appOnly:true},
  {name:'delete_source',title:'Delete source',description:'Move a student-selected source to Recently deleted. Preserve its original contents, questions and exam progress; the student can restore it.',schema:z.object({...stateArgs,sourceId:id}),readOnly:false,appOnly:true},
+ {name:'purge_source',title:'Delete source forever',description:'Permanently remove a source already in Recently deleted, including unshared original files and presentation annotations, after student confirmation. Keeps saved questions and exam progress.',schema:z.object({...stateArgs,sourceId:id,confirmed:z.literal(true)}),readOnly:false,destructive:true,appOnly:true},
  {name:'restore_source',title:'Restore deleted source',description:'Restore a source from Recently deleted without changing questions or exam progress.',schema:z.object({...stateArgs,sourceId:id}),readOnly:false,appOnly:true},
  {name:'manage_folder',title:'Manage study folder',description:'Create, rename, or remove a study folder. Removing its grouping keeps its study material in the course.',schema:z.object({...stateArgs,kind:folderKind,label:z.string().min(1).max(300),action:z.enum(['create','rename','delete']),newName:z.string().min(1).max(160).optional()}),readOnly:false,appOnly:true},
  {name:'set_folder_tags',title:'Assign study folder tags',description:'Save tags used to filter study folders in the course overview.',schema:z.object({...stateArgs,assignments:z.array(z.object({kind:folderKind,label:z.string().min(1).max(300),tags:z.array(z.string().trim().min(1).max(40)).max(12)})).max(250)}),readOnly:false,appOnly:true},
@@ -75,8 +77,9 @@ definitions.push(
  {name:'list_practice_banks',title:'List saved practice question banks',description:'List all archived question banks without exposing answer keys.',schema:z.object(courseArgs),readOnly:true,appOnly:true},
  {name:'read_practice_bank',title:'Open question bank for editing or download',description:'Student-requested archive editor and export. Contains keys; do not use for answering an active exam.',schema:z.object({...courseArgs,bankId:z.string().min(1).max(400)}),readOnly:true,appOnly:true},
  {name:'combine_practice_banks',title:'Combine selected question banks',description:'Combine archive entries selected by the student. Keeps every question and preserves course questions, exams and progress.',schema:z.object({...courseArgs,requestId:z.string().uuid(),banks:z.array(z.object({id:z.string().min(1).max(400),revision:z.number().int().min(0)})).min(2).max(100),name:z.string().trim().min(1).max(300)}),readOnly:false,appOnly:true},
+ {name:'purge_practice_bank',title:'Permanently delete archived bank',description:'Permanently erase an already deleted archive bank after student confirmation. Preserve course questions and exam progress.',schema:z.object({...courseArgs,bankId:z.string().min(1).max(400),bankRevision:z.number().int().min(0),confirmed:z.literal(true)}),readOnly:false,destructive:true,appOnly:true},
  ...['delete','restore'].map(action=>({name:action+'_practice_bank',title:action==='delete'?'Delete saved question bank':'Restore deleted question bank',description:action==='delete'?'Move the selected archive bank to Recently deleted. Keeps course questions, exams and progress.':'Restore the selected archived bank from Recently deleted.',schema:z.object({...courseArgs,bankId:z.string().min(1).max(400),bankRevision:z.number().int().min(0)}),readOnly:false,appOnly:true})),
- {name:'edit_practice_bank',title:'Save an archived question',description:'Edit an archive copy, preserving active exam keys, course questions, results and progress.',schema:z.object({...courseArgs,bankId:z.string().min(1).max(400),bankRevision:z.number().int().min(0),name:z.string().trim().min(1).max(300),questionId:id,question}),readOnly:false,appOnly:true}
+ {name:'edit_practice_bank',title:'Save an archived question',description:'Edit an archive copy, preserving active exam keys, course questions, results and progress.',schema:z.object({...courseArgs,bankId:z.string().min(1).max(400),bankRevision:z.number().int().min(0),name:z.string().trim().min(1).max(300),questionId:id.optional(),question:question.optional(),questions:z.array(z.object({questionId:id,question})).max(500).optional()}).refine(v=>v.questions!==undefined?!(v.questionId||v.question):!!v.questionId&&!!v.question,'Provide question edits or one question.'),readOnly:false,appOnly:true}
 );
 const tutorDefs=tutorDefinitions(question),tutorNames=new Set(tutorDefs.map(d=>d.name));
 definitions.push(...tutorDefs);
@@ -127,7 +130,9 @@ export async function executeTool(repo,name,raw){
   const result=await saveNewCourse(repo,model);return {...result,message:result.message||`Imported ${args.questions.length} questions.`};
  }
  const saved=await repo.get(args.courseId);if(!saved)throw new Error('Course not found. Import a bank first.');
- if(['list_practice_banks','read_practice_bank','edit_practice_bank','combine_practice_banks','delete_practice_bank','restore_practice_bank'].includes(name))return executeBanks(repo,saved,name,args,validateQuestion);
+ if(['list_practice_banks','read_practice_bank','edit_practice_bank','combine_practice_banks','delete_practice_bank','restore_practice_bank','purge_practice_bank'].includes(name))return executeBanks(repo,saved,name,args,validateQuestion);
+ if(name==='purge_source')return purgeSource(repo,saved,args);
+ if(args.sourceId&&saved.data.sources?.find(s=>s.id===args.sourceId)?.purgedAt)throw new Error('This source was permanently deleted. Import it with a new source ID to add it again.');
  const model=new PluginCourse(saved.data),exam=createExam(model),s=model.session;
  if(['request_bank_explanations','read_bank_explanations','provide_bank_explanations'].includes(name))return executeBankExplanations(repo,model,saved,name,args,view,validateExplanationSources);
  if(['open_test','read_course_state','open_interface'].includes(name))return {state:view(model,saved.revision)};
@@ -156,7 +161,7 @@ export async function executeTool(repo,name,raw){
   if(model.questions.size+args.questions.length>500)throw new Error('Split larger courses; use at most 500 stored questions per course.');
   args.questions.forEach(validateQuestion);
   for(const src of args.sources){if(model.sources.has(src.id)){if(model.texts.get(src.id)!==src.text)throw new Error('That source ID has different content. Use a new ID to preserve the existing reference.');}else{const {text,...info}=src;model.sources.set(src.id,{...info,kind:'material',createdAt:Date.now()});model.texts.set(src.id,text);}}
-  if(model.sources.size>30)throw new Error('Use up to 30 course sources.');
+  if([...model.sources.values()].filter(s=>!s.purgedAt).length>30)throw new Error('Use up to 30 course sources.');
   for(const o of restoring?args.objectives:validateSourceObjectives(args.objectives,model)){const old=model.objectives.find(v=>v.id===o.id);if(old&&(old.sourceId!==o.sourceId||old.text!==o.text))throw new Error('That objective ID has different wording. Reuse the saved objective or use a new ID for another verbatim objective.');if(!old)model.objectives.push(o);}
   pullSourceObjectives(model,args.sources.map(s=>s.id));
   if(model.objectives.length>200)throw new Error('Use up to 200 objectives.');
@@ -167,7 +172,7 @@ export async function executeTool(repo,name,raw){
   model.completedRequests=[...model.completedRequests,{id:args.requestId,tool:'add_questions',sessionId:s?.id,addedCount:args.questions.length,questionIds,generationId:args.generationId,bankName:args.bankName,bankSourceIds:args.bankSourceIds,completedAt:Date.now()}].slice(-40);
  }
  else if(name==='pull_source_objectives'){for(const id of args.sourceIds)if(!model.sources.has(id)||model.sources.get(id).deletedAt)throw new Error('Choose an active course source.');const added=pullSourceObjectives(model,args.sourceIds);if(!added.length)return {state:view(model,saved.revision),message:'No new explicit objectives found. Upload the objectives document or PowerPoint objective slides; no objectives were generated.'};}
- else if(name==='update_course'){if(args.name)model.nameData=args.name.trim();if('project' in args)model.project=args.project||null;for(const src of args.sources||[]){if(model.sources.has(src.id))throw new Error('That source ID already exists. Add a new source ID to preserve the existing reference.');model.sources.set(src.id,{id:src.id,name:src.name,rank:src.rank,kind:'material',createdAt:Date.now()});model.texts.set(src.id,src.text);}if(model.sources.size>30)throw new Error('Use up to 30 sources per course.');pullSourceObjectives(model,(args.sources||[]).map(s=>s.id));}
+ else if(name==='update_course'){if(args.name)model.nameData=args.name.trim();if('project' in args)model.project=args.project||null;for(const src of args.sources||[]){if(model.sources.has(src.id))throw new Error('That source ID already exists. Add a new source ID to preserve the existing reference.');model.sources.set(src.id,{id:src.id,name:src.name,rank:src.rank,kind:'material',createdAt:Date.now()});model.texts.set(src.id,src.text);}if([...model.sources.values()].filter(s=>!s.purgedAt).length>30)throw new Error('Use up to 30 sources per course.');pullSourceObjectives(model,(args.sources||[]).map(s=>s.id));}
  else if(name==='manage_folder'){
   const key=folderKey(args.kind,args.label);
   if(args.action==='create'){

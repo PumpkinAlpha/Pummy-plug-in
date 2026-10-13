@@ -42,3 +42,42 @@ test('source actions reject other users, missing sources and stale revisions wit
  await assert.rejects(call('restore_source',{courseId:state.courseId,revision:state.revision,sourceId:'lecture'}),/changed/);assert.deepEqual(await repo.get(state.courseId),deleted);
  const restored=await call('sync_course_sources',{courseId:state.courseId,revision:r.state.revision,requestId:crypto.randomUUID(),sources:[{id:'lecture',name:'Professor lecture',text:before.data.texts[0][1]}]});assert.equal(restored.state.sources[0].id,'lecture');assert.equal(restored.state.deletedSources.length,0);
 });
+
+test('Delete forever removes source text, private files, annotations and requests while retaining questions and progress',async t=>{
+ const {db,repo,call,state}=await setup(t),bytes=await fixturePDF(),assetId=await uploadPresentationFile(call,state.courseId,new File([bytes],'Private.pdf'));
+ let current=(await call('attach_source_original',{courseId:state.courseId,revision:state.revision,sourceId:'lecture',assetId})).state;
+ const {presentation:p}=await call('import_course_presentation',{courseId:state.courseId,sourceId:'lecture',presentationId:crypto.randomUUID()});
+ await call('save_slide_annotations',{courseId:state.courseId,presentationId:p.id,slideId:p.slides[0].id,revision:p.revision,requestId:crypto.randomUUID(),annotations:[object(p,p.slides[0].id)]});
+ await call('request_slide_tutor',{courseId:state.courseId,presentationId:p.id,slideId:p.slides[0].id,requestId:crypto.randomUUID(),question:'Explain.'});
+ const before=await repo.get(state.courseId),banks=(await call('list_practice_banks',{courseId:state.courseId})).banks;
+ await assert.rejects(call('purge_source',{courseId:state.courseId,revision:current.revision,sourceId:'lecture',confirmed:true}),/Recently deleted/);
+ current=(await call('delete_source',{courseId:state.courseId,revision:current.revision,sourceId:'lecture'})).state;
+ const args={courseId:state.courseId,revision:current.revision,sourceId:'lecture',confirmed:true};await assert.rejects(call('purge_source',{...args,revision:state.revision}),/changed/);await assert.rejects(executeTool(new CourseRepository(db,'other'),'purge_source',args),/not found/);
+ current=(await call('purge_source',args)).state;assert.equal(current.deletedSources.length,0);assert.deepEqual(current.purgedSourceIds,['lecture']);
+ const after=await repo.get(state.courseId);assert.deepEqual(after.data.texts,[]);assert.equal(after.data.sources[0].originalFile,undefined);assert.equal(after.data.sources[0].name,'Deleted source');
+ for(const table of ['course_source_content','tutor_assets','tutor_asset_chunks','tutor_presentations','tutor_requests','tutor_revisions','tutor_slide_annotations'])assert.equal((await db.prepare(`SELECT count(*) AS n FROM ${table} WHERE user_id=? AND course_id=?`).bind('student',state.courseId).first()).n,0,table);
+ for(const key of ['questions','concepts','session','history'])assert.deepEqual(after.data[key],before.data[key],key);
+ assert.deepEqual((await call('list_practice_banks',{courseId:state.courseId})).banks,banks);await assert.rejects(call('read_presentation_chunk',{courseId:state.courseId,assetId,index:0}),/File not found/);
+ await assert.rejects(call('restore_source',{courseId:state.courseId,revision:current.revision,sourceId:'lecture'}),/permanently deleted/);
+ await assert.rejects(call('sync_course_sources',{courseId:state.courseId,revision:current.revision,requestId:crypto.randomUUID(),sources:[{id:'lecture',name:'Must not resurrect',text:'Old material'}]}),/permanently deleted/);
+ assert.equal((await call('purge_source',args)).state.revision,current.revision);
+});
+test('source permanent deletion preserves an original shared by another presentation',async t=>{
+ const {repo,call,state}=await setup(t),bytes=await fixturePDF(),assetId=await uploadPresentationFile(call,state.courseId,new File([bytes],'Shared.pdf'));
+ let current=(await call('attach_source_original',{courseId:state.courseId,revision:state.revision,sourceId:'lecture',assetId})).state;
+ await call('import_course_presentation',{courseId:state.courseId,sourceId:'lecture',presentationId:crypto.randomUUID()});
+ const {presentation:p}=await call('import_presentation',{courseId:state.courseId,presentationId:crypto.randomUUID(),originalAssetId:assetId});
+ current=(await call('delete_source',{courseId:state.courseId,revision:current.revision,sourceId:'lecture'})).state;
+ await call('purge_source',{courseId:state.courseId,revision:current.revision,sourceId:'lecture',confirmed:true});
+ assert.deepEqual(await loadAsset(call,state.courseId,{id:assetId,chunks:1}),bytes);assert.equal((await call('read_presentation',{courseId:state.courseId,presentationId:p.id})).presentation.id,p.id);
+});
+test('failed source object cleanup survives reload and safely retries after other course edits',async t=>{
+ const {db,repo,call,state}=await setup(t),objects=new Map();let fail=false;
+ repo.assetStore={async put(k,v){objects.set(k,v);},async get(k){return objects.has(k)?{text:async()=>objects.get(k)}:null;},async list({prefix}){return {objects:[...objects.keys()].filter(k=>k.startsWith(prefix)).map(key=>({key})),truncated:false};},async delete(keys){if(fail)throw Error('Temporary outage');for(const k of keys)objects.delete(k);}};
+ const assetId=await uploadPresentationFile(call,state.courseId,new File([await fixturePDF()],'Private.pdf'));let current=(await call('attach_source_original',{courseId:state.courseId,revision:state.revision,sourceId:'lecture',assetId})).state;
+ objects.set('files/other/private','keep');current=(await call('delete_source',{courseId:state.courseId,revision:current.revision,sourceId:'lecture'})).state;
+ const args={courseId:state.courseId,revision:current.revision,sourceId:'lecture',confirmed:true};fail=true;await assert.rejects(call('purge_source',args),/deletion is pending/);
+ current=(await call('read_course_state',{courseId:state.courseId})).state;assert.equal(current.deletedSources.length,1);assert.equal(current.sources.length,0);
+ current=(await call('update_course',{courseId:state.courseId,revision:current.revision,name:'Keep this edit'})).state;
+ fail=false;const reloaded=new CourseRepository(db,'student',null,repo.assetStore);current=(await executeTool(reloaded,'purge_source',args)).state;assert.equal(current.name,'Keep this edit');assert.equal(current.deletedSources.length,0);assert.deepEqual([...objects.keys()],['files/other/private']);
+});

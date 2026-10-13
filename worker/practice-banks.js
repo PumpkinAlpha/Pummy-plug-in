@@ -25,7 +25,7 @@ function legacyBanks(data,stored){
  for(const [key,questions] of groups)add('recovered:'+key,questions[0].setId||data.sources?.find(s=>s.id===key)?.name||'Recovered course questions',questions);
  return banks;
 }
-async function bankEntries(repo,courseId,data){
+export async function bankEntries(repo,courseId,data){
  const {results}=await repo.db.prepare('SELECT data,revision,updated_at FROM practice_banks WHERE user_id=? AND course_id=? ORDER BY created_at DESC,id').bind(repo.userId,courseId).all();
  const stored=results.map(r=>({...JSON.parse(r.data),revision:r.revision,updatedAt:r.updated_at})),known=new Set(stored.map(b=>b.id));
  // Older slide practice may never have been appended to the course bank.
@@ -47,7 +47,7 @@ function groupBanks(entries){
  return result.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)||a.id.localeCompare(b.id));
 }
 const publicBank=({_members,...bank})=>bank;
-export async function allBanks(repo,courseId,data){return groupBanks((await bankEntries(repo,courseId,data)).filter(b=>!b.deletedAt));}
+export async function allBanks(repo,courseId,data){return groupBanks((await bankEntries(repo,courseId,data)).filter(b=>!b.deletedAt&&!b.purgedAt));}
 
 // Check every member before writing any of them. The failing SQL expression
 // aborts the entire D1 batch if another editor changed a member in the meantime.
@@ -62,16 +62,17 @@ async function writeBanks(repo,saved,members,next){
   const {revision,updatedAt,_members,memberCount,...data}=bank,json=JSON.stringify(data);
   if(new TextEncoder().encode(json).length>1800000)throw new Error('This archived bank is too large to save.');
   if(revision===0)return bankInsert(repo,saved.data.id,data);
+  if(data.purgedAt)return repo.db.prepare('UPDATE practice_banks SET name=?,data=?,revision=revision+1,updated_at=? WHERE user_id=? AND course_id=? AND id=?').bind(data.name,json,Date.now(),repo.userId,saved.data.id,data.id);
   // Preserve links added atomically by a concurrent course append.
   return repo.db.prepare("UPDATE practice_banks SET name=?,data=json_set(?,'$.linkedQuestionIds',json(COALESCE(json_extract(data,'$.linkedQuestionIds'),json_extract(?,'$.linkedQuestionIds'),'[]'))),revision=revision+1,updated_at=? WHERE user_id=? AND course_id=? AND id=?").bind(data.name,json,json,Date.now(),repo.userId,saved.data.id,data.id);
  });
  try{await repo.db.batch([guard,...writes]);}catch(e){if(/practice-bank-conflict|malformed JSON|invalid JSON/i.test(e.message))throw conflict();throw e;}
 }
 export async function executeBanks(repo,saved,name,args,validateQuestion){
- const entries=await bankEntries(repo,args.courseId,saved.data),banks=groupBanks(entries.filter(b=>!b.deletedAt));
+ const entries=await bankEntries(repo,args.courseId,saved.data),banks=groupBanks(entries.filter(b=>!b.deletedAt&&!b.purgedAt));
  const objectives=verifiedObjectives({objectives:saved.data.objectives||[],sources:new Map((saved.data.sources||[]).map(s=>[s.id,s])),texts:new Map(saved.data.texts||[])});
  const summary=bank=>{const {questions,...b}=publicBank(bank);return {...b,count:questions.length,coverage:bankObjectiveCoverage(questions,objectives,saved.data.sources,bank.sourceIds),questionIndex:questions.map(({id,sourceId,objectiveId,objective,lecture,weekId})=>({id,sourceId,objectiveId:objectiveId||objective,lecture,weekId}))};};
- if(name==='list_practice_banks')return {banks:banks.map(summary),deletedBanks:groupBanks(entries.filter(b=>b.deletedAt)).map(summary)};
+ if(name==='list_practice_banks')return {banks:banks.map(summary),deletedBanks:groupBanks(entries.filter(b=>b.deletedAt&&!b.purgedAt)).map(summary)};
  if(name==='combine_practice_banks'){
   const id='group:combined:'+args.requestId,existing=banks.find(b=>b.id===id);if(existing)return {bank:publicBank(existing),message:'Question banks combined.'};
   if(new Set(args.banks.map(b=>b.id)).size!==args.banks.length)throw new Error('Choose different question banks.');
@@ -79,23 +80,35 @@ export async function executeBanks(repo,saved,name,args,validateQuestion){
   const members=chosen.flatMap(b=>b._members);await writeBanks(repo,saved,members,members.map(b=>({...b,groupId:'combined:'+args.requestId,groupName:args.name})));
   return {bank:publicBank((await allBanks(repo,args.courseId,saved.data)).find(b=>b.id===id)),message:'Question banks combined. All questions and exam progress preserved.'};
  }
- const pool=name==='restore_practice_bank'?groupBanks(entries.filter(b=>b.deletedAt)):banks;
+ if(name==='purge_practice_bank'&&entries.some(b=>b.purgedAt&&(b.id===args.bankId||b.purgedBankId===args.bankId)))return {message:'Question bank permanently deleted.'};
+ const pool=['restore_practice_bank','purge_practice_bank'].includes(name)?groupBanks(entries.filter(b=>b.deletedAt&&!b.purgedAt)):banks;
  const bank=pool.find(b=>b.id===args.bankId);if(!bank)throw new Error('Question bank not found.');
  if(name==='read_practice_bank')return {bank:publicBank(bank)};
  if(bank.revision!==args.bankRevision)throw conflict();
+ if(name==='purge_practice_bank'){
+  // Keep only identifiers that prevent old course/tutor copies being recovered
+  // into the archive again. No question text, answer keys or diagrams remain.
+  await writeBanks(repo,saved,bank._members,bank._members.map(b=>({id:b.id,name:'Deleted bank',purgedBankId:bank.id,revision:b.revision,createdAt:b.createdAt,deletedAt:b.deletedAt,purgedAt:Date.now(),questions:[],linkedQuestionIds:[...new Set([...b.questions.map(q=>q.id),...(b.linkedQuestionIds||[])])]})));
+  return {message:'Question bank permanently deleted.'};
+ }
  if(name==='delete_practice_bank'||name==='restore_practice_bank'){
   const remove=name==='delete_practice_bank';await writeBanks(repo,saved,bank._members,bank._members.map(b=>({...b,deletedAt:remove?Date.now():null})));
   return {message:remove?'Question bank moved to Recently deleted. Course questions and exam progress preserved.':'Question bank restored.'};
  }
- const member=bank._members.find(b=>b.questions.some(q=>q.id===args.questionId));if(!member)throw new Error('Question not found in this bank.');
- validateQuestion(args.question);
- const original=member.questions.find(q=>q.id===args.questionId),hasObjective=Object.hasOwn(args.question,'objectiveId')||Object.hasOwn(args.question,'objective'),objectiveId=args.question.objectiveId??args.question.objective;
- if(hasObjective)args.question={...args.question,objectiveId:objectiveId||null,objective:undefined};
- if(objectiveId&&objectiveId!==original.objectiveId&&!objectives.some(o=>o.id===objectiveId))throw new Error('Choose a verified course objective.');
- if(JSON.stringify(original.options)!==JSON.stringify(args.question.options)||JSON.stringify(original.answer)!==JSON.stringify(args.question.answer))args.question.optionNotes=[];
- if(args.question.type==='label')args.question.bank=[...args.question.targets.map(t=>t.answer),...(args.question.distractors||[])];
+ const edits=args.questions||[{questionId:args.questionId,question:args.question}],byId=new Map();
+ for(const edit of edits){
+  if(byId.has(edit.questionId))throw new Error('Each question may only be edited once.');
+  const original=bank.questions.find(q=>q.id===edit.questionId);if(!original)throw new Error('Question not found in this bank.');
+  validateQuestion(edit.question);let question={...edit.question};
+  const hasObjective=Object.hasOwn(question,'objectiveId')||Object.hasOwn(question,'objective'),objectiveId=question.objectiveId??question.objective;
+  if(hasObjective)question={...question,objectiveId:objectiveId||null,objective:undefined};
+  if(objectiveId&&objectiveId!==(original.objectiveId||original.objective)&&!objectives.some(o=>o.id===objectiveId))throw new Error('Choose a verified course objective.');
+  if(JSON.stringify(original.options)!==JSON.stringify(question.options)||JSON.stringify(original.answer)!==JSON.stringify(question.answer))question.optionNotes=[];
+  if(question.type==='label')question.bank=[...question.targets.map(t=>t.answer),...(question.distractors||[])];
+  byId.set(edit.questionId,question);
+ }
  const renamed=args.name.trim()!==bank.name;
- const updates=bank._members.filter(b=>b.id===member.id||renamed).map(b=>({...b,...(bank.groupId?{groupName:args.name.trim()}:{name:args.name.trim()}),questions:b.id===member.id?b.questions.map(q=>q.id===args.questionId?{...q,...args.question,id:q.id}:q):b.questions}));
+ const updates=bank._members.filter(b=>renamed||b.questions.some(q=>byId.has(q.id))).map(b=>({...b,...(bank.groupId?{groupName:args.name.trim()}:{name:args.name.trim()}),questions:b.questions.map(q=>byId.has(q.id)?{...q,...byId.get(q.id),id:q.id}:q)}));
  await writeBanks(repo,saved,bank._members,updates);
  return {bank:publicBank((await allBanks(repo,args.courseId,saved.data)).find(b=>b.id===bank.id)),message:'Question-bank copy saved. Exam answers and progress preserved.'};
 }

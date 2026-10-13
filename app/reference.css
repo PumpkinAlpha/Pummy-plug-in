@@ -637,3 +637,7 @@ html[data-theme=light] .choice.correct,.choice.correct{background:color-mix(in s
 .bank-entry-heading{display:flex;align-items:flex-start;gap:12px;min-width:0}.bank-entry-heading>input{margin-top:5px;flex:none;accent-color:var(--accent)}.bank-entry-heading>div{min-width:0}.bank-coverage{margin-bottom:0}.practice-bank-list>.practice-bank-editor{margin:0 0 12px}.bank-combine{flex-wrap:wrap;gap:12px;margin:16px 0}.bank-combine label{display:grid;gap:6px;min-width:0}.bank-delete{color:var(--ink)}.deleted-banks{margin:24px 0}.deleted-banks>.actions{justify-content:space-between;gap:12px;margin-top:12px;flex-wrap:wrap}.practice-bank-editor:focus{outline:2px solid var(--accent);outline-offset:2px}
 
 .bank-question-fields select{width:100%;min-width:0;max-width:100%}
+.bank-author-fields{border:0;padding:0;margin:18px 0 0;min-width:0}
+.bank-question-details>label{display:grid;gap:8px;margin-top:14px}
+.bank-question-details select{width:100%;min-width:0;padding:12px 14px;background:var(--sunk);color:var(--ink);border:1px solid var(--line2);border-radius:8px}
+.practice-bank-editor .custom-author fieldset>label{display:grid;gap:8px;margin-bottom:12px}
