@@ -42,3 +42,7 @@ Exports run locally. Downloads depend on the host/browser. Native opening does n
 Run npm test, npm run build, npm run validate and npm run test:all-browser. Chrome/Chromium is required for browser checks. PUMMY_BROWSER_EXECUTABLE can select an installed browser. Tests use isolated users/databases and do not answer the student's live exam. Direct native opening is covered by default. PUMMY_TEST_CONVERSION=1 additionally enables a LibreOffice fixture workflow and requires PUMMY_SOFFICE; LibreOffice/Docker are unavailable in this audit environment.
 
 See [DEEP-REVIEW-2026-10-12.md](DEEP-REVIEW-2026-10-12.md) for the current results and verification limits. Live ChatGPT model quality, native PowerPoint compatibility for every possible deck, OAuth callback completion and physical stylus behavior are outside the automated harness.
+
+## Independent slide requests
+
+The existing floating **Explain the slide** control now snapshots each requested slide and queues rapid clicks. Only one follow-up is sent at a time; the student confirms **ChatGPT finished** before the next request is sent. The four sections are A. Reading the Slide, B. Understanding the Material, C. What to Remember and D. Check Your Understanding. Each testable slide gets one independent selectable check with saved selections/results. ChatGPT owns assistant message boundaries; see [SLIDE-MESSAGES.md](./SLIDE-MESSAGES.md) for the API limitations and acceptance coverage. The existing docking, zoom, viewer and annotation controls are preserved.

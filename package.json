@@ -11,6 +11,7 @@
     "converter": "node scripts/converter-server.mjs",
     "db:generate": "drizzle-kit generate",
     "test:browser": "node test/tutor-browser.mjs",
+    "test:slide-explanations-browser": "node test/slide-explanations-browser.mjs",
     "test:explanations-browser": "node test/explanations-browser.mjs",
     "test:workspace-browser": "node test/workspace-browser.mjs",
     "test:figma-browser": "node test/figma-browser.mjs",
