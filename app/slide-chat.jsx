@@ -1,23 +1,5 @@
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {bridge,call} from './bridge.js';
-import {SlideExplanationQueue,slideExplanationPrompt} from './slide-explanation-queue.js';
-import {renderSlide} from './tutor-files.js';
-
-const queues=new Map();
-function explanationQueue(p){
- const key=`pummy-slide-queue:${p.ownerId}`;
- if(!queues.has(key))queues.set(key,new SlideExplanationQueue({storage:window.sessionStorage,key,
-  prepare:args=>call('request_slide_tutor',args),
-  send:async item=>{
-   const {courseId,presentationId,requestId}=item.args;
-   const r=await call('claim_slide_message',{courseId,presentationId,requestId});
-   if(!r.tutor.claimed)throw new Error('This request already has a delivery attempt. Check the conversation; it will not be sent twice.');
-   const result=await bridge.sendMessage({role:'user',content:[{type:'text',text:slideExplanationPrompt(item)}]});
-   if(result.isError)throw new Error('ChatGPT rejected the request. Check the conversation before requesting this slide again.');
-  }
- }));
- return queues.get(key);
-}
 import {PummyMark} from './dashboard.jsx';
 
 // Original professor pixels only: student overlays remain separately identified notes.
@@ -53,7 +35,7 @@ export function SlideChatContext({p,slide,image,annotations,region}){
    const [result,visual]=await Promise.all([call('read_slide_context',captured.args),originalVisual(captured.image,captured.args.region)]);
    if(!alive||version!==generation.current)return;
    result.context.studentAnnotations=captured.notes;
-   await bridge.updateModelContext({structuredContent:{interactiveTutor:{...result.context,answerInConversation:true}},content:[{type:'text',text:'The user is viewing this Pummy slide. For typed questions use read_slide_context with these IDs. For an Explain the slide request, use only the explicit request ID and its saved context from read_slide_tutor; this visible slide may have changed. Do not process other queued requests.'},...(visual?[{type:'image',mimeType:'image/jpeg',data:visual.split(',')[1]}]:[])]});
+   await bridge.updateModelContext({structuredContent:{interactiveTutor:{...result.context,answerInConversation:true}},content:[{type:'text',text:'The user is viewing this Pummy slide. For typed questions use read_slide_context with these IDs. For "explain this slide" or "Explain the slide" without a requestId, call read_slide_context with these IDs and explain=true, then explain the visible slide in the conversation. For a legacy request with an explicit requestId, use only its saved context from read_slide_tutor.'},...(visual?[{type:'image',mimeType:'image/jpeg',data:visual.split(',')[1]}]:[])]});
   }catch{}},200);
   return()=>{alive=false;clearTimeout(timer);};
  },[slide.id,image,JSON.stringify(notes),JSON.stringify(region),allowGeneral]);
@@ -71,10 +53,9 @@ const nearestCorner=(x,y,el)=>{const b=screenBox(),w=el?.offsetWidth||52,h=el?.o
 const clampToViewport=(x,y,el)=>{const b=screenBox(),w=el?.offsetWidth||52,h=el?.offsetHeight||52;return {x:Math.min(Math.max(b.left+8,x),Math.max(b.left+8,b.right-w-8)),y:Math.min(Math.max(b.top+8,y),Math.max(b.top+8,b.bottom-h-8))};};
 
 // Floating, draggable control: collapses to the Pummy mark and opens on hover or focus.
-// "Explain the slide." is sent to the conversation so the student keeps working in the editor.
-export function ExplainSlideButton({p,slide,image,annotations=[],region,index,count,onIndex,zoom=1,onZoom,onFit,status:toolStatus,hasNotes,showNotes,onNotes,showThumbs,onThumbs}){
- const [queue,setQueue]=useState(null),[items,setItems]=useState([]),[error,setError]=useState('');
- useEffect(()=>{if(!bridge)return;try{const q=explanationQueue(p);setQueue(q);return q.subscribe(setItems);}catch(e){setError('Slide queue storage is unavailable. '+e.message);}},[p.ownerId,p.courseId]);
+// Send exactly the text the student would type into the chat and submit.
+export function ExplainSlideButton({slide,index,count,onIndex,zoom=1,onZoom,onFit,status:toolStatus,hasNotes,showNotes,onNotes,showThumbs,onThumbs}){
+ const sending=useRef(false);
  const ref=useRef(null),drag=useRef(null),closeTimer=useRef(null);
  const [corner,setCorner]=useState(savedCorner),cornerRef=useRef(corner),[pos,setPos]=useState({x:window.innerWidth-80,y:window.innerHeight-96});
  const [open,setOpen]=useState(false),[status,setStatus]=useState('idle'),[message,setMessage]=useState('');
@@ -87,12 +68,17 @@ export function ExplainSlideButton({p,slide,image,annotations=[],region,index,co
  useEffect(()=>()=>clearTimeout(closeTimer.current),[]);
  const show=()=>{clearTimeout(closeTimer.current);setOpen(true);};
  const hide=()=>{clearTimeout(closeTimer.current);closeTimer.current=setTimeout(()=>{if(!drag.current&&!ref.current?.contains(document.activeElement))setOpen(false);},250);};
- function explain(){
-  if(!bridge||!queue){setStatus('error');setMessage(error||'Open Pummy in ChatGPT to explain slides.');return;}
-  const captured=structuredClone({courseId:p.courseId,presentationId:p.id,slideId:slide.id,annotationIds:annotations.slice(0,30).map(a=>a.id),...(region?{region}:{}),allowGeneral:false}),page=slide.page,presentation=p,original=image;
-  try{queue.enqueue({...captured,requestId:crypto.randomUUID(),mode:'explain',oneSlide:true,question:'Explain this slide using the four required sections and one selectable check when testable.'},page,async()=>originalVisual(original||await renderSlide(call,presentation,page,1000),captured.region));setError('');}catch(e){setError(e.message);}
+ async function explain(){
+  if(sending.current)return;
+  if(!bridge){setStatus('error');setMessage('Open Pummy in ChatGPT to send a message to the chat.');return;}
+  sending.current=true;setStatus('sending');setMessage('');
+  try{
+   const result=await bridge.sendMessage({role:'user',content:[{type:'text',text:'explain this slide'}]});
+   if(result.isError)throw new Error('ChatGPT could not send the message. Please try it in the chat.');
+   setStatus('idle');
+  }catch(e){setStatus('error');setMessage(e.message);}
+  finally{sending.current=false;}
  }
- const deliveryError=items.find(item=>item.status==='uncertain'&&item.error)?.error;
 
  const stick=c=>{cornerRef.current=c;try{localStorage.setItem(POSITION_KEY+':corner',c);}catch{}setCorner(c);const n=cornerPosition(c,ref.current);if(n)setPos(place(n.x,n.y));};
  function down(e){if(e.button!==0)return;e.currentTarget.setPointerCapture(e.pointerId);drag.current={id:e.pointerId,sx:e.clientX,sy:e.clientY,ox:pos.x,oy:pos.y,moved:false};}
@@ -112,12 +98,10 @@ export function ExplainSlideButton({p,slide,image,annotations=[],region,index,co
     {onThumbs&&<button type="button" className="explain-slide-toggle" aria-pressed={!!showThumbs} onClick={onThumbs}>Slides</button>}
     {hasNotes&&<button type="button" className="explain-slide-toggle" aria-pressed={!!showNotes} onClick={onNotes}>Notes</button>}
     <span className="explain-slide-divider" aria-hidden="true"/>
-    <button type="button" className="explain-slide-action" onClick={explain}>Explain the slide</button>
+    <button type="button" className="explain-slide-action" disabled={status==='sending'} onClick={explain}>Explain the slide</button>
    </>}
   </div>
   {open&&toolStatus&&!message&&<p className="explain-slide-status explain-slide-tool">{toolStatus}</p>}
   {message&&<p role="status" className="explain-slide-status">{message}</p>}
-  {open&&deliveryError&&<p role="alert" className="explain-slide-status">{deliveryError} Delivery will not be retried automatically.</p>}
-  {open&&error&&<p role="alert" className="explain-slide-status">{error}</p>}
  </div>;
 }
