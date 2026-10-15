@@ -2,17 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {LocalD1} from '../scripts/local-db.mjs';
 import {CourseRepository} from '../worker/repository.js';
-import {executeTool} from '../worker/tools.js';
+import {executeTool,definitions} from '../worker/tools.js';
+import {bankOperationPacket} from '../worker/bank-compatibility.js';
 
 test('cached add_questions descriptors can complete the native staged review workflow without bypassing validation',async t=>{
  const db=new LocalD1();t.after(()=>db.close());const repo=new CourseRepository(db,'compat-owner');
  let state=(await executeTool(repo,'create_course',{name:'Compatibility',requestId:crypto.randomUUID()})).state;
  state=(await executeTool(repo,'sync_course_sources',{courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),sources:[{id:'source',name:'Professor',text:'Internal oblique rotates the trunk ipsilaterally. External oblique rotates the trunk contralaterally.'}]})).state;
  const before=(await repo.get(state.courseId)).data;
- const compat=async(name,args={},requestId=crypto.randomUUID())=>{const r=await executeTool(repo,'add_questions',{courseId:state.courseId,revision:state.revision,requestId,questions:[{pummyBankOperation:{name,arguments:args}}]});if(r.state)state=r.state;return r;};
+ const compat=async(name,args={},requestId=crypto.randomUUID())=>{const r=await executeTool(repo,'add_questions',{courseId:state.courseId,revision:state.revision,requestId,questions:[bankOperationPacket(name,args)]});if(r.state)state=r.state;return r;};
+ const legacy=definitions.find(d=>d.name==='add_questions').schema.parse({courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),questions:[bankOperationPacket('describe',{tool:'begin_bank_repair'})]});assert.equal((await executeTool(repo,'add_questions',legacy)).context.operation,'begin_bank_repair');
  const discovery=await executeTool(repo,'read_course_state',{courseId:state.courseId});assert.equal(discovery.context.bankWorkflow.compatibilityTool,'add_questions');
  const description=await compat('describe',{tool:'stage_bank_questions'});assert.ok(description.context.inputSchema.properties.questions);assert.equal((await repo.get(state.courseId)).revision,state.revision);
- await assert.rejects(compat('submit_answer'),/Invalid option/);
+ await assert.rejects(compat('submit_answer'),/Invalid Pummy workflow packet/);
  await assert.rejects(compat('read_bank_repair',{courseId:'someone-else'}),/nested overrides/);
  const runId=crypto.randomUUID(),topic={id:'right',detail:'Combine opposite oblique sides for right trunk rotation.',suitableTypes:['mcq']};
  await compat('begin_bank_repair',{sourceIds:['source'],bankName:'Reviewed bank',mode:'gaps',topics:[topic]},runId);

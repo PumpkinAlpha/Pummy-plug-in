@@ -3,7 +3,16 @@ import {definitions} from '../worker/tools.js';
 import assert from 'node:assert/strict';
 import worker from '../dist/server/index.js';
 import {LocalD1} from '../scripts/local-db.mjs';
+import {bankOperationPacket} from '../worker/bank-compatibility.js';
 const rpc=(method,params={},user)=>new Request('https://example.test/mcp',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json, text/event-stream',...(user?{'oai-authenticated-user-id':user}:{})},body:JSON.stringify({jsonrpc:'2.0',id:1,method,params})});
+test('bank compatibility packets pass real MCP input validation and never import a framing question',async t=>{
+ const db=new LocalD1();t.after(()=>db.close());const env={DB:db};
+ const call=async(name,args)=>{const response=await worker.fetch(rpc('tools/call',{name,arguments:args},'packet-owner'),env);assert.equal(response.status,200);const result=(await response.json()).result;assert.ok(!result.isError,JSON.stringify(result));return result.structuredContent;};
+ const {state}=await call('create_course',{name:'MCP packet verification',requestId:crypto.randomUUID()});
+ const result=await call('add_questions',{courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),questions:[bankOperationPacket('describe',{tool:'begin_bank_repair'})]});
+ assert.equal(result.context.operation,'begin_bank_repair');assert.ok(result.context.inputSchema.properties.topics);
+ const after=(await call('read_course_state',{courseId:state.courseId})).state;assert.equal(after.questionCount,0);assert.equal(after.revision,state.revision);
+});
 test('publisher discovery, tool discovery and private reads use current MCP while legacy clients remain supported',async()=>{
  const request=(method,params={},extra={},version='2026-07-28')=>new Request('https://example.test/mcp',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json, text/event-stream','mcp-method':method,'mcp-protocol-version':version,...extra},body:JSON.stringify({jsonrpc:'2.0',id:'publisher-probe',method,params:{...params,_meta:{'io.modelcontextprotocol/protocolVersion':version,'io.modelcontextprotocol/clientInfo':{name:'publisher',version:'1'},'io.modelcontextprotocol/clientCapabilities':{}}}})});
  const env={DB:{prepare(){throw new Error('Discovery must not access saved course data.');}}};
@@ -27,7 +36,7 @@ test('publisher discovery, tool discovery and private reads use current MCP whil
 });
 test('MCP initialization, discovery, resource MIME and fullscreen metadata, and authenticated calls',async()=>{
  const db=new LocalD1(),env={DB:db};
- let response=await worker.fetch(rpc('initialize',{protocolVersion:'2025-03-26',capabilities:{},clientInfo:{name:'test',version:'1'}}),env);assert.equal(response.status,200);let result=(await response.json()).result;assert.equal(result.serverInfo.name,'pummy-adaptive-test');assert.equal(result.serverInfo.version,'0.6.2');assert.equal(result.serverInfo.icons[0].src,'https://pummy-adaptive-test.daniel-dehkordi1.chatgpt.site/pummy-logo.png');assert.match(result.instructions,/student/);
+ let response=await worker.fetch(rpc('initialize',{protocolVersion:'2025-03-26',capabilities:{},clientInfo:{name:'test',version:'1'}}),env);assert.equal(response.status,200);let result=(await response.json()).result;assert.equal(result.serverInfo.name,'pummy-adaptive-test');assert.equal(result.serverInfo.version,'0.6.3');assert.equal(result.serverInfo.icons[0].src,'https://pummy-adaptive-test.daniel-dehkordi1.chatgpt.site/pummy-logo.png');assert.match(result.instructions,/student/);
  response=await worker.fetch(rpc('tools/list'),env);result=(await response.json()).result;assert.equal(result.tools.length,definitions.length);assert.deepEqual(result.tools.find(t=>t.name==='open_interface')._meta['openai/ui'].entrypoints,[{type:'global'},{type:'thread'}]);assert.equal(result.tools.find(t=>t.name==='submit_answer').annotations.readOnlyHint,false);assert.deepEqual(result.tools.find(t=>t.name==='delete_course')._meta.ui.visibility,['app']);assert.equal(result.tools.find(t=>t.name==='delete_course').annotations.destructiveHint,true);
  response=await worker.fetch(rpc('resources/read',{uri:'ui://pummy/adaptive-test-v4.html'}),env);result=(await response.json()).result;assert.equal(result.contents[0].mimeType,'text/html;profile=mcp-app');assert.equal(result.contents[0]._meta['openai/ui'].preferredDisplayMode,'inline');assert.match(result.contents[0].text,/Pummy Adaptive Test/);
  const currentPage=result.contents[0].text;

@@ -1,3 +1,9 @@
+# Pummy Adaptive Test 1.0.9
+
+Runtime 0.6.3 adapts the review transport to the actual cached connector question schema: a reserved marker packet uses existing question fields, is intercepted before import and calls the same native repair operations. No framing question is saved. 298 automated tests pass, including real MCP input-schema validation, plus browser checks for original-figure preparation and all question formats. This corrects the connector-side validation discovered during live verification of 1.0.8. Source review and separate independent approval remain mandatory.
+
+Previous release (1.0.8):
+
 # Pummy Adaptive Test 1.0.8
 
 Runtime 0.6.2 fixes bank generation in chats that still expose older Pummy tool descriptors. Current repair operations can be described and executed through a strictly scoped add_questions envelope, using the same native source validation, calibrated difficulty, staging and separate independent review. Generated questions remain generated; unsupported and failed items cannot bypass review. Saved course reads supply the persistent fallback instructions.

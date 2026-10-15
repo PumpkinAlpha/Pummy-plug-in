@@ -1,4 +1,4 @@
-Current update: runtime 0.6.2 / plugin 1.0.8 adds validated bank-review compatibility for cached chat tools and separate original-figure preparation. Exact-page source reads include prepared original images even when text extraction is empty. See [bank-review compatibility](BANK-REVIEW-COMPATIBILITY.md).
+Current update: runtime 0.6.3 / plugin 1.0.9 adds validated bank-review compatibility for cached chat tools and separate original-figure preparation. Exact-page source reads include prepared original images even when text extraction is empty. See [bank-review compatibility](BANK-REVIEW-COMPATIBILITY.md).
 
 # Pummy Adaptive Test — ChatGPT plugin
 
