@@ -1,3 +1,13 @@
+# Pummy Adaptive Test 1.0.8
+
+Runtime 0.6.2 fixes bank generation in chats that still expose older Pummy tool descriptors. Current repair operations can be described and executed through a strictly scoped add_questions envelope, using the same native source validation, calibrated difficulty, staging and separate independent review. Generated questions remain generated; unsupported and failed items cannot bypass review. Saved course reads supply the persistent fallback instructions.
+
+Course & sources now offers Prepare original figures separately from bank generation. Exact-page read_source calls return prepared original images and provenance, including pages with no extracted text. This makes source diagrams and professor emphasis available through the existing chat tool list. Preparing originals preserves questions, exams and history. Supplemental sources require student authorization and remain below professor materials in priority.
+
+297 automated tests pass. Browser verification exercises the actual preparation button, image-only page reads, all five question formats, desktop/mobile input, explanations and preserved state. The actual supplied lecture PDF was recovered and visually inspected for source gaps; source findings and student study files stay in private local work storage, outside GitHub. Earlier resource URLs remain supported. No new permissions or database migration.
+
+Previous release (1.0.7):
+
 # Pummy Adaptive Test 1.0.7
 
 Runtime 0.6.1 makes selectable native chat checks the persistent default after typed and app-triggered slide explanations. Typed context now supplies fresh check IDs; the app captures the original slide and a saved informal request before sending its short message. Full professor-aligned explanations and source citations precede the native widget. Options start unselected, Check answer reveals correctness and rationale, and informal checks cannot leak into automatic bank recovery or change formal exams/progress/slide position.

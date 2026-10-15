@@ -2,7 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {App} from '@modelcontextprotocol/ext-apps';
 
-const app=new App({name:'pummy-slide-check',version:'0.6.1'},{},{autoResize:true});
+const app=new App({name:'pummy-slide-check',version:'0.6.2'},{},{autoResize:true});
 function SlideCheck(){
  const [data,setData]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),identity=useRef(null),locked=useRef(false);
  function accept(result){

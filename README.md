@@ -1,3 +1,5 @@
+Current update: runtime 0.6.2 / plugin 1.0.8 adds validated bank-review compatibility for cached chat tools and separate original-figure preparation. Exact-page source reads include prepared original images even when text extraction is empty. See [bank-review compatibility](BANK-REVIEW-COMPATIBILITY.md).
+
 # Pummy Adaptive Test — ChatGPT plugin
 
 Runtime 0.6.1 / plugin 1.0.7: selectable native practice checks are the default after typed and app-triggered slide explanations. Complete explanations and citations come first; clickable checks start unselected and reveal feedback only after Check answer. They preserve formal exam progress and slide position. See [SELECTABLE-SLIDE-CHECKS-2026-10-15.md](SELECTABLE-SLIDE-CHECKS-2026-10-15.md).

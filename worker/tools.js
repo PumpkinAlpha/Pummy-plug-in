@@ -1,4 +1,5 @@
 import {validateCognitiveReview} from '../lib/assessment-quality.js';
+import {bankCompatibilityCall,bankWorkflow} from './bank-compatibility.js';
 import {repairDefinitions,executeRepair,assessmentSchema,cognitiveSchema} from './assessment-repair.js';
 import {purgeSource} from './source-purge.js';
 import {executeBanks} from './practice-banks.js';
@@ -107,6 +108,8 @@ async function saveNewCourse(repo,model){
  }
 }
 export async function executeTool(repo,name,raw){
+ const compatibility=bankCompatibilityCall(name,raw,definitions);
+ if(compatibility)return compatibility.result||executeTool(repo,compatibility.name,compatibility.args);
  const restoring=name==='restore_saved_bank'||name==='append_saved_bank';
  const def=definitions.find(t=>t.name===name);if(!def)throw new Error('Unknown tool.');const parsed=def.schema.safeParse(raw);if(!parsed.success){const issue=parsed.error.issues[0];throw Object.assign(new Error(`Check ${issue.path.join('.')||'the request'}: ${issue.message}. ${name==='sync_course_sources'?'Sync rejected; no changes were saved.':'For imports, use a supported question format with a complete key.'}`),name==='sync_course_sources'?{sync:{added:[],updated:[],unchanged:[],rejected:parsed.error.issues.map(i=>({path:i.path.join('.'),message:i.message}))}}:{});}let args=parsed.data;
  if(restoring)name=name==='restore_saved_bank'?'import_questions':'add_questions';
@@ -137,20 +140,23 @@ export async function executeTool(repo,name,raw){
  if(args.sourceId&&saved.data.sources?.find(s=>s.id===args.sourceId)?.purgedAt)throw new Error('This source was permanently deleted. Import it with a new source ID to add it again.');
  const model=new PluginCourse(saved.data),exam=createExam(model),s=model.session;
  if(['request_bank_explanations','read_bank_explanations','provide_bank_explanations'].includes(name))return executeBankExplanations(repo,model,saved,name,args,view,validateExplanationSources);
- if(['open_test','read_course_state','open_interface'].includes(name))return {state:view(model,saved.revision)};
+ if(['open_test','read_course_state','open_interface'].includes(name))return {state:view(model,saved.revision),context:{bankWorkflow}};
  const repairResult=await executeRepair(repo,model,saved,name,args,{view,validateQuestion,ingest});if(repairResult)return repairResult;
  if(name==='sync_course_sources'){try{return await syncSources(repo,saved,model,args,view,refreshGrounding);}catch(e){e.sync={requestId:args.requestId,added:[],updated:[],unchanged:[],rejected:[{message:e.message}],totalSources:saved.data.sources?.length||0,revision:saved.revision};throw e;}}
  if(name==='retrieve_sources'){if(args.sourceIds?.some(id=>!model.sources.has(id)))throw new Error('A selected source was not found.');if(args.objectiveId&&!model.objective(args.objectiveId))throw new Error('Objective not found.');const o=model.objective(args.objectiveId);return {context:grounding(model,args.query+(o?' '+o.text:''),args.budget,{onlySids:args.sourceIds??null,preferSids:o?.sourceId?[o.sourceId]:[],question:{objectiveId:o?.id,sourceId:o?.sourceId,lecture:o?.lecture,weekId:o?.weekId}})};}
  if(name==='read_source'){
   const source=model.sources.get(args.sourceId);if(!source)throw new Error('Source not found.');const {pages,visualPdf,...info}=source,text=model.texts.get(args.sourceId)||'';
-  const allPageNumbers=pagesOf(source,text).filter(p=>p.page).map(p=>p.page);
+  const preparedFigurePages=model.sourceVisuals.filter(v=>v.sourceId===source.id&&v.contentHash===source.contentHash).map(v=>v.page);
+  const allPageNumbers=[...new Set([...pagesOf(source,text).filter(p=>p.page).map(p=>p.page),...preparedFigurePages])].sort((a,b)=>a-b);
   if(args.metadataOnly)return {source:{...info,hasVisual:!!visualPdf,pageNumbers:allPageNumbers,chars:text.length}};
   if(args.page!=null&&(args.fromPage!=null||args.toPage!=null))throw new Error('Use page or a page range, not both.');
   if(args.toPage!=null&&args.fromPage==null)throw new Error('Provide fromPage with toPage.');
   if(args.toPage!=null&&args.toPage<args.fromPage)throw new Error('The page range is reversed.');
+  const visual=args.page!=null?await executeRepair(repo,model,saved,'read_source_visual',{courseId:args.courseId,sourceId:source.id,page:args.page},{view,validateQuestion,ingest}):null;
   let content=text,selected=[];
-  if(args.page!=null||args.fromPage!=null){const from=args.page??args.fromPage,to=args.page??args.toPage??from;selected=pagesOf(source,text).filter(p=>p.page>=from&&p.page<=to);if(!selected.length)throw new Error('No supplied pages match this request.');content=selected.map(p=>`--- ${p.unit==='slide'?'Slide':'Page'} ${p.page} ---\n${p.text}`).join('\n');}
-  const end=Math.min(content.length,args.offset+args.limit);return {source:{...info,hasVisual:!!visualPdf,text:content.slice(args.offset,end),pageNumbers:(selected.length?selected:pagesOf(source,text)).filter(p=>p.page).map(p=>p.page),allPageNumbers,offset:args.offset,totalChars:content.length,truncated:end<content.length,nextOffset:end<content.length?end:null}};
+  if(args.page!=null||args.fromPage!=null){const from=args.page??args.fromPage,to=args.page??args.toPage??from;selected=pagesOf(source,text).filter(p=>p.page>=from&&p.page<=to);if(!selected.length&&!visual?.visual)throw new Error('No supplied pages match this request.');content=selected.map(p=>`--- ${p.unit==='slide'?'Slide':'Page'} ${p.page} ---\n${p.text}`).join('\n');}
+  const end=Math.min(content.length,args.offset+args.limit);
+  return {source:{...info,hasVisual:!!visualPdf||!!visual?.visual,text:content.slice(args.offset,end),pageNumbers:visual?.visual?[args.page]:(selected.length?selected:pagesOf(source,text)).filter(p=>p.page).map(p=>p.page),allPageNumbers,preparedFigurePages,offset:args.offset,totalChars:content.length,truncated:end<content.length,nextOffset:end<content.length?end:null},...(visual?.visual?visual:{context:{bankWorkflow,...(visual?.context?{originalFigure:visual.context}:{})}})};
  }
  if(name==='read_source_pdf'){
   const source=model.sources.get(args.sourceId);if(!source)throw new Error('Source not found.');
@@ -161,7 +167,7 @@ export async function executeTool(repo,name,raw){
  if(['provide_question','provide_explanation','add_questions'].includes(name)&&model.completedRequests.some(r=>r.id===(name==='add_questions'?args.requestId:args.generationId||args.requestId)&&(name==='add_questions'?(!r.tool||r.tool==='add_questions'):r.sessionId===s?.id)))return {state:view(model,saved.revision),message:'This request was already completed.'};
  if(args.revision!==saved.revision)throw Object.assign(new Error('Your test changed. Refresh before continuing.'),{code:'conflict'});
  if(name==='add_questions'){
-  if(!restoring&&args.questions.some(q=>!['practice','own'].includes(q.origin)||q.assessment))throw Error('AI-generated bank questions must use begin_bank_repair, stage_bank_questions and independent review_bank_question. Existing supplied professor questions can be appended with origin:practice.');
+  if(!restoring&&args.questions.some(q=>!['practice','own'].includes(q.origin)||q.assessment))throw Error('AI-generated bank questions must use begin_bank_repair, stage_bank_questions and independent review_bank_question. Read read_course_state context.bankWorkflow for the add_questions compatibility transport if this chat lacks the native review tools. Existing supplied professor questions can be appended with origin:practice.');
   if(model.activeQuestions().length+args.questions.length>500)throw new Error('Split larger courses; use at most 500 stored questions per course.');
   args.questions.forEach(validateQuestion);
   for(const src of args.sources){if(model.sources.has(src.id)){if(model.texts.get(src.id)!==src.text)throw new Error('That source ID has different content. Use a new ID to preserve the existing reference.');}else{const {text,...info}=src;model.sources.set(src.id,{...info,kind:'material',createdAt:Date.now()});model.texts.set(src.id,text);}}

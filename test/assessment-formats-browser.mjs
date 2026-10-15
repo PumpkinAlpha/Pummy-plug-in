@@ -2,7 +2,6 @@
 import {createServer} from 'node:http';
 import {mkdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
-import {build} from 'esbuild';
 import {chromium} from '@playwright/test';
 import {LocalD1} from '../scripts/local-db.mjs';
 import {CourseRepository} from '../worker/repository.js';
@@ -16,16 +15,23 @@ const call=async(n,a)=>{const r=await executeTool(repo,n,a);if(r.state)state=r.s
 ({state}=await call('create_course',{requestId:crypto.randomUUID(),name:'Assessment formats QA'}));
 const assetId=await uploadPresentationFile(call,state.courseId,new File([await fixturePDF()],'Professor schematic.pdf'));
 await call('sync_course_sources',{courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),sources:[{id:'s',name:'Professor schematic.pdf',sourceType:'professor_slides',originalAssetId:assetId,text:'Objectives\n1. Interpret the original schematic and its spatial relationships.\nThe diagram contains a blue circle and orange line. The jugular and subclavian veins unite.',metadata:{pageCount:2}}]});
-const driver=(await build({stdin:{contents:"import {prepareSourceVisuals} from './app/source-visuals.js';window.prepareQAVisuals=(state)=>prepareSourceVisuals(async(name,args)=>{const r=await fetch('/api/tool',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,arguments:args})});const data=await r.json();if(!r.ok)throw Error(data.error);return data.structuredContent;},state,['s']);",resolveDir:process.cwd()},bundle:true,write:false,format:'iife',platform:'browser'})).outputFiles[0].text;
 const server=createServer(async(req,res)=>{try{
- if(req.url==='/driver.js'){res.writeHead(200,{'Content-Type':'text/javascript'});res.end(driver);return;}
  const chunks=[];for await(const c of req)chunks.push(c);const headers=new Headers(req.headers);headers.set('oai-authenticated-user-id','format-qa');const r=await worker.fetch(new Request(`http://127.0.0.1:${server.address().port}${req.url}`,{method:req.method,headers,...(chunks.length?{body:Buffer.concat(chunks)}:{})}),{DB:db});res.writeHead(r.status,Object.fromEntries(r.headers));res.end(Buffer.from(await r.arrayBuffer()));
 }catch(e){res.writeHead(500);res.end(e.message);}});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser,page;const errors=[];
 try{
  browser=await chromium.launch({headless:true,executablePath:process.env.PUMMY_BROWSER_EXECUTABLE||'C:/Program Files/Google/Chrome/Application/chrome.exe'});page=await browser.newPage({viewport:{width:1200,height:900}});page.on('pageerror',e=>errors.push(e.message));
- await page.goto(`http://127.0.0.1:${server.address().port}`);await page.addScriptTag({content:driver});
- const prepared=await page.evaluate(state=>window.prepareQAVisuals(state),state);assert.deepEqual(prepared.failures,[]);state=prepared.state;assert.equal(state.sourceVisuals.length,2);
+ await page.goto(`http://127.0.0.1:${server.address().port}`);
+ await page.getByRole('button',{name:'Open course',exact:true}).click();
+ await page.getByRole('button',{name:/Study resources.*source/}).click();
+ await page.getByRole('button',{name:/Course & sources Organize/}).click();
+ const beforePreparation=await repo.get(state.courseId);
+ await page.getByRole('button',{name:'Prepare original figures',exact:true}).click();
+ await page.getByText(/Original figures prepared for source review/).waitFor();
+ state=(await call('read_course_state',{courseId:state.courseId})).state;assert.equal(state.sourceVisuals.length,2);assert.equal(state.questionCount,0);
+ const afterPreparation=await repo.get(state.courseId);for(const key of ['session','questions','history','concepts'])assert.deepEqual(afterPreparation.data[key],beforePreparation.data[key]);
+ const legacyRead=await call('read_source',{courseId:state.courseId,sourceId:'s',page:1});assert.equal(legacyRead.context.status,'verified_original');assert.ok(legacyRead.visual.dataUrl);
+ await page.screenshot({path:output+'/prepared-original-figures.png',fullPage:true});
  const visual=(await call('read_source_visual',{courseId:state.courseId,sourceId:'s',page:1})).visual.dataUrl;
  const figure={dataUrl:visual,file:'Professor schematic.pdf',unit:'page',page:1},raw=[
  {term:'Single choice',stem:'Identify the drawn blue shape.',options:['Circle','Line','Triangle'],answer:[0],optionNotes:['The blue region is circular.','The orange region is a line.','No triangle is drawn.']},
