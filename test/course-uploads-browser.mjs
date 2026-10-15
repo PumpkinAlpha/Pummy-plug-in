@@ -10,9 +10,9 @@ import worker from '../dist/server/index.js';
 const directory=new URL('../work/upload-qa/',import.meta.url);await mkdir(directory,{recursive:true});
 const db=new LocalD1(),objects=new Map(),bucket={put:async(k,v)=>objects.set(k,v),get:async k=>objects.has(k)?{text:async()=>objects.get(k)}:null},repo=new CourseRepository(db,'browser-upload-test',null,bucket);
 const {state}=await executeTool(repo,'create_course',{requestId:crypto.randomUUID(),name:'Upload QA'});
-let fail=true;const errors=[];
+let failures=3;const errors=[];
 const server=createServer(async(req,res)=>{try{const chunks=[];for await(const c of req)chunks.push(c);const body=Buffer.concat(chunks);const headers=new Headers(req.headers);headers.set('oai-authenticated-user-id','browser-upload-test');
- if(req.method==='POST'){const data=JSON.parse(body);if(data.name==='sync_course_sources'&&(data.arguments.sources[0].name==='discard.txt'||data.arguments.sources[0].name==='second.md'&&fail)){fail=false;res.writeHead(503,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Temporary upload failure'}));return;}}
+ if(req.method==='POST'){const data=JSON.parse(body);if(data.name==='sync_course_sources'&&(data.arguments.sources[0].name==='discard.txt'||data.arguments.sources[0].name==='second.md'&&failures>0)){failures--;res.writeHead(503,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Temporary upload failure'}));return;}}
  const response=await worker.fetch(new Request(`http://127.0.0.1:${server.address().port}${req.url}`,{method:req.method,headers,...(body.length?{body}:{})}),{DB:db,BUCKET:bucket,ASSETS:new Proxy({},{get:()=>()=>{throw new Error('Wrong storage binding');}})});res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));
  }catch(e){res.writeHead(500);res.end(e.message);}});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;
