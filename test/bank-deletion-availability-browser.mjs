@@ -10,7 +10,7 @@ import worker from '../dist/server/index.js';
 const directory='/private/tmp/pummy-bank-deletion-sync-qa';await mkdir(directory,{recursive:true});
 const db=new LocalD1(),repo=new CourseRepository(db,'bank-sync-browser'),call=(n,a)=>executeTool(repo,n,a),question=stem=>({term:stem,stem,options:['Yes','No'],answer:[0],sourceId:'a',weekId:'Week 13'});
 let {state}=await call('import_questions',{requestId:crypto.randomUUID(),name:'Deletion sync QA',sources:[{id:'a',name:'Lecture',weekId:'Week 13',text:'Use these supplied number facts.'}],questions:[question('Keep this question?')]});
-state=(await call('add_questions',{courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),bankName:'Delete these questions',questions:[question('Deleted question one?'),question('Deleted question two?')]})).state;
+state=(await call('append_saved_bank',{courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),bankName:'Delete these questions',questions:[question('Deleted question one?'),question('Deleted question two?')]})).state;
 state=(await call('save_custom_test',{courseId:state.courseId,revision:state.revision,testId:crypto.randomUUID(),name:'Mixed saved test',questionIds:state.questionIndex.map(q=>q.id),size:'all',adaptive:false})).state;
 state=(await call('start_test',{courseId:state.courseId,revision:state.revision,size:'all',examMode:'all',adaptive:false})).state;
 const before=await repo.get(state.courseId),errors=[];

@@ -1,6 +1,6 @@
 {
   "name": "pummy-adaptive-plugin",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -19,7 +19,8 @@
     "test:recovery-browser": "node test/review-fixes-browser.mjs",
     "test:practice-banks-browser": "node test/practice-banks-browser.mjs",
     "test:bank-browser": "node test/bank-import-browser.mjs",
-    "test:all-browser": "node scripts/test-browser.mjs"
+    "test:all-browser": "node scripts/test-browser.mjs",
+    "test:assessment-formats-browser": "node test/assessment-formats-browser.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/core": "^2.3.1",

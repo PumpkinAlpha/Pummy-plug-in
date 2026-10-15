@@ -1,3 +1,4 @@
+import {cognitiveFixture} from './cognitive-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {LocalD1} from '../scripts/local-db.mjs';
@@ -14,11 +15,11 @@ test('empty course, project association, source addition, bank append, saved cus
  await assert.rejects(executeTool(repo,'update_course',{...args(s),project:{name:'Wrong',url:'https://example.com'}}),/Project URL/);
  s=(await executeTool(repo,'update_course',{...args(s),sources:[{id:'arch',name:'Arch slides',text:'Normal right-to-left order: brachiocephalic trunk, left common carotid, left subclavian.'}]})).state;
  const rid=crypto.randomUUID(),add={...args(s),requestId:rid,questions:[{...keyed,sourceId:'arch'},{...keyed,stem:'Which arch branch is last?',options:['Brachiocephalic trunk','Left subclavian'],answer:[1],definition:'Left subclavian is last.',sourceId:'arch'}]};
- s=(await executeTool(repo,'add_questions',add)).state;assert.equal(s.questionCount,2);assert.equal(s.hasMaterials,true);
+ s=(await executeTool(repo,'append_saved_bank',add)).state;assert.equal(s.questionCount,2);assert.equal(s.hasMaterials,true);
  const testId=crypto.randomUUID();s=(await executeTool(repo,'save_custom_test',{...args(s),testId,name:'Both arch questions',adaptive:false,size:2,questionIds:s.questionIndex.map(q=>q.id)})).state;
  assert.equal(s.customTests.length,1);assert.equal(s.session,null);
  s=(await executeTool(repo,'start_test',{...args(s),customTestId:testId})).state;assert.equal(s.session.total,2);assert.equal(s.session.adaptive,false);const session=s.session.id;
- assert.equal((await executeTool(repo,'add_questions',add)).state.questionCount,2);assert.equal((await executeTool(repo,'add_questions',add)).state.session.id,session);
+ assert.equal((await executeTool(repo,'append_saved_bank',add)).state.questionCount,2);assert.equal((await executeTool(repo,'append_saved_bank',add)).state.session.id,session);
  s=(await executeTool(repo,'update_course',{...args(s),name:'Thoracic Anatomy'})).state;assert.equal(s.name,'Thoracic Anatomy');assert.equal(s.session.id,session);
  const stored=await repo.get(s.courseId);assert.equal(stored.data.project.name,'Anatomy');assert.equal(stored.data.customTests[0].id,testId);
  assert.equal(s.question.answer,undefined);assert.ok(s.questionIndex.every(q=>!('answer' in q)&&!('definition' in q)));
@@ -82,7 +83,7 @@ test('unsupported foundation plus replacement completes in one write, hides key 
  assert.match(s.generation.prompt,/ONLY if explicitly marked/);
  const optionNotes=keyed.options.map((_,i)=>i===keyed.answer[0]?'This branch is first.':'This branch is not first.');
  await assert.rejects(executeTool(repo,'provide_question',{...args(s),generationId:s.generation.id,question:{...keyed,term:'ARCH ORDER',optionNotes}}),/distinct prerequisite/);
- const payload={...args(s),generationId:s.generation.id,question:{outOfScope:true,gap:'No distinct prerequisite is supported by the excerpt.',replacement:{...keyed,optionNotes,stem:'Which arch branch arises to the right of the left common carotid?'}}};
+ const payload={...args(s),generationId:s.generation.id,question:{outOfScope:true,gap:'No distinct prerequisite is supported by the excerpt.',replacement:{cognitive:cognitiveFixture,...keyed,optionNotes,stem:'Which arch branch arises to the right of the left common carotid?'}}};
  s=(await executeTool(repo,'provide_question',payload)).state;assert.equal(s.generation,null);assert.equal(s.session.next.ready,true);assert.equal(s.session.phase,'feedback');assert.equal(s.session.nextType,'retry');
  assert.deepEqual((await executeTool(repo,'provide_question',payload)).state,s);
  s=(await executeTool(repo,'next_question',args(s))).state;assert.match(s.question.stem,/to the right/);assert.equal(s.question.answer,undefined);

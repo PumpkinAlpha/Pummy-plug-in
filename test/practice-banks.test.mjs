@@ -1,3 +1,4 @@
+import {cognitiveFixture} from './cognitive-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {LocalD1} from '../scripts/local-db.mjs';
@@ -11,7 +12,7 @@ async function setup(t){const db=new LocalD1();t.after(()=>db.close());const rep
 test('every append is archived once, persists beyond rolling receipts and preserves a live exam',async t=>{
  const {repo,call,state:initial}=await setup(t);let state=(await call('start_test',{courseId:initial.courseId,revision:initial.revision,size:1,adaptive:false})).state;
  const started=(await repo.get(state.courseId)).data.session;
- for(let i=0;i<42;i++){const args={courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),questions:[{...question,stem:'Bank question '+i,setId:'Bank '+i}]};state=(await call('add_questions',args)).state;await call('add_questions',args);}
+ for(let i=0;i<42;i++){const args={courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),questions:[{...question,stem:'Bank question '+i,setId:'Bank '+i}]};state=(await call('append_saved_bank',args)).state;await call('append_saved_bank',args);}
  const {banks}=await call('list_practice_banks',{courseId:state.courseId});assert.equal(banks.length,43);assert.equal(new Set(banks.map(b=>b.id)).size,43);assert.equal(banks.reduce((n,b)=>n+b.count,0),43);assert.deepEqual((await repo.get(state.courseId)).data.session,started);
 });
 test('editing archive keys leaves course revision, active answers, results and mastery untouched; stale edits reject',async t=>{
@@ -40,7 +41,7 @@ test('tutor completion archives practice before Add to bank, atomically and with
  await tutor.putRequest(state.courseId,pid,rid,request);
  const archived={id:'batch:'+appendId,name:'Tutor practice',createdAt:Date.now(),questions:[{...question,id:'tutor-question'}]};
  await tutor.completeRequest(state.courseId,pid,rid,{...request,status:'complete'},request,(gate,bindings)=>bankInsert(repo,state.courseId,archived,gate,bindings));
- const next=(await call('add_questions',{courseId:state.courseId,revision:state.revision,requestId:appendId,questions:[question]})).state;
+ const next=(await call('append_saved_bank',{courseId:state.courseId,revision:state.revision,requestId:appendId,questions:[question]})).state;
  assert.equal((await call('list_practice_banks',{courseId:state.courseId})).banks.length,2);
  assert.equal(next.questionCount,2);
  const before=(await call('list_practice_banks',{courseId:state.courseId})).banks.length;
@@ -54,14 +55,14 @@ test('Quizlet uses exactly two columns and one row per question for every questi
 test('adaptive follow-ups and older unsaved slide practice appear in the archive',async t=>{
  const {repo,call,state:initial}=await setup(t);let state=(await call('start_test',{courseId:initial.courseId,revision:initial.revision,size:1,adaptive:true})).state;
  state=(await call('submit_answer',{courseId:state.courseId,revision:state.revision,sessionId:state.session.id,questionId:state.question.id,choices:[0]})).state;
- state=(await call('provide_question',{courseId:state.courseId,revision:state.revision,generationId:state.generation.id,question:{...question,term:'Evenness prerequisite',stem:'Which number is divisible by two?',optionNotes:['One is odd.','Two is even.']}})).state;
+ state=(await call('provide_question',{courseId:state.courseId,revision:state.revision,generationId:state.generation.id,question:{...question,cognitive:cognitiveFixture,term:'Evenness prerequisite',stem:'Which number is divisible by two?',optionNotes:['One is odd.','Two is even.']}})).state;
  let {banks}=await call('list_practice_banks',{courseId:state.courseId});assert.equal(banks.length,2);assert.equal(banks.reduce((n,b)=>n+b.count,0),2);
  const tutor=new TutorRepository(repo),appendId=crypto.randomUUID();await tutor.putRequest(state.courseId,crypto.randomUUID(),crypto.randomUUID(),{status:'complete',appendId,page:1,completedAt:Date.now(),questions:[question]});
  banks=(await call('list_practice_banks',{courseId:state.courseId})).banks;assert.equal(banks.length,3);assert.ok(banks.find(b=>b.id==='batch:'+appendId)?.recovered);
 });
 test('archive editor accepts ordering, matching and diagram labels with their keys intact',async t=>{
  const {repo,call,state}=await setup(t),figure={dataUrl:'data:image/png;base64,iVBORw0KGgo=',file:'Diagram',unit:'page',page:1,marks:[]},questions=[{type:'order',term:'Order',stem:'Put in order',items:['first','second','third']},{type:'match',term:'Match',stem:'Match pairs',pairs:[{left:'A',right:'one'},{left:'B',right:'two'},{left:'C',right:'three'}]},{type:'label',term:'Label',stem:'Label diagram',figure,targets:[{x:0,y:0,w:.2,h:.2,answer:'Heart'},{x:.5,y:.5,w:.2,h:.2,answer:'Lung'}]}];
- const requestId=crypto.randomUUID();await call('add_questions',{courseId:state.courseId,revision:state.revision,requestId,questions});let {bank}=await call('read_practice_bank',{courseId:state.courseId,bankId:'batch:'+requestId});const before=await repo.get(state.courseId);
+ const requestId=crypto.randomUUID();await call('append_saved_bank',{courseId:state.courseId,revision:state.revision,requestId,questions});let {bank}=await call('read_practice_bank',{courseId:state.courseId,bankId:'batch:'+requestId});const before=await repo.get(state.courseId);
  for(const q of bank.questions){const question={...q,stem:q.stem+' edited'};if(q.type==='label')question.targets=q.targets.map((t,i)=>({...t,answer:i===0?'Edited heart':t.answer}));bank=(await call('edit_practice_bank',{courseId:state.courseId,bankId:bank.id,bankRevision:bank.revision,name:bank.name,questionId:q.id,question})).bank;}
  assert.deepEqual(await repo.get(state.courseId),before);assert.equal(bank.questions[2].targets[0].answer,'Edited heart');assert.ok(bank.questions[2].bank.includes('Edited heart'));assert.equal(quizletTSV(bank.questions).trimEnd().split('\n').length,3);
 });
@@ -71,7 +72,7 @@ test('batches from one generation are a single bank; other prompts stay separate
  const generationId=crypto.randomUUID(),requestIds=[crypto.randomUUID(),crypto.randomUUID()];
  for(const [i,requestId] of requestIds.entries()){
   const args={courseId:state.courseId,revision:state.revision,requestId,generationId,bankName:'One prompt',bankSourceIds:['a'],questions:[{...question,stem:'Prompt question '+i}]};
-  state=(await call('add_questions',args)).state;await call('add_questions',args);
+  state=(await call('append_saved_bank',args)).state;await call('append_saved_bank',args);
  }
  let banks=(await call('list_practice_banks',{courseId:state.courseId})).banks;
  assert.equal(banks.length,2);const group=banks.find(b=>b.groupId);assert.equal(group.name,'One prompt');assert.equal(group.count,2);assert.equal(group.memberCount,2);
@@ -81,12 +82,12 @@ test('batches from one generation are a single bank; other prompts stay separate
  bank=(await call('edit_practice_bank',args)).bank;assert.equal(bank.questions[1].stem,'Edited second batch');assert.equal(bank.questions[0].stem,'Prompt question 0');assert.equal(bank.name,'Renamed prompt');
  await assert.rejects(call('edit_practice_bank',args),/changed in another window/);assert.deepEqual(await repo.get(state.courseId),before);
  const reopened=await executeTool(new CourseRepository(repo.db,'student'),'read_practice_bank',{courseId:state.courseId,bankId:bank.id});assert.equal(reopened.bank.name,'Renamed prompt');assert.equal(reopened.bank.questions.length,2);
- state=(await call('add_questions',{courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),generationId:crypto.randomUUID(),questions:[question]})).state;
+ state=(await call('append_saved_bank',{courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),generationId:crypto.randomUUID(),questions:[question]})).state;
  assert.equal((await call('list_practice_banks',{courseId:state.courseId})).banks.length,3);
 });
 test('selected older banks combine idempotently with every question retained, including recovered entries',async t=>{
  const {repo,db,call,state:initial}=await setup(t);
- const state=(await call('add_questions',{courseId:initial.courseId,revision:initial.revision,requestId:crypto.randomUUID(),questions:[{...question,stem:'Second bank'}]})).state;
+ const state=(await call('append_saved_bank',{courseId:initial.courseId,revision:initial.revision,requestId:crypto.randomUUID(),questions:[{...question,stem:'Second bank'}]})).state;
  await db.prepare('DELETE FROM practice_banks WHERE id=?').bind('import:'+state.courseId).run();
  const before=await repo.get(state.courseId),banks=(await call('list_practice_banks',{courseId:state.courseId})).banks;
  const args={courseId:state.courseId,requestId:crypto.randomUUID(),name:'Combined older prompt',banks:banks.map(b=>({id:b.id,revision:b.revision}))};
@@ -96,7 +97,7 @@ test('selected older banks combine idempotently with every question retained, in
 });
 test('delete and restore apply to whole grouped banks and cannot recover deleted questions as new entries',async t=>{
  const {repo,call,state:initial}=await setup(t),generationId=crypto.randomUUID();let state=initial;
- for(let i=0;i<2;i++)state=(await call('add_questions',{courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),generationId,questions:[{...question,stem:'Grouped '+i}]})).state;
+ for(let i=0;i<2;i++)state=(await call('append_saved_bank',{courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),generationId,questions:[{...question,stem:'Grouped '+i}]})).state;
  const before=await repo.get(state.courseId),group=(await call('list_practice_banks',{courseId:state.courseId})).banks.find(b=>b.groupId);
  await call('delete_practice_bank',{courseId:state.courseId,bankId:group.id,bankRevision:group.revision});
  let result=await call('list_practice_banks',{courseId:state.courseId});assert.equal(result.banks.length,1);assert.equal(result.deletedBanks.length,1);assert.equal(result.deletedBanks[0].count,2);
@@ -114,7 +115,7 @@ test('deleting recovered course and unsaved tutor banks persists without changin
  const listed=await call('list_practice_banks',{courseId:state.courseId});assert.equal(listed.banks.length,0);assert.equal(listed.deletedBanks.length,2);assert.deepEqual(await tutor.request(state.courseId,pid,rid),request);
 });
 test('concurrent combine and edit operations reject stale snapshots without partial archive changes',async t=>{
- const {repo,call,state:initial}=await setup(t);const state=(await call('add_questions',{courseId:initial.courseId,revision:initial.revision,requestId:crypto.randomUUID(),questions:[{...question,stem:'Other'}]})).state;
+ const {repo,call,state:initial}=await setup(t);const state=(await call('append_saved_bank',{courseId:initial.courseId,revision:initial.revision,requestId:crypto.randomUUID(),questions:[{...question,stem:'Other'}]})).state;
  const banks=(await call('list_practice_banks',{courseId:state.courseId})).banks,refs=banks.map(b=>({id:b.id,revision:b.revision}));
  const outcomes=await Promise.allSettled([call('combine_practice_banks',{courseId:state.courseId,requestId:crypto.randomUUID(),name:'One',banks:refs}),call('combine_practice_banks',{courseId:state.courseId,requestId:crypto.randomUUID(),name:'Two',banks:refs})]);
  assert.equal(outcomes.filter(r=>r.status==='fulfilled').length,1);assert.equal(outcomes.filter(r=>r.status==='rejected').length,1);assert.match(outcomes.find(r=>r.status==='rejected').reason.message,/changed in another window/);
@@ -124,7 +125,7 @@ test('coverage uses only verified objective links and stays scoped to each bankâ
  const db=new LocalD1();t.after(()=>db.close());const repo=new CourseRepository(db,'student'),call=(name,args)=>executeTool(repo,name,args);
  const {state}=await call('import_questions',{requestId:crypto.randomUUID(),name:'Coverage',sources:[{id:'a',name:'Objectives A',lecture:'A',sourceType:'objectives',text:'1. Describe first objective.\n2. Describe second objective.'},{id:'b',name:'Objectives B',lecture:'B',sourceType:'objectives',text:'1. Describe unrelated objective.'}],questions:[question]});
  const o=state.objectives.find(o=>o.sourceId==='a');assert.ok(o);
- const updated=(await call('add_questions',{courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),questions:[{...question,objectiveId:o.id},{...question,stem:'Same objective twice',objectiveId:o.id}]})).state;
+ const updated=(await call('append_saved_bank',{courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),questions:[{...question,objectiveId:o.id},{...question,stem:'Same objective twice',objectiveId:o.id}]})).state;
  const banks=(await call('list_practice_banks',{courseId:state.courseId})).banks,b=banks.find(b=>b.count===2);assert.deepEqual(b.coverage,{percent:50,covered:1,total:2});assert.equal(b.questionIndex[0].objectiveId,o.id);
  const bank=(await call('read_practice_bank',{courseId:state.courseId,bankId:b.id})).bank;
  for(const q of bank.questions){const current=(await call('read_practice_bank',{courseId:state.courseId,bankId:b.id})).bank;await call('edit_practice_bank',{courseId:state.courseId,bankId:b.id,bankRevision:current.revision,name:b.name,questionId:q.id,question:{...question,objectiveId:null}});}

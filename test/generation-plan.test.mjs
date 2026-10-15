@@ -9,9 +9,9 @@ test('coverage mode lets source breadth determine count and reserves final recei
  const prompt=buildGenerationPrompt(state,{...base,mode:'coverage',count:null},'final-request');
  assert.match(prompt,/Full coverage mode/);
  assert.match(prompt,/do not use a fixed question count/);
- assert.match(prompt,/FINAL add_questions call: final-request/);
- assert.match(prompt,/On EVERY add_questions call.*generationId to final-request/);
- assert.match(prompt,/bankSourceIds to \["slide"\]/);
+ assert.match(prompt,/begin_bank_repair requestId final-request/);
+ assert.match(prompt,/finish_bank_repair/);
+ assert.match(prompt,/selected saved reference IDs: \["slide"\]/);
  assert.match(prompt,/verified objectiveId/);
  assert.match(prompt,/explanation:/);
  assert.equal(generationCapacity(state),490);
@@ -41,7 +41,7 @@ test('generation capacity counts stored adaptive followups as well as root quest
 
 test('difficulty and generation preferences reach the prompt without claiming model routing',()=>{
  const prompt=buildGenerationPrompt(state,{...base,mode:'custom',count:8,difficulty:'mcat',questionModel:'gpt-6.1-sol',questionEffort:'high',explanationModel:'gpt-6-astra',explanationEffort:'xhigh'},'final-request');
- assert.match(prompt,/Difficulty: MCAT/);
+ assert.match(prompt,/Style preference: MCAT/);
  assert.match(prompt,/MCAT-style questions/);
  assert.match(prompt,/question model and effort: GPT-6\.1 Sol \/ High/);
  assert.match(prompt,/explanation model and effort: GPT-6 Astra \/ Extra high/);
@@ -51,7 +51,7 @@ test('difficulty and generation preferences reach the prompt without claiming mo
 
 test('quiz difficulty stays source-grounded and omits explanation preferences when off',()=>{
  const prompt=buildGenerationPrompt(state,{...base,generateExplanations:false,difficulty:'quiz',questionModel:'not-a-model'},'final-request');
- assert.match(prompt,/Difficulty: Quiz/);
+ assert.match(prompt,/Style preference: Quiz/);
  assert.match(prompt,/straightforward application/);
  assert.match(prompt,/question model and effort: Current ChatGPT model \/ Current ChatGPT effort/);
  assert.doesNotMatch(prompt,/requested explanation model and effort/);

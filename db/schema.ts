@@ -39,3 +39,7 @@ export const tutorSlideAnnotations = sqliteTable('tutor_slide_annotations', {
 export const practiceBanks = sqliteTable('practice_banks', {
  userId:text('user_id').notNull(),courseId:text('course_id').notNull(),id:text('id').notNull(),name:text('name').notNull(),data:text('data').notNull(),revision:integer('revision').notNull().default(1),createdAt:integer('created_at').notNull(),updatedAt:integer('updated_at').notNull(),
 },t=>[primaryKey({columns:[t.userId,t.courseId,t.id]})]);
+
+export const sourceVisuals = sqliteTable('source_visuals', {
+ userId:text('user_id').notNull(),courseId:text('course_id').notNull(),id:text('id').notNull(),dataUrl:text('data_url').notNull(),
+},t=>[primaryKey({columns:[t.userId,t.courseId,t.id]})]);

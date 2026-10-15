@@ -1,0 +1,5 @@
+import React from 'react';
+export function CoverageReport({state}){
+ const report=state.coverageReport;
+ return <section className="coverage-report" aria-label="Verified subtopic coverage"><h3>Verified subtopic coverage</h3>{!report?.topics?.length?<p>Conceptual coverage has not been audited. Objective links and question counts do not establish completeness.</p>:<><p><b>{report.covered}/{report.total} subtopics assessed ({report.percent}%)</b> · {report.complete?'Complete':report.terminal?'Finished with unresolved source limitations':'Repair in progress'}</p>{report.topics.map(t=><details key={t.id}><summary>{t.detail} — {t.status.replaceAll('_',' ')}</summary><p>{t.reason}</p>{t.correctiveAction&&t.status!=='assessed'&&<p>Next step: {t.correctiveAction}</p>}<p className="fine">Sources inspected: {(t.inspectedSourceIds||[]).map(id=>state.sources.find(s=>s.id===id)?.name||id).join('; ')||'Pending'}</p><p className="fine">{t.questionIds.length} verified questions · {t.failures||0}/3 consecutive failed attempts</p></details>)}</>}</section>;
+}

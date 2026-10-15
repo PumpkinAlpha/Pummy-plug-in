@@ -18,7 +18,7 @@ test('retrying a lost append response saves only the draft questions after an un
  };
  await assert.rejects(saveDraftCustomTest({state:initial,name:'My test',questions:[question],attemptRef,call,getState:()=>visible}),/Response lost/);
  const current=(await executeTool(repo,'read_course_state',{courseId:initial.courseId})).state;
- await executeTool(repo,'add_questions',{courseId:current.courseId,revision:current.revision,requestId:crypto.randomUUID(),questions:[{...question,stem:'An unrelated tutor question.',origin:'generated'}]});
+ await executeTool(repo,'append_saved_bank',{courseId:current.courseId,revision:current.revision,requestId:crypto.randomUUID(),questions:[{...question,stem:'An unrelated tutor question.',origin:'generated'}]});
  await saveDraftCustomTest({state:initial,name:'My test',questions:[question],attemptRef,call,getState:()=>visible});
  const saved=(await repo.get(initial.courseId)).data;
  assert.equal(saved.questions.length,2);

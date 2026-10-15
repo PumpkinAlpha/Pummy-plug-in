@@ -12,7 +12,7 @@ async function setup(t){
  const db=new LocalD1();t.after(()=>db.close());const repo=new CourseRepository(db,'student'),call=(n,a)=>executeTool(repo,n,a);
  let {state}=await call('import_questions',{requestId:crypto.randomUUID(),name:'Bank visibility',sources:[{id:'a',name:'Objectives',sourceType:'objectives',text:'1. Describe number A.\n2. Describe number B.',weekId:'Week 13'}],questions:[q('Keep this question?','Shared concept')]});
  const generationId=crypto.randomUUID();
- for(const term of ['Deleted concept','Shared concept'])state=(await call('add_questions',{courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),generationId,bankName:'Delete this group',questions:[{...q(term+'? ',term),objectiveId:state.objectives[1].id}]})).state;
+ for(const term of ['Deleted concept','Shared concept'])state=(await call('append_saved_bank',{courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),generationId,bankName:'Delete this group',questions:[{...q(term+'? ',term),objectiveId:state.objectives[1].id}]})).state;
  const grouped=(await call('list_practice_banks',{courseId:state.courseId})).banks.find(b=>b.groupId),full=(await call('read_practice_bank',{courseId:state.courseId,bankId:grouped.id})).bank;
  const ids=full.questions.map(q=>q.id),testId=crypto.randomUUID();state=(await call('save_custom_test',{courseId:state.courseId,revision:state.revision,testId,name:'Mixed saved test',questionIds:[...state.questionIndex.map(q=>q.id)]})).state;
  state=(await call('start_test',{courseId:state.courseId,revision:state.revision,adaptive:false,size:'all'})).state;
@@ -69,6 +69,6 @@ test('deleted questions free active capacity and an oversized restore fails with
  const db=new LocalD1();t.after(()=>db.close());const repo=new CourseRepository(db,'student'),call=(n,a)=>executeTool(repo,n,a),questions=Array.from({length:200},(_,i)=>q('Question '+i+'?','Concept '+i));
  let {state}=await call('import_questions',{requestId:crypto.randomUUID(),name:'Capacity',questions,sources:[{id:'a',name:'Source',text:'Reference facts.'}]});const original=(await call('list_practice_banks',{courseId:state.courseId})).banks[0];
  state=(await call('delete_practice_bank',{courseId:state.courseId,bankId:original.id,bankRevision:original.revision})).state;assert.equal(generationCapacity(state),500);
- for(let i=0;i<2;i++)state=(await call('add_questions',{courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),questions})).state;assert.equal(state.storedQuestionCount,400);assert.equal(state.questionCount,400);
+ for(let i=0;i<2;i++)state=(await call('append_saved_bank',{courseId:state.courseId,revision:state.revision,requestId:crypto.randomUUID(),questions})).state;assert.equal(state.storedQuestionCount,400);assert.equal(state.questionCount,400);
  const trash=(await call('list_practice_banks',{courseId:state.courseId})).deletedBanks[0],before=await repo.get(state.courseId);await assert.rejects(call('restore_practice_bank',{courseId:state.courseId,bankId:trash.id,bankRevision:trash.revision}),/exceed 500 active/);assert.deepEqual(await repo.get(state.courseId),before);assert.equal((await call('read_course_state',{courseId:state.courseId})).state.questionCount,400);
 });

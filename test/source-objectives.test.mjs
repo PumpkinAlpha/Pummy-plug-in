@@ -14,7 +14,7 @@ import {importBankFiles} from '../app/bank-import.js';
 import {PluginCourse,emptyCourse} from '../worker/course.js';
 import {grounding,formatGrounding,MAX_CONTEXT} from '../worker/grounding.js';
 import {uploadPresentationFile} from '../app/tutor-files.js';
-const question={term:'Venous return',stem:'Which vessel?',options:['Vein','Aorta'],answer:[0]};
+const question={origin:'practice',term:'Venous return',stem:'Which vessel?',options:['Vein','Aorta'],answer:[0]};
 test('assignment sections do not become part of the preceding PowerPoint objective',()=>{
  for(const heading of ['Lecturio Assignments','Lecturio\nAssignments']){const goals=sourceObjectives({id:'s',name:'Respiratory.pptx',pages:[{page:2,text:`Learning objectives\nExplain lung compliance.\n${heading}\nBreathing Mechanics (4:29 min & 2 questions)\nRespiratory – 2\nObjectives\nDiscuss pulmonary blood flow.\n${heading}\nPulmonary Blood Flow (2:35 min & 1 question)`}]});assert.deepEqual(goals.map(o=>o.text),['Explain lung compliance.','Discuss pulmonary blood flow.']);assert.ok(goals.every(o=>o.page===2));}
 });

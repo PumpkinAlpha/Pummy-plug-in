@@ -1,4 +1,5 @@
-import {getDocumentProxy} from 'unpdf';
+import {getDocumentProxy,getResolvedPDFJS} from 'unpdf';
+import {pdfEmphasis} from '../lib/professor-emphasis.js';
 import {PDFDocument} from 'pdf-lib';
 import {retryUploadOperation} from './upload-retry.js';
 import {zipSync,unzipSync,strToU8,strFromU8} from 'fflate';
@@ -37,6 +38,12 @@ export async function renderSlide(call,presentation,page,width=1500){
   documentCache=entry;
  }
  const doc=await documentCache.promise,p=await doc.getPage(page),base=p.getViewport({scale:1}),viewport=p.getViewport({scale:width/base.width}),canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);await p.render({canvasContext:canvas.getContext('2d'),viewport}).promise;return canvas.toDataURL('image/png');
+}
+export async function originalPageEmphasis(call,presentation,page){
+ if(isNativePowerPoint(presentation))return presentation.slides.find(s=>s.page===page)?.emphasis||[];
+ if(documentCache?.key!==presentation.courseId+':'+presentation.pdfAssetId)await renderSlide(call,presentation,page,200);
+ const doc=await documentCache.promise,p=await doc.getPage(page),pdfjs=await getResolvedPDFJS();
+ return pdfEmphasis(await p.getOperatorList(),pdfjs.OPS,await p.getAnnotations({intent:'display'}),p.getViewport({scale:1}));
 }
 // Finds the original slide text block (line or paragraph) at a normalized point, read from the
 // rendered PDF so it works for PDF and converted PowerPoint slides. The source file is never changed.

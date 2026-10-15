@@ -21,10 +21,11 @@ export async function purgeSource(repo,saved,args){
   const requests=(await repo.db.prepare('SELECT presentation_id,id,data FROM tutor_requests WHERE user_id=? AND course_id=? AND presentation_id IN (SELECT value FROM json_each(?))').bind(repo.userId,args.courseId,JSON.stringify(ids)).all()).results;
   const recovered=(await bankEntries(repo,args.courseId,saved.data)).filter(b=>b.revision===0);
   const retired={id:source.id,name:source.name,deletedAt:source.deletedAt,purgedAt:Date.now(),purgePending:{assets:r2}};
-  model.sources.set(source.id,retired);model.texts.delete(source.id);model.objectives=model.objectives.filter(o=>o.sourceId!==source.id);model._index=null;
+  model.sourceVisuals=model.sourceVisuals.filter(v=>v.sourceId!==source.id);model.sources.set(source.id,retired);model.texts.delete(source.id);model.objectives=model.objectives.filter(o=>o.sourceId!==source.id);model._index=null;
   const revision=await repo.save(model.serialize(),saved.revision,saved.data,writeId=>{
    const gate="EXISTS(SELECT 1 FROM courses WHERE user_id=? AND id=? AND json_extract(data,'$._sourceStorage.writeId')=?)",scope=[repo.userId,args.courseId,writeId];
    const statements=[];
+   statements.push(repo.db.prepare(`DELETE FROM source_visuals WHERE user_id=? AND course_id=? AND id IN (SELECT value FROM json_each(?)) AND ${gate}`).bind(repo.userId,args.courseId,JSON.stringify((saved.data.sourceVisuals||[]).filter(v=>v.sourceId===source.id).map(v=>v.id)),...scope));
    // Independent tutor writes must still match the snapshot used to identify
    // shared files and recover older practice checks. A mismatch rolls back all.
    statements.push(repo.db.prepare(`SELECT CASE WHEN NOT ${gate} OR (

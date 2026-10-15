@@ -47,7 +47,7 @@ export class CourseRepository {
     // A stale revision creates no receipt and cannot delete files or child rows.
     const pending='EXISTS(SELECT 1 FROM course_deletions WHERE user_id=? AND course_id=? AND revision=?)';
     const statements=[this.db.prepare('INSERT OR IGNORE INTO course_deletions(user_id,course_id,name,revision,updated_at,has_r2) SELECT user_id,id,name,revision,updated_at,EXISTS(SELECT 1 FROM tutor_assets WHERE user_id=courses.user_id AND course_id=courses.id AND storage=\'r2\') FROM courses WHERE user_id=? AND id=? AND revision=?').bind(this.userId,id,revision)];
-    for(const table of ['practice_banks','course_source_content','tutor_asset_chunks','tutor_assets','tutor_slide_annotations','tutor_revisions','tutor_requests','tutor_conversions','tutor_presentations'])statements.push(this.db.prepare(`DELETE FROM ${table} WHERE user_id=? AND course_id=? AND ${pending}`).bind(this.userId,id,this.userId,id,revision));
+    for(const table of ['source_visuals','practice_banks','course_source_content','tutor_asset_chunks','tutor_assets','tutor_slide_annotations','tutor_revisions','tutor_requests','tutor_conversions','tutor_presentations'])statements.push(this.db.prepare(`DELETE FROM ${table} WHERE user_id=? AND course_id=? AND ${pending}`).bind(this.userId,id,this.userId,id,revision));
     statements.push(this.db.prepare(`DELETE FROM courses WHERE user_id=? AND id=? AND revision=? AND ${pending}`).bind(this.userId,id,revision,this.userId,id,revision));
     await this.db.batch(statements);
     const receipt=await this.db.prepare('SELECT has_r2 FROM course_deletions WHERE user_id=? AND course_id=? AND revision=?').bind(this.userId,id,revision).first();

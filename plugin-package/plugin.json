@@ -1,0 +1,29 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "author": {
+    "name": "App developer"
+  },
+  "description": "Adaptive practice exams with foundation questions, saved progress, and Pummy.Ai question bank import.",
+  "name": "dev-5ed088f70be481919dbe83559d58d046",
+  "version": "1.0.6",
+  "extensions": {
+    "com.openai": {
+      "apps": "./.app.json",
+      "interface": {
+        "capabilities": [],
+        "category": "Other",
+        "defaultPrompt": null,
+        "developerName": "App developer",
+        "displayName": "Pummy Adaptive Test",
+        "longDescription": "Adaptive practice exams with foundation questions, saved progress, and Pummy.Ai question bank import.",
+        "shortDescription": "Adaptive practice exams with foundation questions, saved progress, and Pummy.Ai question bank import.",
+        "websiteURL": "https://pummy-adaptive-test.daniel-dehkordi1.chatgpt.site",
+        "logo": "./assets/pummy-logo.png",
+        "composerIcon": "./assets/pummy-logo.png",
+        "logoDark": "./assets/pummy-logo.png",
+        "composerIconDark": "./assets/pummy-logo.png"
+      }
+    }
+  }
+}
+
