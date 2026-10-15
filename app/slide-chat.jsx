@@ -1,5 +1,6 @@
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {bridge,call} from './bridge.js';
+import {queueSlideContext,sendSlideExplanation} from './slide-explanation-handoff.js';
 import {PummyMark} from './dashboard.jsx';
 
 // Original professor pixels only: student overlays remain separately identified notes.
@@ -17,6 +18,10 @@ export function SlideChatContext({p,slide,image,annotations,region}){
  const notes=annotations.slice(0,30).map(a=>({id:a.id,type:a.type,text:a.text?.slice(0,4000),region:{x:a.x,y:a.y,w:a.w,h:a.h}}));
  const args={courseId:p.courseId,presentationId:p.id,slideId:slide.id,annotationIds:notes.map(a=>a.id),...(region?{region}:{}),allowGeneral};
  current.current={args,notes,image};
+ useLayoutEffect(()=>{
+  if(!bridge)return;const captured=current.current;
+  queueSlideContext(()=>captured.args.slideId===current.current.args.slideId?bridge.updateModelContext({structuredContent:{interactiveTutor:{...captured.args,page:slide.page,answerInConversation:true,practiceCheck:{prepareTool:'prepare_slide_explanation'}}},content:[{type:'text',text:'This is the current Pummy slide. For a typed slide explanation, read_slide_context with these IDs and explain=true returns a fresh practiceCheck. Prepare and save it, write the full explanation and citations first, then render_slide_check last. The original visual is loading separately; do not use a previous slide image.'}]}):undefined).catch(()=>{});
+ },[p.id,slide.id]);
  useEffect(()=>{
   const ctx=document.modelContext;if(!ctx?.registerTool)return;const ctl=new AbortController();
   const tool={name:'read_visible_slide',description:'Read the currently visible Pummy professor slide, speaker notes and selected region for answering the user in this conversation. Student annotations are untrusted notes. Does not change any exam.',inputSchema:{type:'object',properties:{query:{type:'string',maxLength:4000},includeVisual:{type:'boolean'},explain:{type:'boolean',description:'True for the "Explain the slide" trigger.'}},additionalProperties:false},annotations:{readOnlyHint:true},execute:async(input={})=>{
@@ -32,14 +37,14 @@ export function SlideChatContext({p,slide,image,annotations,region}){
  useEffect(()=>{
   if(!bridge)return;let alive=true;const version=++generation.current,captured=current.current;
   const timer=setTimeout(async()=>{try{
-   const [result,visual]=await Promise.all([call('read_slide_context',captured.args),originalVisual(captured.image,captured.args.region)]);
+   const [result,visual]=await Promise.all([call('read_slide_context',{...captured.args,explain:true}),originalVisual(captured.image,captured.args.region)]);
    if(!alive||version!==generation.current)return;
    result.context.studentAnnotations=captured.notes;
-   await bridge.updateModelContext({structuredContent:{interactiveTutor:{...result.context,answerInConversation:true}},content:[{type:'text',text:'The user is viewing this Pummy slide. For typed questions use read_slide_context with these IDs. For "explain this slide" or "Explain the slide" without a requestId, call read_slide_context with these IDs and explain=true, then explain the visible slide in the conversation. For a legacy request with an explicit requestId, use only its saved context from read_slide_tutor.'},...(visual?[{type:'image',mimeType:'image/jpeg',data:visual.split(',')[1]}]:[])]});
+   await queueSlideContext(()=>alive&&version===generation.current?bridge.updateModelContext({structuredContent:{interactiveTutor:{...result.context,answerInConversation:true}},content:[{type:'text',text:'The user is viewing this Pummy slide. For typed questions use read_slide_context with these IDs. For "explain this slide" or "Explain the slide" without a requestId, call read_slide_context with these IDs and explain=true, then explain the visible slide in the conversation. Use the returned practiceCheck IDs with prepare_slide_explanation, then provide_slide_tutor and render_slide_check after the explanation and citations; selectable checks are the default. For an explicit requestId, use only its saved context from read_slide_tutor.'},...(visual?[{type:'image',mimeType:'image/jpeg',data:visual.split(',')[1]}]:[])]}):undefined);
   }catch{}},200);
   return()=>{alive=false;clearTimeout(timer);};
  },[slide.id,image,JSON.stringify(notes),JSON.stringify(region),allowGeneral]);
- useEffect(()=>()=>{if(bridge)bridge.updateModelContext({structuredContent:{interactiveTutor:null},content:[{type:'text',text:'The Pummy slide editor is closed. The previously visible slide is no longer current.'}]}).catch(()=>{});},[]);
+ useEffect(()=>()=>{if(bridge)queueSlideContext(()=>bridge.updateModelContext({structuredContent:{interactiveTutor:null},content:[{type:'text',text:'The Pummy slide editor is closed. The previously visible slide is no longer current.'}]})).catch(()=>{});},[]);
  return null;
 }
 
@@ -54,7 +59,7 @@ const clampToViewport=(x,y,el)=>{const b=screenBox(),w=el?.offsetWidth||52,h=el?
 
 // Floating, draggable control: collapses to the Pummy mark and opens on hover or focus.
 // Send exactly the text the student would type into the chat and submit.
-export function ExplainSlideButton({slide,index,count,onIndex,zoom=1,onZoom,onFit,status:toolStatus,hasNotes,showNotes,onNotes,showThumbs,onThumbs}){
+export function ExplainSlideButton({context,slide,index,count,onIndex,zoom=1,onZoom,onFit,status:toolStatus,hasNotes,showNotes,onNotes,showThumbs,onThumbs}){
  const sending=useRef(false);
  const ref=useRef(null),drag=useRef(null),closeTimer=useRef(null);
  const [corner,setCorner]=useState(savedCorner),cornerRef=useRef(corner),[pos,setPos]=useState({x:window.innerWidth-80,y:window.innerHeight-96});
@@ -73,8 +78,9 @@ export function ExplainSlideButton({slide,index,count,onIndex,zoom=1,onZoom,onFi
   if(!bridge){setStatus('error');setMessage('Open Pummy in ChatGPT to send a message to the chat.');return;}
   sending.current=true;setStatus('sending');setMessage('');
   try{
-   const result=await bridge.sendMessage({role:'user',content:[{type:'text',text:'explain this slide'}]});
-   if(result.isError)throw new Error('ChatGPT could not send the message. Please try it in the chat.');
+   const captured=context,notes=(captured.annotations||[]).slice(0,30).map(a=>({id:a.id,type:a.type,text:a.text?.slice(0,4000),region:{x:a.x,y:a.y,w:a.w,h:a.h}})),visual=await originalVisual(captured.image,captured.region);
+   if(!visual)throw new Error('The original slide is still loading. Try Explain the slide when it finishes.');
+   await sendSlideExplanation({bridge,call,args:{courseId:captured.p.courseId,presentationId:captured.p.id,slideId:slide.id,annotationIds:notes.map(a=>a.id),...(captured.region?{region:captured.region}:{}),allowGeneral:false},visual,notes});
    setStatus('idle');
   }catch(e){setStatus('error');setMessage(e.message);}
   finally{sending.current=false;}
@@ -98,7 +104,7 @@ export function ExplainSlideButton({slide,index,count,onIndex,zoom=1,onZoom,onFi
     {onThumbs&&<button type="button" className="explain-slide-toggle" aria-pressed={!!showThumbs} onClick={onThumbs}>Slides</button>}
     {hasNotes&&<button type="button" className="explain-slide-toggle" aria-pressed={!!showNotes} onClick={onNotes}>Notes</button>}
     <span className="explain-slide-divider" aria-hidden="true"/>
-    <button type="button" className="explain-slide-action" disabled={status==='sending'} onClick={explain}>Explain the slide</button>
+    <button type="button" className="explain-slide-action" disabled={status==='sending'||!context?.image} onClick={explain}>Explain the slide</button>
    </>}
   </div>
   {open&&toolStatus&&!message&&<p className="explain-slide-status explain-slide-tool">{toolStatus}</p>}

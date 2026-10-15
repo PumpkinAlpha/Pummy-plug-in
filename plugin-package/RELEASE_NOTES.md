@@ -1,4 +1,10 @@
-# Pummy Adaptive Test 1.0.6
+# Pummy Adaptive Test 1.0.7
+
+Runtime 0.6.1 makes selectable native chat checks the persistent default after typed and app-triggered slide explanations. Typed context now supplies fresh check IDs; the app captures the original slide and a saved informal request before sending its short message. Full professor-aligned explanations and source citations precede the native widget. Options start unselected, Check answer reveals correctness and rationale, and informal checks cannot leak into automatic bank recovery or change formal exams/progress/slide position.
+
+295 automated tests pass. The MCP Apps browser bridge verifies both request paths, native controls, explanation/citation ordering, hidden keys, fresh checks, replay isolation, slide capture and unchanged exam/presentation snapshots. Existing explanation and tutor/audio-control browser checks pass. The harness supplies authored explanations; live ChatGPT model behavior and turn layout remain host-controlled. Earlier check and interface resource URLs remain supported. No database migration or new permission is required.
+
+Previous release (1.0.6):
 
 Updates the existing Pummy App with runtime 0.6.0:
 

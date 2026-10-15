@@ -137,3 +137,26 @@ test('one-slide explanations enforce format, independent checks and idempotent d
  await call('provide_slide_tutor',{...administrative,answer:'A. Reading the Slide\nTitle.\nB. Understanding the Material\nLecture title.\nC. What to Remember\nNo new facts.\nD. Check Your Understanding\nNo testable information.',testable:false,questions:[]});
  assert.equal((await call('render_slide_check',administrative)).tutor.check.testable,false);
 });
+test('typed slide explanations obtain a fresh native check descriptor and preserve exams and slide position',async t=>{
+ const {call,state,repo,db}=await setup(t),p=await presentation(call,state.courseId,'pptx');
+ await call('start_test',{courseId:state.courseId,revision:state.revision,size:1,adaptive:false});
+ const before=await repo.get(state.courseId),beforeP=(await call('read_presentation',{courseId:p.courseId,presentationId:p.id})).presentation;
+ const visible={courseId:p.courseId,presentationId:p.id,slideId:p.slides[1].id},ctx=(await call('read_slide_context',{...visible,query:'explain this slide'})).context;
+ assert.equal(ctx.practiceCheck.renderTool,'render_slide_check');assert.equal(ctx.practiceCheck.slideId,visible.slideId);
+ assert.equal((await db.prepare('SELECT count(*) AS n FROM tutor_requests').first()).n,0,'reading typed context creates no request');
+ const {courseId,presentationId,slideId,requestId}=ctx.practiceCheck,ref={courseId,presentationId,slideId,requestId};
+ await call('prepare_slide_explanation',ref);await call('prepare_slide_explanation',ref);
+ assert.equal((await db.prepare('SELECT count(*) AS n FROM tutor_requests').first()).n,1,'same request is idempotent');
+ await call('read_slide_context',{...visible,slideId:p.slides[0].id,explain:true});
+ const captured=(await call('read_slide_tutor',ref)).tutor.requests[0];assert.equal(captured.page,2);assert.match(captured.context.professorSlide.text,/brachiocephalic/);
+ const answer='A. Reading the Slide\nArch branching.\nB. Understanding the Material\nThe professor identifies the first branch.\nC. What to Remember\nBrachiocephalic trunk.\nD. Check Your Understanding\nSelect an answer in the native check.';
+ const payload={...ref,answer,testable:true,citations:[{sourceId:`presentation-${p.id}`,page:2}],questions:[{...q,page:2,optionNotes:['This is the first branch in the professor slide.','The left subclavian is not the first arch branch.']}]};
+ await assert.rejects(call('provide_slide_tutor',{...payload,questions:[{...q,definition:''}]}),/needs an explanation/);
+ const provided=await call('provide_slide_tutor',payload);assert.equal(provided.tutor.request.questions,undefined,'save response does not expose answer keys');
+ let check=(await call('render_slide_check',ref)).tutor.check;assert.equal(check.selected,null);assert.equal(check.checked,false);assert.equal(check.answer,undefined);assert.equal(check.explanation,undefined);
+ check=(await call('answer_slide_check',{...ref,option:1,check:false})).tutor.check;assert.equal(check.selected,1);assert.equal(check.answer,undefined);assert.equal(check.explanation,undefined);
+ check=(await call('answer_slide_check',{...ref,option:1,check:true})).tutor.check;assert.equal(check.correct,false);assert.equal(check.explanation,q.definition);assert.match(check.optionExplanation,/not the first/);
+ const next=(await call('read_slide_context',{...visible,explain:true})).context.practiceCheck;assert.notEqual(next.requestId,requestId);await call('prepare_slide_explanation',next);
+ const fresh=(await call('read_slide_tutor',next)).tutor.requests[0];assert.equal(fresh.check,undefined);assert.equal(fresh.oneSlide,true);
+ assert.deepEqual(await repo.get(state.courseId),before);assert.deepEqual((await call('read_presentation',{courseId:p.courseId,presentationId:p.id})).presentation,beforeP);assert.equal((await call('list_practice_banks',{courseId:p.courseId})).banks.length,1);
+});

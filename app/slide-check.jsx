@@ -2,7 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {App} from '@modelcontextprotocol/ext-apps';
 
-const app=new App({name:'pummy-slide-check',version:'0.5.0'},{},{autoResize:true});
+const app=new App({name:'pummy-slide-check',version:'0.6.1'},{},{autoResize:true});
 function SlideCheck(){
  const [data,setData]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),identity=useRef(null),locked=useRef(false);
  function accept(result){
@@ -38,7 +38,7 @@ function SlideCheck(){
   {data&&!data.testable&&<p>This slide introduces no testable information; no question is needed.</p>}
   {data?.testable&&<><fieldset disabled={busy||data.checked}><legend>{data.stem}</legend>{data.options.map((option,index)=><label key={index}><input type="radio" name={data.requestId} checked={data.selected===index} onChange={()=>answer(index,false)}/>{option}</label>)}</fieldset>
    <button disabled={busy||data.checked||data.selected===null} onClick={()=>answer(data.selected,true)}>{data.checked?'Answer checked':'Check answer'}</button>
-   {data.checked&&<div role="status"><strong>{data.correct?'Correct':'Incorrect'}</strong><p>Correct answer: {data.options[data.answer]}</p>{data.explanation&&<p>{data.explanation}</p>}</div>}</>}
+   {data.checked&&<div role="status"><strong>{data.correct?'Correct':'Incorrect'}</strong><p>Correct answer: {data.options[data.answer]}</p>{data.explanation&&<p>{data.explanation}</p>}{data.optionExplanation&&data.optionExplanation!==data.explanation&&<p>{data.optionExplanation}</p>}</div>}</>}
   {error&&<p role="alert">{error}</p>}
  </section>;
 }

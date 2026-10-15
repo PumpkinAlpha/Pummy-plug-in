@@ -1,5 +1,7 @@
 # Pummy Adaptive Test — ChatGPT plugin
 
+Runtime 0.6.1 / plugin 1.0.7: selectable native practice checks are the default after typed and app-triggered slide explanations. Complete explanations and citations come first; clickable checks start unselected and reveal feedback only after Check answer. They preserve formal exam progress and slide position. See [SELECTABLE-SLIDE-CHECKS-2026-10-15.md](SELECTABLE-SLIDE-CHECKS-2026-10-15.md).
+
 October 15 upload repair: course-source imports retry transient MCP connection failures during initialization, chunks, course reads and final saves, preserving upload IDs and import receipts. Persistent failures show retry/reopen guidance. Interface resource v25 retains earlier aliases. See `UPLOAD-CONNECTION-2026-10-15.md` for verification and limits.
 
 Tutor UI repair: the floating Pummy control docks to any visible screen corner rather than the slide. Drag it or use Alt + arrow keys; the corner survives reopen/reload and stays reachable on phones and in fullscreen. Slide audio uses the selected theme for surfaces, buttons, hover/focus states and native player colors. See `TUTOR-UI-2026-10-12.md`. The current interface resource is v20; earlier addresses remain supported.

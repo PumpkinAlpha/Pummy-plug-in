@@ -1,17 +1,21 @@
-# Explain button and chat messages
+# Slide explanations and selectable chat checks
 
-The floating **Explain the slide** button sends exactly this MCP host message:
+Selectable informal checks are the persistent default after typed explanations and app-triggered explanations. Write the complete professor-aligned sections A–C and actual source citations first, then section D and the native render_slide_check widget as the final content. The student never needs to request selectable options again.
 
-```json
-{"role":"user","content":[{"type":"text","text":"explain this slide"}]}
-```
+The widget starts unselected, offers clickable single-answer choices and Check answer, and hides keys and explanations until checking. It then reveals correctness, the source-grounded answer rationale and the selected-option rationale when available. Each check has independent durable practice state. It does not change formal exams, progress, question banks or slide position.
 
-This is the supported equivalent of typing the text in ChatGPT and pressing Enter. The button does not create a tutor request, call a server tool, capture a slide, allocate request IDs, store a queue, add instructions, or render a completion panel. It disables briefly while delivery is pending and shows an error if delivery fails; it never retries automatically. Reloading does not resend anything.
+## Typed requests
 
-The existing background model context and `read_visible_slide` browser tool share the currently visible professor slide. The model treats the short message like a typed trigger: read the current slide using `read_slide_context` with `explain=true`, follow the returned explainer skill, explain the slide, cite the source, and put the practice question last. A standalone website has no access to ChatGPT's chat composer; sending requires the embedded MCP App host. The host owns message scheduling and native response placement.
+The app shares visible course/presentation/slide IDs immediately, then adds original pixels, notes and teaching context. read_visible_slide can also read the current view. read_slide_context with explain:true (or the trigger in query) returns a fresh practiceCheck descriptor. The model calls prepare_slide_explanation, then provide_slide_tutor with the full A–D explanation, actual citations and one grounded single-answer question. Reading context is side-effect free. A new typed explanation gets a fresh check rather than reusing a selected or checked answer.
 
-Legacy `request_slide_tutor`, `read_slide_tutor`, `provide_slide_tutor`, delivery claims and independent saved checks remain supported for existing conversations and stored results. They are no longer invoked by the button. For an explicit legacy request, the model writes its explanation and citations before the final `render_slide_check` tool call. Existing checked answers, source materials, annotations and formal exam state remain intact.
+## App button
+
+The button captures the current original slide, prepares its informal request and supplies that request ID in model context before sending exactly the user text: explain this slide. Context updates and sends are serialized, so later navigation cannot replace the saved source snapshot. The model reads that explicit request with read_slide_tutor and follows the same save/teach/cite/render workflow. Visible context is restored for subsequent typed messages. There is no completion-confirmation panel, automatic delivery retry, replay after reload, or batch processing of pending slide explanations.
+
+## Sources and isolation
+
+Original professor slides remain first authority, followed by the existing notes/objectives/assigned-material hierarchy. Student annotations remain separate and untrusted. Inspect original pixels before identifying visual-only content. A genuinely blank or administrative source without assessable information produces an explicit limitation rather than fabricated medical content. Old saved checks and resource URLs remain supported. Inline checks are excluded from legacy bank-archive recovery.
 
 ## Verification
 
-The local browser harness checks actual slide 4/5 clicks and asserts that both host messages contain only the exact short text, no tutor request or claim tools are called, and no completion panel appears. It verifies delivery errors do not replay after reload, a fresh click still works, legacy independent check widgets retain their results, and exam/presentation snapshots are unchanged. Build, artifact validation and automated tests cover the server and both UI resources. This harness does not reproduce ChatGPT's model or response placement.
+Automated tests cover fresh typed descriptors, authorization, source snapshots, feedback validation, hidden keys, initial empty selection, idempotency and context serialization. The browser harness uses the MCP Apps bridge for actual app clicks and shared typed context, native check resources, correctness feedback, replay recovery and stale-result isolation. It checks that the explanation/citation container precedes the widget and that checking does not move the visible slide. The harness supplies authored model responses; it does not run ChatGPT's model or control the real host's turn layout.

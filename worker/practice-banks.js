@@ -32,7 +32,7 @@ export async function bankEntries(repo,courseId,data){
  // Older slide practice may never have been appended to the course bank.
  // Recover those completed responses as editable archive copies as well.
  const rows=await repo.db.prepare("SELECT r.data,p.metadata FROM tutor_requests r LEFT JOIN tutor_presentations p ON p.user_id=r.user_id AND p.course_id=r.course_id AND p.id=r.presentation_id WHERE r.user_id=? AND r.course_id=? AND json_extract(r.data,'$.status')='complete' AND json_array_length(r.data,'$.questions')>0 ORDER BY r.updated_at DESC").bind(repo.userId,courseId).all();
- for(const row of rows.results){const r=JSON.parse(row.data),p=JSON.parse(row.metadata||'{}'),id='batch:'+r.appendId;if(known.has(id))continue;const source=data.sources?.find(s=>s.id===p.sourceId),linkedQuestionIds=data.completedRequests?.find(item=>item.id===r.appendId)?.questionIds||[];
+ for(const row of rows.results){const r=JSON.parse(row.data),p=JSON.parse(row.metadata||'{}'),id='batch:'+r.appendId;if(r.oneSlide||known.has(id))continue;const source=data.sources?.find(s=>s.id===p.sourceId),linkedQuestionIds=data.completedRequests?.find(item=>item.id===r.appendId)?.questionIds||[];
   stored.push({id,name:(p.name||'Slide practice')+' · slide '+r.page,createdAt:r.completedAt||r.createdAt||0,revision:0,recovered:true,linkedQuestionIds,questions:r.questions.map((q,i)=>({...q,id:r.appendId+':'+i,lecture:source?.lecture||(p.folder?.kind==='lecture'?p.folder.label:''),weekId:source?.weekId||(p.folder?.kind==='week'?p.folder.label:null),sourceName:p.name||null}))});known.add(id);
  }
  return [...stored,...legacyBanks(data,stored)];

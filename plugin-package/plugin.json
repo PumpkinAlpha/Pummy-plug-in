@@ -5,7 +5,7 @@
   },
   "description": "Adaptive practice exams with foundation questions, saved progress, and Pummy.Ai question bank import.",
   "name": "dev-5ed088f70be481919dbe83559d58d046",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "extensions": {
     "com.openai": {
       "apps": "./.app.json",
@@ -26,4 +26,3 @@
     }
   }
 }
-
