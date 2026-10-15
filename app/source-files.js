@@ -1,4 +1,5 @@
 import {uploadPresentationFile} from './tutor-files.js';
+import {retryUploadOperation,isUploadConnectionError} from './upload-retry.js';
 import {extractQuestionFile,minimizeContacts,MAX_TEXT} from './question-files.js';
 import {pptxMetadata} from '../lib/tutor/presentations.js';
 import {legacyPptSlides} from '../lib/tutor/legacy-ppt.js';
@@ -24,11 +25,12 @@ export async function saveManualSource(call,courseId,file,folder,attempt,onUploa
  const text=minimizeContacts(file.text).trim();if(!text||text.length>MAX_TEXT)throw new Error('Review source text containing 1–60,000 characters.');
  if(!file.originalFile)throw new Error('Choose the original source file before importing.');
  if(!attempt.originalAssetId)attempt.originalAssetId=await uploadPresentationFile(call,courseId,file.originalFile,{source:true,onProgress:onUploadProgress});
- const state=(await call('read_course_state',{courseId})).state;
+ const state=(await retryUploadOperation(()=>call('read_course_state',{courseId}))).state;
  const grouping=folder?.kind==='week'?{weekId:folder.label}:folder?.kind==='lecture'?{lecture:folder.label}:{};
  const pages=file.pages?.filter(p=>p.text.trim()).map(p=>({...p,text:minimizeContacts(p.text)}));
  const source={id:attempt.sourceId,originalAssetId:attempt.originalAssetId,name:file.name.trim(),text,sourceType:file.sourceType,rank:file.rank,...grouping,...(pages?.length?{pages}:{}),metadata:{originalFileName:file.originalFileName||file.name,mimeType:file.mimeType,sourceOrigin:'student_upload',...file.syncMetadata,...(file.pageCount?{pageCount:file.pageCount}:{})}};
- return call('sync_course_sources',{courseId,revision:state.revision,requestId:attempt.requestId,sources:[source]});
+ const args={courseId,revision:state.revision,requestId:attempt.requestId,sources:[source]};
+ return retryUploadOperation(()=>call('sync_course_sources',args));
 }
 
 // Keep each file's receipt across retries; a failed file must not block the others.
@@ -37,7 +39,7 @@ export async function saveManualSources(call,courseId,entries,folder,onProgress=
   if(!entry.file||entry.status==='saved')continue;
   entry.status='saving';entry.error='';onProgress();
   try{entry.result=await saveManualSource(call,courseId,entry.file,folder,entry.attempt,progress=>{entry.progress=Math.round(progress.completed/progress.total*100);onProgress();});entry.status='saved';}
-  catch(e){entry.status='failed';entry.error=e.message||'Could not import this file. Retry.';}
+  catch(e){entry.status='failed';entry.error=isUploadConnectionError(e)?'Pummy lost its connection while importing this file. Choose Retry failed uploads to continue; completed uploads are kept. If it keeps failing, close and reopen Pummy, then select the file again.':e.message||'Could not import this file. Retry.';}
   onProgress();
  }
  return entries;

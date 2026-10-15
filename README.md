@@ -1,5 +1,7 @@
 # Pummy Adaptive Test — ChatGPT plugin
 
+October 15 upload repair: course-source imports retry transient MCP connection failures during initialization, chunks, course reads and final saves, preserving upload IDs and import receipts. Persistent failures show retry/reopen guidance. Interface resource v25 retains earlier aliases. See `UPLOAD-CONNECTION-2026-10-15.md` for verification and limits.
+
 Tutor UI repair: the floating Pummy control docks to any visible screen corner rather than the slide. Drag it or use Alt + arrow keys; the corner survives reopen/reload and stays reachable on phones and in fullscreen. Slide audio uses the selected theme for surfaces, buttons, hover/focus states and native player colors. See `TUTOR-UI-2026-10-12.md`. The current interface resource is v20; earlier addresses remain supported.
 
 Latest repair: local-folder sync replaces ChatGPT Project sync. Course & sources lets you choose a study folder, review changes and sync without duplicate references. Supported standalone browsers can remember read-only access and auto-sync every 30 seconds while the page is open; embedded hosts use folder re-selection. PowerPoint uploads now show progress, use bounded parallel retries and open through memory-efficient server chunk decoding. A real 15 MB, 16-slide lecture passed upload, native rendering and byte-equal export. See `FOLDER-SYNC-2026-10-12.md`.

@@ -31,14 +31,14 @@ test('batch imports continue after a failure and retry only unfinished files wit
  const call=(n,a)=>executeTool(repo,n,a),{state}=await call('import_questions',{requestId:crypto.randomUUID(),name:'Batch imports',questions:[{stem:'One?',options:['Yes','No'],answer:[0]}]});
  await call('start_test',{courseId:state.courseId,revision:state.revision,size:1,adaptive:false});const before=(await repo.get(state.courseId)).data;
  const entries=[];for(const name of ['first.txt','second.md','third.txt'])entries.push({file:{...await extractSourceFile(new File(['Source for '+name],name)),sourceType:'professor_slides',rank:1},attempt:{sourceId:crypto.randomUUID(),requestId:crypto.randomUUID()},status:'ready'});
- const receipts=entries.map(e=>({...e.attempt}));let fail=true,active=0,maxActive=0;const writes=[];
- const failingCall=async(n,a)=>{active++;maxActive=Math.max(maxActive,active);try{if(n==='sync_course_sources'){writes.push(a.sources[0].id);if(a.sources[0].id===entries[1].attempt.sourceId&&fail){fail=false;throw new Error('Temporary outage');}}return await call(n,a);}finally{active--;}};
+ const receipts=entries.map(e=>({...e.attempt}));let failures=3,active=0,maxActive=0;const writes=[];
+ const failingCall=async(n,a)=>{active++;maxActive=Math.max(maxActive,active);try{if(n==='sync_course_sources'){writes.push(a.sources[0].id);if(a.sources[0].id===entries[1].attempt.sourceId&&failures>0){failures--;throw new Error('Temporary outage');}}return await call(n,a);}finally{active--;}};
  await saveManualSources(failingCall,state.courseId,entries,{kind:'lecture',label:'Week 3'});
  assert.deepEqual(entries.map(e=>e.status),['saved','failed','saved']);assert.match(entries[1].error,/Temporary/);assert.equal(maxActive,1);
  const assetId=entries[1].attempt.originalAssetId;
  await saveManualSources(failingCall,state.courseId,entries,{kind:'lecture',label:'Week 3'});
  assert.ok(entries.every(e=>e.status==='saved'));assert.equal(entries[1].attempt.originalAssetId,assetId);
  assert.deepEqual(entries.map(e=>({sourceId:e.attempt.sourceId,requestId:e.attempt.requestId})),receipts);
- assert.deepEqual(writes,[receipts[0].sourceId,receipts[1].sourceId,receipts[2].sourceId,receipts[1].sourceId]);
+ assert.deepEqual(writes,[receipts[0].sourceId,receipts[1].sourceId,receipts[1].sourceId,receipts[1].sourceId,receipts[2].sourceId,receipts[1].sourceId]);
  const after=(await repo.get(state.courseId)).data;assert.equal(after.sources.length,3);assert.ok(after.sources.every(s=>s.lecture==='Week 3'));assert.deepEqual(after.questions,before.questions);assert.deepEqual(after.session,before.session);
 });

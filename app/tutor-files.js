@@ -1,5 +1,6 @@
 import {getDocumentProxy} from 'unpdf';
 import {PDFDocument} from 'pdf-lib';
+import {retryUploadOperation} from './upload-retry.js';
 import {zipSync,unzipSync,strToU8,strFromU8} from 'fflate';
 import {CHUNK_SIZE,encode64,decode64,pptxMetadata} from '../lib/tutor/presentations.js';
 import {annotationSVG} from '../lib/tutor/annotations.js';
@@ -12,11 +13,11 @@ export async function uploadPresentationFile(call,courseId,file,{source=false,on
  if(!kind)throw new Error(source?'Choose a PDF, PowerPoint, Word, TXT or Markdown file.':'Choose a PDF, PPT or PPTX file.');
  let transfer=uploads.get(file)?.get(courseId);
  if(!transfer){transfer={assetId:crypto.randomUUID(),chunks:Math.ceil(file.size/(CHUNK_SIZE/4*3)),done:new Set()};if(!uploads.has(file))uploads.set(file,new Map());uploads.get(file).set(courseId,transfer);}
- await call('begin_presentation_upload',{courseId,assetId:transfer.assetId,name:file.name,kind,bytes:file.size,chunks:transfer.chunks});
+ await retryUploadOperation(()=>call('begin_presentation_upload',{courseId,assetId:transfer.assetId,name:file.name,kind,bytes:file.size,chunks:transfer.chunks}));
  const remaining=Array.from({length:transfer.chunks},(_,i)=>i).filter(i=>!transfer.done.has(i));let cursor=0,failure;
  const progress=()=>onProgress({completed:transfer.done.size,total:transfer.chunks,bytes:Math.min(file.size,transfer.done.size*CHUNK_SIZE/4*3),totalBytes:file.size});progress();
  await Promise.all(Array.from({length:Math.min(3,remaining.length)},async()=>{while(!failure&&cursor<remaining.length){const index=remaining[cursor++];try{const start=index*CHUNK_SIZE/4*3,end=(index+1)*CHUNK_SIZE/4*3,buffer=file.slice?await file.slice(start,end).arrayBuffer():(await file.arrayBuffer()).slice(start,end);const args={courseId,assetId:transfer.assetId,index,data:encode64(new Uint8Array(buffer))};
-  for(let retry=0;;retry++){try{await call('upload_presentation_chunk',args);break;}catch(e){if(retry>=2||!/timeout|timed out|network|fetch|temporar|storage|interrupted|unavailable|502|503|504|10001/i.test(e.message))throw e;await new Promise(r=>setTimeout(r,250*(retry+1)));}}
+  await retryUploadOperation(()=>call('upload_presentation_chunk',args));
   transfer.done.add(index);progress();}catch(e){failure=e;}}}));if(failure)throw failure;
 
  return transfer.assetId;
