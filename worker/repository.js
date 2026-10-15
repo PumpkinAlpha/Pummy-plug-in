@@ -1,17 +1,18 @@
 import {bankIndexColumns,deletedBankQuestions,setBankAvailability,unavailableQuestions,availableConcepts} from '../lib/bank-availability.js';
 import {bucket,isDue} from '../lib/pummy-core.mjs';
 import {captureBanks} from './practice-banks.js';
+import {packMedia,hydrateMedia} from './course-media.js';
 const storedSnapshots=new WeakMap(),externalSnapshots=new WeakSet();
 function sourceEntries(data){
   const content=new Map((data.texts||[]).map(([id,text],position)=>[id,{id,text,pages:null,visualPdf:null,position}]));
   for(const source of data.sources||[])if(Array.isArray(source.pages)||'visualPdf' in source){const entry=content.get(source.id)||{id:source.id,text:null,position:content.size};content.set(source.id,{...entry,pages:Array.isArray(source.pages)?JSON.stringify(source.pages):null,visualPdf:'visualPdf' in source?JSON.stringify(source.visualPdf)??null:null});}
   return content;
 }
-function packCourse(data){
+async function packCourse(data){
   const content=sourceEntries(data),sources=(data.sources||[]).map(source=>{const {visualPdf,...metadata}=source;if(Array.isArray(metadata.pages))delete metadata.pages;return metadata;});
-  const writeId=crypto.randomUUID(),json=JSON.stringify({...data,sources,texts:[],_sourceStorage:{version:1,writeId}});
+  const writeId=crypto.randomUUID(),packed=await packMedia({...data,sources,texts:[],_sourceStorage:{version:1,writeId}}),json=JSON.stringify(packed.data);
   if(new TextEncoder().encode(json).length>900000)throw new Error('The saved questions and exam history exceed course capacity. Export progress and split the question bank into smaller courses. Source files are stored separately.');
-    return {json,writeId,content:[...content.values()],assetIds:[...new Set((data.sources||[]).map(s=>s.originalFile?.id).filter(Boolean))]};
+    return {json,writeId,images:packed.images,content:[...content.values()],assetIds:[...new Set((data.sources||[]).map(s=>s.originalFile?.id).filter(Boolean))]};
 }
 export class CourseRepository {
   constructor(db,userId,converter=null,assetStore=null,profile=null){this.db=db;this.userId=userId;this.converter=converter;this.assetStore=assetStore;this.profile=profile;}
@@ -25,14 +26,15 @@ export class CourseRepository {
   async get(id){
     // Read the snapshot and its source rows together so a concurrent sync cannot
     // pair an older exam revision with newer source text.
-    const [snapshot,sourceRows,bankRows]=await this.db.batch([
+    const [snapshot,sourceRows,bankRows,mediaRows]=await this.db.batch([
       this.db.prepare('SELECT data, revision FROM courses WHERE user_id=? AND id=?').bind(this.userId,id),
       this.db.prepare('SELECT source_id AS id,text,pages,visual_pdf AS visualPdf,position FROM course_source_content WHERE user_id=? AND course_id=? ORDER BY position').bind(this.userId,id),
-      this.db.prepare(`SELECT ${bankIndexColumns} FROM practice_banks WHERE user_id=? AND course_id=?`).bind(this.userId,id)
+      this.db.prepare(`SELECT ${bankIndexColumns} FROM practice_banks WHERE user_id=? AND course_id=?`).bind(this.userId,id),
+      this.db.prepare("SELECT id,data_url FROM source_visuals WHERE user_id=? AND course_id=? AND id LIKE 'media:%'").bind(this.userId,id)
     ]);
     const row=snapshot.results[0];
     if(!row)return null;
-    const data=JSON.parse(row.data);
+    const data=hydrateMedia(JSON.parse(row.data),new Map(mediaRows.results.map(r=>[r.id,r.data_url])));
     if(data._sourceStorage?.version===1){
       externalSnapshots.add(data);
       const content=sourceRows.results,byId=new Map(content.map(entry=>[entry.id,entry]));
@@ -64,7 +66,7 @@ export class CourseRepository {
     }catch(e){throw new Error('Course deletion is pending. Retry Delete course to finish removing its files. '+e.message);}
   }
   async save(data,revision,expectedData,extraWrites=()=>[]){
-    const packed=packCourse(data),{json}=packed;
+    const packed=await packCourse(data),{json}=packed;
     const write=revision===0
       ?this.db.prepare('INSERT OR IGNORE INTO courses (user_id,id,name,data,revision,updated_at) SELECT ?,?,?,?,1,? WHERE NOT EXISTS(SELECT 1 FROM course_deletions WHERE user_id=? AND course_id=?)').bind(this.userId,data.id,data.name,json,Date.now(),this.userId,data.id)
       :this.db.prepare('UPDATE courses SET name=?,data=?,revision=revision+1,updated_at=? WHERE user_id=? AND id=? AND revision=?'+(expectedData?' AND data=?':'')).bind(data.name,json,Date.now(),this.userId,data.id,revision,...(expectedData?[storedSnapshots.get(expectedData)||JSON.stringify(expectedData)]:[]));
@@ -73,17 +75,18 @@ export class CourseRepository {
     return revision+1;
   }
   async recordReceipt(data,revision,expectedData){
-    const packed=packCourse(data);
+    const packed=await packCourse(data);
     const write=this.db.prepare('UPDATE courses SET data=? WHERE user_id=? AND id=? AND revision=? AND data=?').bind(packed.json,this.userId,data.id,revision,storedSnapshots.get(expectedData)||JSON.stringify(expectedData));
     const [result]=await this.db.batch([write,...this.contentWrites(data.id,packed,expectedData)]);
     if(result.meta.changes!==1)throw Object.assign(new Error('Your course changed. Refresh and retry.'),{code:'conflict'});
     return revision;
   }
-  contentWrites(id,{writeId,content,assetIds},expectedData){
+  contentWrites(id,{writeId,content,assetIds,images},expectedData){
     // Only the winning snapshot write may replace its source rows. The unique
     // token also protects receipt writes that intentionally retain the revision.
     const current="EXISTS(SELECT 1 FROM courses WHERE user_id=? AND id=? AND json_extract(data,'$._sourceStorage.writeId')=?)";
     const hasPrevious=externalSnapshots.has(expectedData),previous=hasPrevious?sourceEntries(expectedData):new Map(),nextIds=new Set(content.map(entry=>entry.id)),statements=[];
+    for(const [imageId,dataUrl] of images)statements.push(this.db.prepare(`INSERT OR IGNORE INTO source_visuals(user_id,course_id,id,data_url) SELECT ?,?,?,? WHERE ${current}`).bind(this.userId,id,imageId,dataUrl,this.userId,id,writeId));
     if(!hasPrevious)statements.push(this.db.prepare(`DELETE FROM course_source_content WHERE user_id=? AND course_id=? AND ${current}`).bind(this.userId,id,this.userId,id,writeId));
     for(const sourceId of previous.keys())if(!nextIds.has(sourceId))statements.push(this.db.prepare(`DELETE FROM course_source_content WHERE user_id=? AND course_id=? AND source_id=? AND ${current}`).bind(this.userId,id,sourceId,this.userId,id,writeId));
     for(const entry of content){const old=previous.get(entry.id);if(old&&old.text===entry.text&&old.pages===entry.pages&&old.visualPdf===entry.visualPdf&&old.position===entry.position)continue;statements.push(this.db.prepare(`INSERT INTO course_source_content(user_id,course_id,source_id,text,pages,visual_pdf,position) SELECT ?,?,?,?,?,?,? WHERE ${current} ON CONFLICT(user_id,course_id,source_id) DO UPDATE SET text=excluded.text,pages=excluded.pages,visual_pdf=excluded.visual_pdf,position=excluded.position`).bind(this.userId,id,entry.id,entry.text,entry.pages,entry.visualPdf??null,entry.position,this.userId,id,writeId));}

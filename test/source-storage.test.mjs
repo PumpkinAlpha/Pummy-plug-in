@@ -55,3 +55,36 @@ test('exam answers and unchanged sync receipts do not rewrite stored lecture con
  await call('submit_answer',{courseId:state.courseId,revision:current.revision,sessionId:current.session.id,questionId:current.question.id,choices:[0]});
  assert.equal(new Map((await repo.get(state.courseId)).data.texts).get(lecture.id),lecture.text);
 });
+
+test('large repeated candidate and exam figures round-trip outside the snapshot with immutable archive copies',async t=>{
+ const {db,repo,state}=await setup(t),before=await repo.get(state.courseId),next=structuredClone(before.data),image='data:image/png;base64,'+'A'.repeat(600000);
+ next.questions[0].figure={dataUrl:image,alt:'Original diagram'};
+ next.bankRepairs=[{candidates:[{question:{figure:{dataUrl:image}}}]}];
+ next.history=[{questions:[{image}]}];
+ const revision=await repo.save(next,before.revision,before.data),reopened=await repo.get(state.courseId);
+ assert.equal(reopened.revision,revision);assert.deepEqual(reopened.data,next);
+ assert.equal(db.db.prepare("SELECT count(*) AS n FROM source_visuals WHERE id LIKE 'media:%'").get().n,1);
+ const raw=db.db.prepare('SELECT data FROM courses WHERE id=?').get(state.courseId).data;
+ assert.ok(Buffer.byteLength(raw)<900000);assert.ok(!raw.includes(image));
+ assert.equal(await new CourseRepository(db,'another-user').get(state.courseId),null);
+ // Original source visuals can be removed without deleting independent question copies.
+ db.db.prepare('INSERT INTO source_visuals VALUES(?,?,?,?)').run('storage-owner',state.courseId,'visual:original',image);
+ db.db.prepare('DELETE FROM source_visuals WHERE id=?').run('visual:original');
+ assert.deepEqual((await repo.get(state.courseId)).data,next);
+ await repo.recordReceipt(next,revision,reopened.data);assert.deepEqual((await repo.get(state.courseId)).data,next);
+ await repo.delete(state.courseId,revision);assert.equal(db.db.prepare('SELECT count(*) AS n FROM source_visuals').get().n,0);
+});
+
+test('image writes roll back atomically and stale writes cannot leak images or replace winning bytes',async t=>{
+ const {db,repo,state}=await setup(t),before=await repo.get(state.courseId),next=structuredClone(before.data);
+ next.questions[0].figure={dataUrl:'data:image/png;base64,AAAA'};
+ db.db.exec("CREATE TRIGGER reject_image BEFORE INSERT ON source_visuals BEGIN SELECT RAISE(ABORT,'image storage interrupted'); END");
+ await assert.rejects(repo.save(next,before.revision,before.data),/image storage interrupted/);assert.deepEqual(await repo.get(state.courseId),before);
+ db.db.exec('DROP TRIGGER reject_image');
+ await repo.save(next,before.revision,before.data);
+ const loser=structuredClone(before.data);loser.questions[0].image='data:image/png;base64,BBBB';
+ await assert.rejects(repo.save(loser,before.revision,before.data),/changed in another window/);
+ assert.equal(db.db.prepare('SELECT count(*) AS n FROM source_visuals').get().n,1);assert.deepEqual((await repo.get(state.courseId)).data,next);
+ db.db.exec('DELETE FROM source_visuals');
+ await assert.rejects(repo.get(state.courseId),/saved question image is unavailable/);
+});

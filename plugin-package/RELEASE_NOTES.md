@@ -1,3 +1,9 @@
+# Pummy Adaptive Test 1.0.11
+
+Runtime 0.6.5 stores immutable question-image bytes separately from the course snapshot, deduplicating repeated candidate and exam copies. Original images round-trip unchanged; atomic revision guards protect concurrent saves and failed writes. Source deletion preserves independent question figures; course deletion removes all copies. Existing text and archive size limits remain. This fixes the course-capacity failure found while saving reviewed original-figure questions.
+
+Previous release (1.0.10):
+
 # Pummy Adaptive Test 1.0.10
 
 Runtime 0.6.4 resolves large original diagrams by their saved visual ID when staging through the cached connector transport. The server retrieves the exact course-owned bytes before applying native question and provenance validation. No source text or original file is replaced.
