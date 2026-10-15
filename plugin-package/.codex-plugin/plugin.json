@@ -15,7 +15,7 @@
     "composerIconDark": "./assets/pummy-logo.png"
   },
   "name": "dev-5ed088f70be481919dbe83559d58d046",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Adaptive practice exams with foundation questions, saved progress, and Pummy.Ai question bank import.",
   "author": {
     "name": "App developer"

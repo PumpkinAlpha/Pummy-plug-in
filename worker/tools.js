@@ -109,7 +109,16 @@ async function saveNewCourse(repo,model){
 }
 export async function executeTool(repo,name,raw){
  const compatibility=bankCompatibilityCall(name,raw,definitions);
- if(compatibility)return compatibility.result||executeTool(repo,compatibility.name,compatibility.args);
+ if(compatibility){
+  if(compatibility.result)return compatibility.result;
+  if(compatibility.name==='stage_bank_questions')for(const q of compatibility.args.questions||[]){
+   if(!q.visualId||!q.figure||q.figure.dataUrl)continue;
+   const row=await repo.db.prepare('SELECT data_url FROM source_visuals WHERE user_id=? AND course_id=? AND id=?').bind(repo.userId,compatibility.args.courseId,q.visualId).first();
+   if(!row)throw Error('Prepared original visual not found for this course. Read its original page before staging.');
+   q.figure.dataUrl=row.data_url;
+  }
+  return executeTool(repo,compatibility.name,compatibility.args);
+ }
  const restoring=name==='restore_saved_bank'||name==='append_saved_bank';
  const def=definitions.find(t=>t.name===name);if(!def)throw new Error('Unknown tool.');const parsed=def.schema.safeParse(raw);if(!parsed.success){const issue=parsed.error.issues[0];throw Object.assign(new Error(`Check ${issue.path.join('.')||'the request'}: ${issue.message}. ${name==='sync_course_sources'?'Sync rejected; no changes were saved.':'For imports, use a supported question format with a complete key.'}`),name==='sync_course_sources'?{sync:{added:[],updated:[],unchanged:[],rejected:parsed.error.issues.map(i=>({path:i.path.join('.'),message:i.message}))}}:{});}let args=parsed.data;
  if(restoring)name=name==='restore_saved_bank'?'import_questions':'add_questions';

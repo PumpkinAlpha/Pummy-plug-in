@@ -1,3 +1,9 @@
+# Pummy Adaptive Test 1.0.10
+
+Runtime 0.6.4 resolves large original diagrams by their saved visual ID when staging through the cached connector transport. The server retrieves the exact course-owned bytes before applying native question and provenance validation. No source text or original file is replaced.
+
+Previous release (1.0.9):
+
 # Pummy Adaptive Test 1.0.9
 
 Runtime 0.6.3 adapts the review transport to the actual cached connector question schema: a reserved marker packet uses existing question fields, is intercepted before import and calls the same native repair operations. No framing question is saved. 298 automated tests pass, including real MCP input-schema validation, plus browser checks for original-figure preparation and all question formats. This corrects the connector-side validation discovered during live verification of 1.0.8. Source review and separate independent approval remain mandatory.
